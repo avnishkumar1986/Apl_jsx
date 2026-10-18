@@ -1,0 +1,23 @@
+import { Breadcrumbs } from '@/components/breadcrumbs';
+import { TopbarActions } from '@/components/topbar/topbar-actions';
+import { TopbarUserMenu } from '@/components/topbar/topbar-user-menu';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { type BreadcrumbItem } from '@/types';
+
+export function Topbar({ breadcrumbs = [] }: { breadcrumbs?: BreadcrumbItem[] }) {
+    return (
+        <header className="after:bg-brand-gold relative flex h-16 min-w-0 shrink-0 items-center border-b border-slate-200 bg-white px-2 shadow-sm shadow-slate-900/5 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-16 sm:px-4">
+            <div className="flex min-w-0 items-center gap-2">
+                <SidebarTrigger className="hover:bg-brand-aqua/15 hover:text-brand-teal text-slate-500" />
+                <div className="hidden min-w-0 md:block">
+                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+                </div>
+            </div>
+            <div className="ml-auto flex items-center">
+                <TopbarActions />
+                <div className="mx-2 h-7 w-px bg-slate-200" />
+                <TopbarUserMenu />
+            </div>
+        </header>
+    );
+}

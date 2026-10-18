@@ -1,0 +1,28 @@
+<?php
+
+test('registration screen can be rendered', function () {
+    $response = $this->get('/register');
+
+    $response->assertStatus(200);
+});
+
+test('new users can register', function () {
+    $response = $this->post('/register', [
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect(route('dashboard', absolute: false));
+    $this->assertDatabaseHas('tbl_usrlogin', [
+        'login_name' => 'test@example.com',
+        'status' => 1,
+    ]);
+    $this->assertDatabaseHas('tbl_usrcontact', [
+        'email' => 'test@example.com',
+        'is_primary' => true,
+        'status' => 1,
+    ]);
+});

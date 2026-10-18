@@ -1,0 +1,340 @@
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../Modules/**/Resources/js/**/*.tsx';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-brand-gold: var(--brand-gold);
+    --color-brand-berry: var(--brand-berry);
+    --color-brand-plum: var(--brand-plum);
+    --color-brand-teal: var(--brand-teal);
+    --color-brand-aqua: var(--brand-aqua);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
+
+:root {
+    --brand-gold: #ffb703;
+    --brand-berry: #fb8500;
+    --brand-plum: #023047;
+    --brand-teal: #219ebc;
+    --brand-aqua: #8ecae6;
+    --brand-blue: #219ebc;
+    --brand-orange: #fb8500;
+    --brand-slate: #023047;
+    --brand-silver: #8ecae6;
+    --brand-grey: #64748b;
+    --background: #f5f9fb;
+    --foreground: #000000;
+    --card: hsl(0, 0%, 100%);
+    --card-foreground: #000000;
+    --popover: hsl(0, 0%, 100%);
+    --popover-foreground: #000000;
+    --primary: #219ebc;
+    --primary-foreground: hsl(0, 0%, 98%);
+    --secondary: #e5f4fa;
+    --secondary-foreground: #023047;
+    --muted: #eef5f8;
+    --muted-foreground: #000000;
+    --accent: #fff4d0;
+    --accent-foreground: #023047;
+    --destructive: #d95000;
+    --destructive-foreground: hsl(0, 0%, 98%);
+    --border: #d7e5eb;
+    --input: #c7dbe4;
+    --ring: #219ebc;
+    --chart-1: #219ebc;
+    --chart-2: #ffb703;
+    --chart-3: #023047;
+    --chart-4: #fb8500;
+    --chart-5: #8ecae6;
+    --radius: 0.5rem;
+    --sidebar-background: #023047;
+    --sidebar-foreground: #f4fbfe;
+    --sidebar-primary: #219ebc;
+    --sidebar-primary-foreground: hsl(0, 0%, 98%);
+    --sidebar-accent: #219ebc;
+    --sidebar-accent-foreground: hsl(0, 0%, 100%);
+    --sidebar-border: #174d65;
+    --sidebar-ring: #ffb703;
+}
+
+.dark {
+    --background: hsl(0, 0%, 3.9%);
+    --foreground: hsl(0, 0%, 98%);
+    --card: hsl(0, 0%, 3.9%);
+    --card-foreground: hsl(0, 0%, 98%);
+    --popover: hsl(0, 0%, 3.9%);
+    --popover-foreground: hsl(0, 0%, 98%);
+    --primary: hsl(0, 0%, 98%);
+    --primary-foreground: hsl(0, 0%, 9%);
+    --secondary: hsl(0, 0%, 14.9%);
+    --secondary-foreground: hsl(0, 0%, 98%);
+    --muted: hsl(0, 0%, 6.9%);
+    --muted-foreground: hsl(0, 0%, 63.9%);
+    --accent: hsl(0, 0%, 14.9%);
+    --accent-foreground: hsl(0, 0%, 98%);
+    --destructive: hsl(0, 84%, 60%);
+    --destructive-foreground: hsl(0, 0%, 98%);
+    --border: hsl(0, 0%, 14.9%);
+    --input: hsl(0, 0%, 14.9%);
+    --ring: hsl(0, 0%, 83.1%);
+    --chart-1: hsl(220, 70%, 50%);
+    --chart-2: hsl(160, 60%, 45%);
+    --chart-3: hsl(30, 80%, 55%);
+    --chart-4: hsl(280, 65%, 60%);
+    --chart-5: hsl(340, 75%, 55%);
+    --sidebar-background: hsl(0, 0%, 7%);
+    --sidebar-foreground: hsl(0, 0%, 80%);
+    --sidebar-primary: hsl(360, 100%, 100%);
+    --sidebar-primary-foreground: hsl(0, 0%, 100%);
+    --sidebar-accent: hsl(0, 0%, 15.9%);
+    --sidebar-accent-foreground: hsl(240, 4.8%, 95.9%);
+    --sidebar-border: hsl(0, 0%, 15.9%);
+    --sidebar-ring: hsl(217.2, 91.2%, 59.8%);
+}
+
+@layer base {
+    html {
+        font-size: clamp(14px, calc(12px + 0.25vw), 17px);
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        max-width: 100%;
+        overflow-x: clip;
+    }
+
+    @media (min-width: 1920px) {
+        html {
+            font-size: clamp(17px, calc(13.5px + 0.18vw), 18px);
+        }
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        min-width: 0;
+        min-height: 100dvh;
+        max-width: 100%;
+        overflow-x: clip;
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    }
+
+    #app,
+    main,
+    section,
+    form,
+    fieldset {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    img,
+    video,
+    canvas {
+        max-width: 100%;
+        height: auto;
+    }
+
+    input,
+    select,
+    textarea {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    table thead {
+        font-size: 0.875rem !important;
+        line-height: 1.25rem !important;
+    }
+
+    ::selection {
+        background: color-mix(in srgb, var(--brand-blue) 25%, white);
+    }
+
+    :focus-visible {
+        outline-color: var(--brand-orange);
+    }
+}
+
+@layer components {
+    .corporate-card {
+        @apply border-border bg-card shadow-sm shadow-slate-900/5;
+    }
+
+    /* Keep text fully legible on white application surfaces. Colored controls
+       retain their own foreground colors because they carry a background class. */
+    :is(.bg-white, .bg-card, .corporate-card) :where([class*='text-slate-'], [class*='text-gray-'], .text-muted-foreground):not([class*='bg-']) {
+        color: #000 !important;
+    }
+
+    :is(.bg-white, .bg-card, .corporate-card) :where(input, select, textarea, table, label) {
+        color: #000;
+    }
+
+    .corporate-page-title {
+        @apply text-3xl font-semibold tracking-tight text-slate-800;
+    }
+
+    .corporate-eyebrow {
+        color: var(--brand-blue);
+        @apply text-xs font-semibold tracking-[0.16em] uppercase;
+    }
+
+    /* Keep every application data table compact and consistent. */
+    table thead th {
+        padding-top: 0.65rem !important;
+        padding-bottom: 0.65rem !important;
+    }
+
+    table tbody td {
+        padding-top: 0.7rem !important;
+        padding-bottom: 0.7rem !important;
+    }
+
+    [class~='overflow-x-auto'],
+    [class~='overflow-auto'] {
+        overscroll-behavior-inline: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .form-fieldset {
+        @apply mx-4 my-4 min-w-0 rounded-lg border border-slate-300 px-4 pb-4 sm:mx-7;
+    }
+
+    .form-fieldset > legend {
+        @apply text-brand-teal bg-white px-2 text-xs font-bold tracking-wide;
+    }
+
+    /* Consistent compact spacing between controls in every fieldset form. */
+    .form-fieldset > .grid {
+        gap: 0.75rem !important;
+    }
+
+    .form-fieldset > .space-y-4 > *,
+    .form-fieldset > .space-y-5 > *,
+    .form-fieldset > .space-y-6 > * {
+        margin-block: 0 !important;
+    }
+
+    .form-fieldset > .space-y-4 > * + *,
+    .form-fieldset > .space-y-5 > * + *,
+    .form-fieldset > .space-y-6 > * + * {
+        margin-top: 0.75rem !important;
+    }
+
+    .sidebar-corporate-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgb(143 166 190 / 45%) transparent;
+    }
+
+    .sidebar-corporate-scroll::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar-corporate-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-corporate-scroll::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgb(143 166 190 / 45%);
+    }
+}
+
+@media (max-width: 639px) {
+    table thead,
+    table thead th {
+        font-size: 0.75rem !important;
+        line-height: 1rem !important;
+    }
+
+    table thead th,
+    table tbody td {
+        padding-top: 0.55rem !important;
+        padding-bottom: 0.55rem !important;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+
+    .form-fieldset {
+        margin-inline: 0.75rem;
+        padding-inline: 0.75rem;
+    }
+}
