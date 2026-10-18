@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\UserLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class DashboardLocationController extends Controller
 {
@@ -18,12 +21,58 @@ class DashboardLocationController extends Controller
             'location_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        UserLocation::query()->updateOrCreate(
-            ['user_id' => $request->user()->getKey()],
-            $validated,
-        );
+        UserLocation::query()->create([
+            'user_id' => $request->user()->getKey(),
+            ...$validated,
+            'captured_at' => now(),
+        ]);
 
         return back();
+    }
+
+    public function report(Request $request): InertiaResponse
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'user_id' => ['nullable', 'integer'],
+        ]);
+        $isSuperAdmin = $request->user()->hasRole('Super Admin');
+
+        $locations = UserLocation::query()
+            ->with('user:id,first_name,last_name')
+            ->when(! $isSuperAdmin, fn ($query) => $query->where('user_id', $request->user()->getKey()))
+            ->when($isSuperAdmin && isset($validated['user_id']), fn ($query) => $query->where('user_id', $validated['user_id']))
+            ->when(isset($validated['from']), fn ($query) => $query->whereDate('captured_at', '>=', $validated['from']))
+            ->when(isset($validated['to']), fn ($query) => $query->whereDate('captured_at', '<=', $validated['to']))
+            ->latest('captured_at')
+            ->paginate(50)
+            ->withQueryString()
+            ->through(fn (UserLocation $location): array => [
+                'id' => $location->id,
+                'userId' => $location->user_id,
+                'userName' => $location->user?->name ?? 'Deleted user',
+                'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
+                'latitude' => $location->latitude,
+                'longitude' => $location->longitude,
+                'capturedAt' => $location->captured_at?->toIso8601String() ?? $location->created_at->toIso8601String(),
+            ]);
+
+        return Inertia::render('location-report', [
+            'locations' => $locations,
+            'filters' => [
+                'from' => $validated['from'] ?? '',
+                'to' => $validated['to'] ?? '',
+                'userId' => $validated['user_id'] ?? '',
+            ],
+            'canFilterUsers' => $isSuperAdmin,
+            'users' => $isSuperAdmin
+                ? User::query()->where('status', true)->orderBy('first_name')->get(['id', 'first_name', 'last_name'])->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ])
+                : [],
+        ]);
     }
 
     public function markSessionClosing(Request $request): Response

@@ -423,10 +423,18 @@ export default function Dashboard({
                                         <span className="bg-brand-teal h-4 w-1 rounded-full" />
                                         Logged-in user locations
                                     </CardTitle>
-                                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                                        <span className="size-1.5 rounded-full bg-emerald-500" />
-                                        {isSuperAdmin ? `${visibleUserLocations.length} active` : 'My location'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Link
+                                            href="/dashboard/location-report"
+                                            className="text-brand-teal hover:bg-brand-aqua/10 rounded-md px-2 py-1 text-[10px] font-semibold"
+                                        >
+                                            View report
+                                        </Link>
+                                        <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                                            <span className="size-1.5 rounded-full bg-emerald-500" />
+                                            {isSuperAdmin ? `${visibleUserLocations.length} active` : 'My location'}
+                                        </span>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5">

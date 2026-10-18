@@ -135,6 +135,7 @@ Route::middleware(['auth'])->group(function () {
         $userLocations = UserLocation::query()
             ->with('user:id,first_name,last_name')
             ->whereIn('user_id', $activeUserIds)
+            ->whereIn('id', UserLocation::query()->selectRaw('MAX(id)')->groupBy('user_id'))
             ->when(
                 ! $request->user()->hasRole('Super Admin'),
                 fn ($query) => $query->where('user_id', $request->user()->getKey()),
@@ -145,8 +146,8 @@ Route::middleware(['auth'])->group(function () {
                 'name' => $location->user->name,
                 'latitude' => $location->latitude,
                 'longitude' => $location->longitude,
-                'locationName' => $location->location_name ?: 'Noida, Uttar Pradesh, India',
-                'lastSeen' => $location->updated_at->toIso8601String(),
+                'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
+                'lastSeen' => ($location->captured_at ?? $location->updated_at)->toIso8601String(),
                 'devices' => $activeSessions
                     ->where('user_id', $location->user_id)
                     ->map(fn (object $session): string => $deviceNameForUserAgent($session->user_agent))
@@ -213,6 +214,9 @@ Route::middleware(['auth'])->group(function () {
     })->middleware('permission:dashboard.view')->name('dashboard');
 
     Route::post('dashboard/location', [DashboardLocationController::class, 'store'])->middleware('permission:dashboard.view')->name('dashboard.location.store');
+    Route::get('dashboard/location-report', [DashboardLocationController::class, 'report'])
+        ->middleware('permission:dashboard.view')
+        ->name('dashboard.location-report');
     Route::post('dashboard/session-closing', [DashboardLocationController::class, 'markSessionClosing'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.session-closing');

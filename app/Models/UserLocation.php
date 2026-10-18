@@ -12,6 +12,7 @@ class UserLocation extends Model
         'latitude',
         'longitude',
         'location_name',
+        'captured_at',
     ];
 
     protected function casts(): array
@@ -19,6 +20,7 @@ class UserLocation extends Model
         return [
             'latitude' => 'float',
             'longitude' => 'float',
+            'captured_at' => 'datetime',
         ];
     }
 
