@@ -21,11 +21,15 @@ class DashboardLocationController extends Controller
             'location_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        UserLocation::query()->create([
-            'user_id' => $request->user()->getKey(),
+        $location = UserLocation::query()
+            ->where('user_id', $request->user()->getKey())
+            ->latest('id')
+            ->firstOrNew(['user_id' => $request->user()->getKey()]);
+
+        $location->fill([
             ...$validated,
             'captured_at' => now(),
-        ]);
+        ])->save();
 
         return back();
     }
@@ -41,6 +45,7 @@ class DashboardLocationController extends Controller
 
         $locations = UserLocation::query()
             ->with('user:id,first_name,last_name')
+            ->whereIn('id', UserLocation::query()->selectRaw('MAX(id)')->groupBy('user_id'))
             ->when(! $isSuperAdmin, fn ($query) => $query->where('user_id', $request->user()->getKey()))
             ->when($isSuperAdmin && isset($validated['user_id']), fn ($query) => $query->where('user_id', $validated['user_id']))
             ->when(isset($validated['from']), fn ($query) => $query->whereDate('captured_at', '>=', $validated['from']))

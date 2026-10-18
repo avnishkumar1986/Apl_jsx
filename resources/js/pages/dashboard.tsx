@@ -439,22 +439,28 @@ export default function Dashboard({
                         </Card>
                         <Card className="corporate-card overflow-hidden">
                             <CardHeader className="border-b border-slate-100 px-5 py-4">
-                                <div className="flex items-center justify-between gap-3">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <span className="bg-brand-teal h-4 w-1 rounded-full" />
-                                        Logged-in user locations
+                                <div className="flex items-center justify-between gap-2">
+                                    <CardTitle className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap">
+                                        <span className="bg-brand-teal h-5 w-1 shrink-0 rounded-full" />
+                                        User locations
                                     </CardTitle>
                                     <div className="flex items-center gap-2">
                                         <Link
                                             href="/dashboard/location-report"
-                                            className="text-brand-teal hover:bg-brand-aqua/10 rounded-md px-2 py-1 text-[10px] font-semibold"
+                                            aria-label="View location report"
+                                            className="text-brand-teal hover:bg-brand-aqua/10 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition"
                                         >
-                                            View report
+                                            <span className="hidden sm:inline">Report</span> <ArrowRight className="size-3" />
                                         </Link>
-                                        <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                                            <span className="size-1.5 rounded-full bg-emerald-500" />
-                                            {isSuperAdmin ? `${visibleUserLocations.length} active` : 'My location'}
-                                        </span>
+                                        <div className="min-w-16 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-center">
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
+                                                <span className="text-lg leading-none font-bold text-emerald-700">{visibleUserLocations.length}</span>
+                                            </div>
+                                            <p className="mt-1 text-[8px] font-bold tracking-wide text-emerald-700 uppercase">
+                                                {visibleUserLocations.length === 1 ? 'Active user' : 'Active users'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -512,7 +518,9 @@ export default function Dashboard({
                                 </div>
                                 <div className="mt-4 text-center">
                                     <p className="text-sm font-semibold text-slate-800">
-                                        {isSuperAdmin ? 'Logged-in users with location' : auth.user.name}
+                                        {isSuperAdmin
+                                            ? `${visibleUserLocations.length} active ${visibleUserLocations.length === 1 ? 'employee' : 'employees'} across ${mapLocationGroups.length} ${mapLocationGroups.length === 1 ? 'location' : 'locations'}`
+                                            : auth.user.name}
                                     </p>
                                     {currentUserLocation ? (
                                         <div className="mt-1 text-[11px] text-slate-500">

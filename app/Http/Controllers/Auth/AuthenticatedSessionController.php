@@ -35,11 +35,15 @@ class AuthenticatedSessionController extends Controller
         $this->authenticationService->login($request);
 
         if ($request->filled(['latitude', 'longitude'])) {
-            UserLocation::query()->create([
-                'user_id' => $request->user()->getKey(),
+            $location = UserLocation::query()
+                ->where('user_id', $request->user()->getKey())
+                ->latest('id')
+                ->firstOrNew(['user_id' => $request->user()->getKey()]);
+
+            $location->fill([
                 ...$request->safe()->only(['latitude', 'longitude', 'location_name']),
                 'captured_at' => now(),
-            ]);
+            ])->save();
         }
 
         $destination = $request->user()->can('dashboard.view')
