@@ -328,7 +328,7 @@ export default function Dashboard({
         {
             label: 'Employees',
             value: organizationStats.employees,
-            href: '/admin/user-master',
+            href: '/admin/employee-hierarchy',
             icon: Users,
             color: '#fb8500',
             surface: 'bg-orange-100',

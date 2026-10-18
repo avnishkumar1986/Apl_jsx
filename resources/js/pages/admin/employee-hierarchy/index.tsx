@@ -67,10 +67,10 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
             <Head title="Employee hierarchy" />
             <div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto max-w-[1500px] space-y-5">
-                    <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-5 text-white shadow-lg">
+                    <header className="relative overflow-hidden rounded-2xl border-t-4 border-orange-400 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-5 text-white shadow-lg">
                         <Network className="absolute -right-8 -bottom-12 size-48 text-white/5" />
                         <div className="relative">
-                            <p className="text-brand-aqua text-[10px] font-bold tracking-[0.18em] uppercase">Organization structure</p>
+                            <p className="text-[10px] font-bold tracking-[0.18em] text-orange-300 uppercase">Organization structure</p>
                             <h1 className="mt-1 text-2xl font-bold">Employee hierarchy</h1>
                             <p className="mt-1 text-xs text-white/75">Company → Location → Department → Designation → Employee</p>
                         </div>
@@ -79,7 +79,7 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                         {statCards.map(([label, value, Icon]) => (
                             <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <span className="bg-brand-aqua/10 text-brand-teal grid size-10 place-items-center rounded-xl">
+                                <span className="grid size-10 place-items-center rounded-xl bg-orange-50 text-orange-600">
                                     <Icon className="size-5" />
                                 </span>
                                 <div>
@@ -96,7 +96,7 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search employee, company, location, department, designation, or role..."
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-white pr-4 pl-10 text-sm shadow-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white pr-4 pl-10 text-sm shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                         />
                     </div>
 
@@ -108,20 +108,20 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                                 className="group min-w-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                             >
                                 <summary className="flex cursor-pointer list-none items-center gap-3 bg-slate-50 px-4 py-4 marker:hidden">
-                                    <span className="bg-brand-teal grid size-10 place-items-center rounded-xl text-white">
+                                    <span className="grid size-10 place-items-center rounded-xl bg-orange-500 text-white">
                                         <Building2 className="size-5" />
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <h2 className="truncate text-sm font-bold text-slate-900">{company}</h2>
                                         <p className="text-[10px] text-slate-500">{Object.keys(locations).length} locations</p>
                                     </div>
-                                    <ChevronDown className="text-brand-teal size-4 transition-transform group-open:rotate-180" />
+                                    <ChevronDown className="size-4 text-orange-500 transition-transform group-open:rotate-180" />
                                 </summary>
                                 <div className="space-y-3 p-3 sm:p-4">
                                     {Object.entries(locations).map(([location, departments]) => (
                                         <details key={location} open className="group/location overflow-hidden rounded-xl border border-slate-200">
-                                            <summary className="flex cursor-pointer list-none items-center gap-2 bg-cyan-50/60 px-3 py-3 marker:hidden">
-                                                <MapPin className="text-brand-teal size-4" />
+                                            <summary className="flex cursor-pointer list-none items-center gap-2 bg-orange-50/70 px-3 py-3 marker:hidden">
+                                                <MapPin className="size-4 text-orange-500" />
                                                 <span className="flex-1 text-xs font-bold text-slate-800">{location}</span>
                                                 <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open/location:rotate-180" />
                                             </summary>
@@ -129,7 +129,7 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                                                 {Object.entries(departments).map(([department, designations]) => (
                                                     <div key={department} className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
                                                         <h3 className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-800">
-                                                            <Network className="size-4 text-indigo-500" />
+                                                            <Network className="size-4 text-orange-500" />
                                                             {department}
                                                         </h3>
                                                         <div className="grid gap-3 2xl:grid-cols-2">
@@ -147,7 +147,7 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                                                                     <div className="divide-y divide-slate-100">
                                                                         {employees.map((employee) => (
                                                                             <div key={employee.id} className="flex items-center gap-2.5 px-3 py-2.5">
-                                                                                <span className="bg-brand-aqua/10 text-brand-teal grid size-8 place-items-center rounded-full text-[10px] font-bold">
+                                                                                <span className="grid size-8 place-items-center rounded-full bg-orange-50 text-[10px] font-bold text-orange-600">
                                                                                     {employee.employeeName
                                                                                         .split(' ')
                                                                                         .map((part) => part[0])
