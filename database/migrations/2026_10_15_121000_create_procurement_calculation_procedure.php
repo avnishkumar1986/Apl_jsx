@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_refresh_procurement_consumption_calculation');
         DB::unprepared(<<<'SQL'
             CREATE PROCEDURE sp_refresh_procurement_consumption_calculation(IN p_consumption_id BIGINT UNSIGNED)
@@ -46,6 +50,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_refresh_procurement_consumption_calculation');
     }
 };

@@ -41,6 +41,9 @@ class UserFactory extends Factory
                     'status' => $user->status,
                 ],
             );
+
+            $user->unsetRelation('login');
+            $user->unsetRelation('primaryEmail');
         });
     }
 

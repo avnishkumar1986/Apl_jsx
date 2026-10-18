@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -236,12 +237,14 @@ class User extends Authenticatable implements JWTSubject
 
     public function getNameAttribute(): string
     {
-        return trim(collect([$this->first_name, $this->middle_name, $this->last_name])->filter()->implode(' ')) ?: ($this->pendingName ?? 'User');
+        return trim(collect([$this->first_name, $this->middle_name, $this->last_name])->filter()->implode(' '))
+            ?: ($this->attributes['name'] ?? $this->pendingName ?? 'User');
     }
 
     public function setNameAttribute(?string $value): void
     {
         $this->pendingName = $value;
+        $this->attributes['name'] = $value;
     }
 
     public function getEmailVerifiedAtAttribute(): mixed

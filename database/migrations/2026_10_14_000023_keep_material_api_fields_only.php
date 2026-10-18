@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::table('tbl_materials', function (Blueprint $table) {
             $table->dropUnique('materials_matnr_plant_unique');
+            $table->dropIndex('tbl_materials_plant_index');
             $table->dropColumn(['plant', 'current_stock', 'stock_value']);
             $table->json('api_payload')->nullable()->after('maktx');
             $table->unique('matnr', 'materials_matnr_unique');

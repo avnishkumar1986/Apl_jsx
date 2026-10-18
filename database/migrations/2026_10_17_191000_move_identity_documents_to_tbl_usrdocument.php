@@ -38,6 +38,8 @@ return new class extends Migration
             });
 
             Schema::table('tbl_users', function (Blueprint $table): void {
+                $table->dropUnique('tbl_users_aadhaar_number_unique');
+                $table->dropUnique('tbl_users_pan_number_unique');
                 $table->dropColumn(['aadhaar_number', 'aadhaar_image', 'pan_number', 'pan_image']);
             });
         }

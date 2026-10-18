@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement(<<<'SQL'
             CREATE OR REPLACE VIEW vw_procurement_consumption_sheet AS
             SELECT
@@ -145,6 +149,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::unprepared('DROP PROCEDURE IF EXISTS sp_refresh_procurement_consumption_calculation');
     }
 };

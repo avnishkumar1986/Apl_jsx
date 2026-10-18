@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('DROP VIEW IF EXISTS vw_procurement_purchase_receipts');
         DB::statement(<<<'SQL'
             CREATE VIEW vw_procurement_purchase_receipts AS
@@ -73,6 +77,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('DROP VIEW IF EXISTS vw_procurement_purchase_receipts');
     }
 };

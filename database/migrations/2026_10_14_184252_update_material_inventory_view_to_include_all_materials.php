@@ -11,6 +11,41 @@ return new class extends Migration
     public function up(): void
     {
         DB::statement('DROP VIEW IF EXISTS vw_material_inventory');
+
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(<<<'SQL'
+                CREATE VIEW vw_material_inventory AS
+                SELECT
+                    materials.id AS material_id,
+                    materials.matnr,
+                    materials.maktx,
+                    materials.mtart,
+                    materials.matkl,
+                    materials.meins,
+                    GROUP_CONCAT(DISTINCT stocks.plant_code) AS plant_code,
+                    GROUP_CONCAT(DISTINCT COALESCE(plants.company_name, stocks.plant_code)) AS plant_name,
+                    COALESCE(SUM(CASE WHEN stocks.status = 1 THEN stocks.current_stock ELSE 0 END), 0) AS current_stock,
+                    COALESCE(SUM(CASE WHEN stocks.status = 1 THEN stocks.stock_value ELSE 0 END), 0) AS stock_value,
+                    materials.status,
+                    MAX(stocks.synced_at) AS synced_at,
+                    MAX(materials.updated_at, COALESCE(MAX(stocks.updated_at), materials.updated_at)) AS updated_at
+                FROM tbl_materials materials
+                LEFT JOIN tbl_material_stocks stocks ON stocks.matnr = materials.matnr
+                LEFT JOIN tbl_company plants ON plants.company_code = stocks.plant_code
+                GROUP BY
+                    materials.id,
+                    materials.matnr,
+                    materials.maktx,
+                    materials.mtart,
+                    materials.matkl,
+                    materials.meins,
+                    materials.status,
+                    materials.updated_at
+            SQL);
+
+            return;
+        }
+
         DB::statement(<<<'SQL'
             CREATE VIEW vw_material_inventory AS
             SELECT
