@@ -1,4 +1,4 @@
-import { IndiaMapSilhouette } from '@/components/india-map-silhouette';
+import ProjectPageHeader from '@/components/project-page-header';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -13,6 +13,7 @@ type LocationRow = {
     locationName: string;
     latitude: number;
     longitude: number;
+    deviceName: string;
     capturedAt: string;
 };
 
@@ -64,23 +65,17 @@ export default function LocationReport({
             <Head title="Location report" />
             <div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto max-w-[1500px] space-y-4">
-                    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#087c98] to-[#19a8bf] p-5 text-white shadow-lg">
-                        <IndiaMapSilhouette className="absolute -top-20 right-4 h-72 w-60 rotate-6 text-white opacity-30" />
-                        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-3">
-                                <span className="grid size-11 place-items-center rounded-xl border border-white/20 bg-white/10">
-                                    <MapPin className="size-5" />
-                                </span>
-                                <div>
-                                    <h1 className="text-xl font-bold">User location history</h1>
-                                    <p className="mt-0.5 text-xs text-white/80">Date-wise location captures stored in the database</p>
-                                </div>
-                            </div>
+                    <ProjectPageHeader
+                        eyebrow="Location report"
+                        title="User location history"
+                        subtitle="Latest captured location for each employee"
+                        icon={<MapPin className="size-5" />}
+                        actions={
                             <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white">
                                 <ArrowLeft className="size-4" /> Dashboard
                             </Link>
-                        </div>
-                    </section>
+                        }
+                    />
 
                     <form
                         onSubmit={applyFilters}
@@ -148,6 +143,7 @@ export default function LocationReport({
                                         <th className="px-4 py-3">User</th>
                                         <th className="px-4 py-3">Location</th>
                                         <th className="px-4 py-3">Coordinates</th>
+                                        <th className="px-4 py-3">Device</th>
                                         <th className="px-4 py-3">Captured date and time</th>
                                     </tr>
                                 </thead>
@@ -160,6 +156,7 @@ export default function LocationReport({
                                             <td className="px-4 py-3 text-slate-600 tabular-nums">
                                                 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                                             </td>
+                                            <td className="px-4 py-3 font-medium text-slate-600">{location.deviceName}</td>
                                             <td className="px-4 py-3 text-slate-600">
                                                 {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(
                                                     new Date(location.capturedAt),
@@ -169,7 +166,7 @@ export default function LocationReport({
                                     ))}
                                     {!locations.data.length && (
                                         <tr>
-                                            <td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-500">
+                                            <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-500">
                                                 No location records found for the selected dates.
                                             </td>
                                         </tr>

@@ -1,5 +1,6 @@
 import InputError from '@/components/input-error';
 import { MasterDialogHeader } from '@/components/master/master-dialog-header';
+import { MasterPageHeader } from '@/components/master/master-page-header';
 import { StatusToggle } from '@/components/master/status-toggle';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
@@ -93,34 +94,25 @@ export default function Modules({
         <AppLayout breadcrumbs={[{ title: 'Module Registry', href: '/admin/modules' }]}>
             <Head title="Module Registry" />
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
-                <section className="rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-brand-teal/10 text-brand-teal grid size-10 place-items-center rounded-lg">
-                                <Boxes className="size-[18px]" />
-                            </span>
-                            <div>
-                                <p className="text-brand-teal text-[10px] font-bold tracking-[.16em] uppercase">Module registry</p>
-                                <h1 className="text-xl font-bold text-slate-900">Module Management</h1>
-                                <p className="text-xs text-slate-500">
-                                    {stats.total} modules · {stats.active} active
-                                </p>
-                            </div>
-                        </div>
-                        {canManage && (
+                <MasterPageHeader
+                    title="Module Management"
+                    description={`${stats.total} modules · ${stats.active} active`}
+                    icon={<Boxes className="size-5" />}
+                    action={
+                        canManage && (
                             <Button
                                 onClick={() => {
                                     form.setData(blank);
                                     form.clearErrors();
                                     setUploadOpen(true);
                                 }}
-                                className="bg-brand-teal h-9 px-4 font-semibold text-white"
+                                className="h-9 bg-orange-500 px-4 font-semibold text-white hover:bg-orange-600"
                             >
                                 <Plus className="size-4" /> Upload module
                             </Button>
-                        )}
-                    </div>
-                </section>
+                        )
+                    }
+                />
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-4 border-b px-5 py-4 md:flex-row md:items-center md:justify-between">
                         <div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserLocation;
+use App\Support\DeviceLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -28,6 +29,8 @@ class DashboardLocationController extends Controller
 
         $location->fill([
             ...$validated,
+            'device_name' => DeviceLabel::fromUserAgent($request->userAgent()),
+            'user_agent' => $request->userAgent(),
             'captured_at' => now(),
         ])->save();
 
@@ -60,6 +63,7 @@ class DashboardLocationController extends Controller
                 'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
                 'latitude' => $location->latitude,
                 'longitude' => $location->longitude,
+                'deviceName' => $location->device_name ?? DeviceLabel::fromUserAgent($location->user_agent),
                 'capturedAt' => $location->captured_at?->toIso8601String() ?? $location->created_at->toIso8601String(),
             ]);
 

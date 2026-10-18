@@ -1,10 +1,12 @@
 import InputError from '@/components/input-error';
+import ProjectPageHeader from '@/components/project-page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
+import { Users } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 type Role = { id: number; name: string };
@@ -51,12 +53,12 @@ export default function UsersIndex({ users, roles }: { users: User[]; roles: Rol
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="User access" />
             <div className="space-y-6 p-4 sm:p-5 md:p-8">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">User access</h1>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                        Assign normalized roles to users. Permissions are inherited through those roles.
-                    </p>
-                </div>
+                <ProjectPageHeader
+                    eyebrow="Security"
+                    title="User access"
+                    subtitle="Assign normalized roles to users. Permissions are inherited through those roles."
+                    icon={<Users className="size-5" />}
+                />
                 <div className="space-y-4">
                     {users.map((user) => (
                         <Card key={user.id}>

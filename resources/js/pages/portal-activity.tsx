@@ -1,3 +1,4 @@
+import ProjectPageHeader from '@/components/project-page-header';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -58,19 +59,17 @@ export default function PortalActivity({ logs, filters }: { logs: LogPage; filte
             <Head title="Portal activity" />
             <div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto max-w-[1500px] space-y-4">
-                    <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#07374b] to-[#0e8ca6] p-5 text-white shadow-lg">
-                        <History className="absolute -right-8 -bottom-10 size-44 text-white/5" />
-                        <div className="relative flex items-center justify-between gap-3">
-                            <div>
-                                <p className="text-brand-aqua text-[10px] font-bold tracking-widest uppercase">Audit trail</p>
-                                <h1 className="mt-1 text-2xl font-bold">Portal activity</h1>
-                                <p className="mt-1 text-xs text-white/75">Complete user request history and technical details</p>
-                            </div>
-                            <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold">
+                    <ProjectPageHeader
+                        eyebrow="Audit trail"
+                        title="Portal activity"
+                        subtitle="Complete user request history and technical details"
+                        icon={<History className="size-5" />}
+                        actions={
+                            <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-white">
                                 <ArrowLeft className="size-4" /> Dashboard
                             </Link>
-                        </div>
-                    </header>
+                        }
+                    />
                     <form
                         onSubmit={apply}
                         className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_.8fr_.8fr_auto_auto] xl:items-end"

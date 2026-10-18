@@ -1,9 +1,10 @@
+import ProjectPageHeader from '@/components/project-page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 type Permission = { id: number; name: string };
 type Role = { id: number; name: string; status: boolean; users_count: number; permissions: Permission[] };
@@ -14,19 +15,19 @@ export default function RolesIndex({ roles }: { roles: Role[] }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Roles & permissions" />
             <div className="space-y-5 p-4 sm:p-5 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Roles & permissions</h1>
-                        <p className="mt-1 text-sm text-slate-500">
-                            Create reusable roles and control access by company, department, designation, and permission.
-                        </p>
-                    </div>
-                    <Button asChild className="bg-brand-teal">
-                        <Link href="/admin/roles/create">
-                            <Plus className="size-4" /> Create role
-                        </Link>
-                    </Button>
-                </div>
+                <ProjectPageHeader
+                    eyebrow="Security"
+                    title="Roles & permissions"
+                    subtitle="Create reusable roles and control access by company, department, designation, and permission."
+                    icon={<ShieldCheck className="size-5" />}
+                    actions={
+                        <Button asChild className="bg-orange-500 text-white hover:bg-orange-600">
+                            <Link href="/admin/roles/create">
+                                <Plus className="size-4" /> Create role
+                            </Link>
+                        </Button>
+                    }
+                />
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {roles.map((role) => (
                         <Card key={role.id} className="border-slate-200 shadow-sm">

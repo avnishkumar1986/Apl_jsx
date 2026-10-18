@@ -1,5 +1,6 @@
 import InputError from '@/components/input-error';
 import { MasterDialogHeader } from '@/components/master/master-dialog-header';
+import { MasterPageHeader } from '@/components/master/master-page-header';
 import { StatusToggle } from '@/components/master/status-toggle';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -104,27 +105,18 @@ export default function Index({
         <AppLayout breadcrumbs={[{ title: 'Designation Level Master', href: '/admin/designation-levels' }]}>
             <Head title="Designation Level Master" />
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
-                <section className="rounded-xl border bg-white px-5 py-3 shadow-sm">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-brand-teal/10 text-brand-teal grid size-10 place-items-center rounded-lg">
-                                <BadgeCheck className="size-5" />
-                            </span>
-                            <div>
-                                <p className="text-brand-teal text-[10px] font-bold tracking-[.16em] uppercase">Master data</p>
-                                <h1 className="text-xl font-bold">Designation Level Master</h1>
-                                <p className="text-xs text-slate-500">
-                                    {stats.total} levels · {stats.active} active
-                                </p>
-                            </div>
-                        </div>
-                        {canManage && (
-                            <Button onClick={create} className="bg-brand-teal hover:bg-brand-plum">
+                <MasterPageHeader
+                    title="Designation Level Master"
+                    description={`${stats.total} levels · ${stats.active} active`}
+                    icon={<BadgeCheck className="size-5" />}
+                    action={
+                        canManage && (
+                            <Button onClick={create} className="bg-orange-500 text-white hover:bg-orange-600">
                                 <Plus className="size-4" /> Add level
                             </Button>
-                        )}
-                    </div>
-                </section>
+                        )
+                    }
+                />
                 <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
                     <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>

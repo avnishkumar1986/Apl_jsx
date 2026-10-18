@@ -1,6 +1,7 @@
 import InputError from '@/components/input-error';
 import { DataTableSortHeader } from '@/components/master/data-table-sort-header';
 import { MasterDialogHeader } from '@/components/master/master-dialog-header';
+import { MasterPageHeader } from '@/components/master/master-page-header';
 import { StatusToggle } from '@/components/master/status-toggle';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -128,31 +129,22 @@ export default function UserTypes({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="User Types" />
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
-                <section className="rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-brand-teal/10 text-brand-teal grid size-10 shrink-0 place-items-center rounded-lg">
-                                <ShieldCheck className="size-[18px]" />
-                            </span>
-                            <div className="min-w-0">
-                                <p className="text-brand-teal text-[10px] font-bold tracking-[0.16em] uppercase">Master data</p>
-                                <h1 className="text-xl font-bold text-slate-900">User Type Master</h1>
-                                <p className="text-xs text-slate-500">
-                                    {stats.total} user types · {stats.active} active · {stats.assignedUsers} assigned users
-                                </p>
-                            </div>
-                        </div>
-                        {canManage && (
+                <MasterPageHeader
+                    title="User Type Master"
+                    description={`${stats.total} user types · ${stats.active} active · ${stats.assignedUsers} assigned users`}
+                    icon={<ShieldCheck className="size-5" />}
+                    action={
+                        canManage && (
                             <Button
                                 type="button"
                                 onClick={openCreate}
-                                className="bg-brand-teal hover:bg-brand-plum h-9 shrink-0 px-4 font-semibold text-white shadow-sm"
+                                className="h-9 bg-orange-500 px-4 font-semibold text-white hover:bg-orange-600"
                             >
                                 <Plus className="size-4" /> Add user type
                             </Button>
-                        )}
-                    </div>
-                </section>
+                        )
+                    }
+                />
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">

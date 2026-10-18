@@ -12,6 +12,8 @@ class UserLocation extends Model
         'latitude',
         'longitude',
         'location_name',
+        'device_name',
+        'user_agent',
         'captured_at',
     ];
 

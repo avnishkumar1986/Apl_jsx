@@ -1,4 +1,5 @@
 import { IndiaMapSilhouette } from '@/components/india-map-silhouette';
+import ProjectPageHeader from '@/components/project-page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -357,24 +358,27 @@ export default function Dashboard({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
             <div className="min-h-full flex-1 bg-[#f1f3f8] p-4 md:p-5 lg:p-6">
-                <section className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back, {auth.user.name.split(' ')[0]}!</h1>
-                        <p className="mt-1 text-sm text-slate-500">Monitor your access, permissions, and administrative workspace.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                            <span className={`size-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-orange-500'}`} />
-                            Systems operational
-                        </span>
-                        <Link
-                            href="/settings/profile"
-                            className="bg-brand-teal hover:bg-brand-plum inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm"
-                        >
-                            <Settings2 className="size-4" /> Settings
-                        </Link>
-                    </div>
-                </section>
+                <div className="mb-5">
+                    <ProjectPageHeader
+                        eyebrow="Dashboard"
+                        title={`Welcome back, ${auth.user.name.split(' ')[0]}!`}
+                        subtitle="Monitor your access, permissions, and administrative workspace."
+                        actions={
+                            <>
+                                <span className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-2 text-xs font-medium text-white shadow-sm">
+                                    <span className={`size-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-orange-500'}`} />
+                                    Systems operational
+                                </span>
+                                <Link
+                                    href="/settings/profile"
+                                    className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
+                                >
+                                    <Settings2 className="size-4" /> Settings
+                                </Link>
+                            </>
+                        }
+                    />
+                </div>
 
                 {((procurementActive && canViewProcurement) || (salesActive && canViewSales)) && (
                     <nav className="mb-5 flex flex-wrap items-center gap-2" aria-label="Business modules">

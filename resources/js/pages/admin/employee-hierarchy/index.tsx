@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { BadgeCheck, Building2, ChevronDown, MapPin, Network, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import ProjectPageHeader from '@/components/project-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 
@@ -67,14 +68,11 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
             <Head title="Employee hierarchy" />
             <div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto max-w-[1500px] space-y-5">
-                    <header className="relative overflow-hidden rounded-2xl border-t-4 border-orange-400 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-5 text-white shadow-lg">
-                        <Network className="absolute -right-8 -bottom-12 size-48 text-white/5" />
-                        <div className="relative">
-                            <p className="text-[10px] font-bold tracking-[0.18em] text-orange-300 uppercase">Organization structure</p>
-                            <h1 className="mt-1 text-2xl font-bold">Employee hierarchy</h1>
-                            <p className="mt-1 text-xs text-white/75">Company → Location → Department → Designation → Employee</p>
-                        </div>
-                    </header>
+                    <ProjectPageHeader
+                        eyebrow="Organization structure"
+                        title="Employee hierarchy"
+                        subtitle="Company → Location → Department → Designation → Employee"
+                    />
 
                     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                         {statCards.map(([label, value, Icon]) => (

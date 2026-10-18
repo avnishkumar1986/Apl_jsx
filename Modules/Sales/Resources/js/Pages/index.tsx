@@ -1,3 +1,4 @@
+import ProjectPageHeader from '@/components/project-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Building2, IndianRupee, ShoppingBag, Target, TrendingUp, Wallet } from 'lucide-react';
@@ -16,27 +17,20 @@ export default function Sales({ dashboard }: { dashboard: Dashboard }) {
         <AppLayout breadcrumbs={[{ title: 'Sales', href: '/admin/sales' }]}>
             <Head title="Sales" />
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
-                <section className="rounded-xl border bg-white px-5 py-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <span className="bg-brand-teal/10 text-brand-teal grid size-11 place-items-center rounded-lg">
-                            <TrendingUp className="size-5" />
-                        </span>
-                        <div>
-                            <p className="text-brand-teal text-[10px] font-bold tracking-[.16em] uppercase">Laravel service</p>
-                            <h1 className="text-xl font-bold">Sales</h1>
-                            <p className="text-xs text-slate-500">
-                                Sales performance, targets, pipeline and outstanding overview · Updated {dashboard.updated_at}
-                            </p>
-                        </div>
-                    </div>
-                </section>
+                <ProjectPageHeader
+                    eyebrow="Sales"
+                    title="Sales performance"
+                    subtitle="Targets, pipeline and outstanding overview"
+                    icon={<TrendingUp className="size-5" />}
+                    meta={`Updated ${dashboard.updated_at}`}
+                />
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {dashboard.kpis.map((k, i) => {
                         const Icon = icons[i];
                         return (
                             <div key={k.label} className="rounded-xl border bg-white p-4 shadow-sm">
                                 <div className="flex items-center justify-between">
-                                    <span className="grid size-9 place-items-center rounded-lg bg-cyan-50 text-cyan-700">
+                                    <span className="grid size-9 place-items-center rounded-lg bg-orange-50 text-orange-600">
                                         <Icon className="size-4" />
                                     </span>
                                     <span className={k.change >= 0 ? 'text-emerald-600' : 'text-red-500'}>

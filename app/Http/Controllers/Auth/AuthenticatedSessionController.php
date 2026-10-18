@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\UserLocation;
 use App\Services\Auth\AuthenticationService;
+use App\Support\DeviceLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +43,8 @@ class AuthenticatedSessionController extends Controller
 
             $location->fill([
                 ...$request->safe()->only(['latitude', 'longitude', 'location_name']),
+                'device_name' => DeviceLabel::fromUserAgent($request->userAgent()),
+                'user_agent' => $request->userAgent(),
                 'captured_at' => now(),
             ])->save();
         }

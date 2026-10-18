@@ -24,7 +24,10 @@ test('users can authenticate using the login screen', function () {
 test('a repeated login updates the existing user location', function () {
     $user = User::factory()->create();
 
-    $this->post('/login', [
+    $this->withHeader(
+        'User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/129.0.0.0 Safari/537.36',
+    )->post('/login', [
         'email' => $user->email,
         'password' => 'password',
         'latitude' => 28.596184,
@@ -48,7 +51,8 @@ test('a repeated login updates the existing user location', function () {
 
     expect($location->latitude)->toBe(28.612345)
         ->and($location->longitude)->toBe(77.356789)
-        ->and($location->location_name)->toBe('Noida Sector 62, Uttar Pradesh, India');
+        ->and($location->location_name)->toBe('Noida Sector 62, Uttar Pradesh, India')
+        ->and($location->device_name)->toBe('Laptop · Windows · Chrome');
 });
 
 test('users can not authenticate with invalid password', function () {

@@ -1,6 +1,7 @@
 import InputError from '@/components/input-error';
 import { DataTableSortHeader } from '@/components/master/data-table-sort-header';
 import { MasterDialogHeader } from '@/components/master/master-dialog-header';
+import { MasterPageHeader } from '@/components/master/master-page-header';
 import { StatusToggle } from '@/components/master/status-toggle';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -104,27 +105,18 @@ export default function DepartmentsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Department Master" />
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
-                <section className="rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-brand-teal/10 text-brand-teal grid size-10 place-items-center rounded-lg">
-                                <Building2 className="size-[18px]" />
-                            </span>
-                            <div>
-                                <p className="text-brand-teal text-[10px] font-bold tracking-[0.16em] uppercase">Master data</p>
-                                <h1 className="text-xl font-bold text-slate-900">Department Master</h1>
-                                <p className="text-xs text-slate-500">
-                                    {stats.total} departments · {stats.active} active
-                                </p>
-                            </div>
-                        </div>
-                        {canManage && (
-                            <Button onClick={openCreate} className="bg-brand-teal hover:bg-brand-plum">
+                <MasterPageHeader
+                    title="Department Master"
+                    description={`${stats.total} departments · ${stats.active} active`}
+                    icon={<Building2 className="size-5" />}
+                    action={
+                        canManage && (
+                            <Button onClick={openCreate} className="bg-orange-500 text-white hover:bg-orange-600">
                                 <Plus className="size-4" /> Add department
                             </Button>
-                        )}
-                    </div>
-                </section>
+                        )
+                    }
+                />
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm [&_tbody_td]:!py-3 [&>div:first-child]:!py-3">
                     <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
