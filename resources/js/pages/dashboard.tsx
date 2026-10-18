@@ -121,7 +121,6 @@ export default function Dashboard({
     const salesActive = activeModules.includes('sales');
     const canViewProcurement = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('procurement.'));
     const canViewSales = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('sales.'));
-    const canViewUsers = isSuperAdmin || auth.permissions.includes('users.view');
     const [selectedUserType, setSelectedUserType] = useState('all');
     const [selectedProductId, setSelectedProductId] = useState(1);
     const [activeOffers, setActiveOffers] = useState([
@@ -446,14 +445,6 @@ export default function Dashboard({
                                         Logged-in user locations
                                     </CardTitle>
                                     <div className="flex items-center gap-2">
-                                        {canViewUsers && (
-                                            <Link
-                                                href="/admin/employee-hierarchy"
-                                                className="text-brand-teal hover:bg-brand-aqua/10 hidden rounded-md px-2 py-1 text-[10px] font-semibold sm:inline-flex"
-                                            >
-                                                Employee hierarchy
-                                            </Link>
-                                        )}
                                         <Link
                                             href="/dashboard/location-report"
                                             className="text-brand-teal hover:bg-brand-aqua/10 rounded-md px-2 py-1 text-[10px] font-semibold"
