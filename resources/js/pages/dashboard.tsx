@@ -89,6 +89,10 @@ export default function Dashboard({
     userLocations: Array<{
         userId: number;
         name: string;
+        employeeId: string | null;
+        companyName: string | null;
+        departmentName: string | null;
+        designationName: string | null;
         latitude: number;
         longitude: number;
         locationName: string;
@@ -117,6 +121,7 @@ export default function Dashboard({
     const salesActive = activeModules.includes('sales');
     const canViewProcurement = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('procurement.'));
     const canViewSales = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('sales.'));
+    const canViewUsers = isSuperAdmin || auth.permissions.includes('users.view');
     const [selectedUserType, setSelectedUserType] = useState('all');
     const [selectedProductId, setSelectedProductId] = useState(1);
     const [activeOffers, setActiveOffers] = useState([
@@ -150,7 +155,15 @@ export default function Dashboard({
                     locationName: string;
                     latitude: number;
                     longitude: number;
-                    users: Array<{ userId: number; name: string; devices: string[] }>;
+                    users: Array<{
+                        userId: number;
+                        name: string;
+                        employeeId: string | null;
+                        companyName: string | null;
+                        departmentName: string | null;
+                        designationName: string | null;
+                        devices: string[];
+                    }>;
                 }
             >
         >((groups, location) => {
@@ -161,7 +174,15 @@ export default function Dashboard({
                 longitude: location.longitude,
                 users: [],
             };
-            group.users.push({ userId: location.userId, name: location.name, devices: location.devices });
+            group.users.push({
+                userId: location.userId,
+                name: location.name,
+                employeeId: location.employeeId,
+                companyName: location.companyName,
+                departmentName: location.departmentName,
+                designationName: location.designationName,
+                devices: location.devices,
+            });
             groups[key] = group;
 
             return groups;
@@ -425,6 +446,14 @@ export default function Dashboard({
                                         Logged-in user locations
                                     </CardTitle>
                                     <div className="flex items-center gap-2">
+                                        {canViewUsers && (
+                                            <Link
+                                                href="/admin/employee-hierarchy"
+                                                className="text-brand-teal hover:bg-brand-aqua/10 hidden rounded-md px-2 py-1 text-[10px] font-semibold sm:inline-flex"
+                                            >
+                                                Employee hierarchy
+                                            </Link>
+                                        )}
                                         <Link
                                             href="/dashboard/location-report"
                                             className="text-brand-teal hover:bg-brand-aqua/10 rounded-md px-2 py-1 text-[10px] font-semibold"
@@ -464,9 +493,17 @@ export default function Dashboard({
                                                 <div className="max-h-32 divide-y divide-slate-100 overflow-y-auto text-left [scrollbar-width:thin]">
                                                     {location.users.map((user) => (
                                                         <div key={user.userId} className="py-1.5 first:pt-0 last:pb-0">
+                                                            <p className="truncate text-[10px] font-bold text-slate-900">
+                                                                {user.name} {user.employeeId ? `(${user.employeeId})` : ''}
+                                                            </p>
+                                                            <p className="truncate text-[9px] text-slate-500">
+                                                                {[user.companyName, user.departmentName, user.designationName]
+                                                                    .filter(Boolean)
+                                                                    .join(' · ') || 'Organization details not assigned'}
+                                                            </p>
                                                             {user.devices.map((device) => (
-                                                                <p key={device} className="truncate text-[10px] font-medium text-slate-900">
-                                                                    {user.name} : Device ({device.startsWith('Mobile') ? 'Mobile' : 'Laptop'})
+                                                                <p key={device} className="mt-0.5 truncate text-[9px] text-slate-400">
+                                                                    Device: {device}
                                                                 </p>
                                                             ))}
                                                         </div>
@@ -750,7 +787,7 @@ export default function Dashboard({
                             </CardHeader>
                             <CardContent className="p-3">
                                 {portalLogs.length ? (
-                                    <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
+                                    <div className="max-h-[216px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
                                         {portalLogs.map((log) => {
                                             const activityTime = new Intl.DateTimeFormat('en-IN', {
                                                 dateStyle: 'medium',

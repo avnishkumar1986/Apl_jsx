@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\DesignationController;
 use App\Http\Controllers\Admin\DesignationLevelController;
+use App\Http\Controllers\Admin\EmployeeHierarchyController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Admin\MaterialStockController;
 use App\Http\Controllers\Admin\ModuleController;
@@ -133,7 +134,12 @@ Route::middleware(['auth'])->group(function () {
         };
 
         $userLocations = UserLocation::query()
-            ->with('user:id,first_name,last_name')
+            ->with([
+                'user:id,unique_id,first_name,last_name',
+                'user.departmentAssignment.company:id,company_name',
+                'user.departmentAssignment.department:id,department_name',
+                'user.departmentAssignment.designation:id,designation_name',
+            ])
             ->whereIn('user_id', $activeUserIds)
             ->whereIn('id', UserLocation::query()->selectRaw('MAX(id)')->groupBy('user_id'))
             ->when(
@@ -144,6 +150,10 @@ Route::middleware(['auth'])->group(function () {
             ->map(fn (UserLocation $location): array => [
                 'userId' => $location->user_id,
                 'name' => $location->user->name,
+                'employeeId' => $location->user->unique_id,
+                'companyName' => $location->user->departmentAssignment?->company?->company_name,
+                'departmentName' => $location->user->departmentAssignment?->department?->department_name,
+                'designationName' => $location->user->departmentAssignment?->designation?->designation_name,
                 'latitude' => $location->latitude,
                 'longitude' => $location->longitude,
                 'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
@@ -222,6 +232,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('dashboard.session-closing');
 
     Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('employee-hierarchy', [EmployeeHierarchyController::class, 'index'])
+            ->middleware('permission:users.view')
+            ->name('employee-hierarchy.index');
         Route::get('modules', [ModuleController::class, 'index'])->middleware('permission:users.view')->name('modules.index');
         Route::post('modules', [ModuleController::class, 'store'])->middleware('permission:users.manage')->name('modules.store');
         Route::put('modules/{module}', [ModuleController::class, 'update'])->middleware('permission:users.manage')->name('modules.update');

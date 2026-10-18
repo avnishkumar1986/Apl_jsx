@@ -25,6 +25,7 @@ import {
     FileSpreadsheet,
     LayoutGrid,
     MessageCircle,
+    Network,
     Package,
     PackageCheck,
     PackageSearch,
@@ -78,6 +79,7 @@ export function AppSidebar() {
             items: canViewUsers
                 ? [
                       { title: 'Companies', href: '/admin/companies', icon: Building2 },
+                      { title: 'Employee hierarchy', href: '/admin/employee-hierarchy', icon: Network },
                       { title: 'Departments', href: '/admin/departments', icon: Building2 },
                       { title: 'Designation levels', href: '/admin/designation-levels', icon: BadgeCheck },
                       { title: 'Designations', href: '/admin/designations', icon: BadgeCheck },
