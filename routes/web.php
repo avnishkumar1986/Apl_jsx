@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\UserMasterController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\UserTypeController;
 use App\Http\Controllers\DashboardLocationController;
+use App\Http\Controllers\PortalActivityController;
 use App\Models\Company;
 use App\Models\Material;
 use App\Models\PortalLog;
@@ -227,6 +228,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard/location-report', [DashboardLocationController::class, 'report'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.location-report');
+    Route::get('dashboard/activity', [PortalActivityController::class, 'index'])
+        ->middleware('permission:dashboard.view')
+        ->name('dashboard.activity');
     Route::post('dashboard/session-closing', [DashboardLocationController::class, 'markSessionClosing'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.session-closing');

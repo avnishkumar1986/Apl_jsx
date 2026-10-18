@@ -783,7 +783,12 @@ export default function Dashboard({
                                     <span className="bg-brand-teal h-4 w-1 rounded-full" />
                                     Portal activity
                                 </CardTitle>
-                                <History className="size-4 text-black" />
+                                <Link
+                                    href="/dashboard/activity"
+                                    className="text-brand-teal hover:bg-brand-aqua/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold"
+                                >
+                                    View all <History className="size-3.5" />
+                                </Link>
                             </CardHeader>
                             <CardContent className="p-3">
                                 {portalLogs.length ? (
