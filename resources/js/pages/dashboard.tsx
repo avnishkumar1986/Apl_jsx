@@ -7,6 +7,7 @@ import {
     ArrowRight,
     Building2,
     CheckCircle2,
+    ChevronDown,
     Download,
     Eye,
     Factory,
@@ -97,8 +98,14 @@ export default function Dashboard({
         id: number;
         userName: string;
         action: string;
+        routeName: string | null;
         method: string;
+        url: string | null;
         statusCode: number | null;
+        ipAddress: string | null;
+        userAgent: string | null;
+        durationMs: number | null;
+        isInertia: boolean;
         createdAt: string;
     }>;
 }) {
@@ -762,27 +769,92 @@ export default function Dashboard({
                             </CardHeader>
                             <CardContent className="p-3">
                                 {portalLogs.length ? (
-                                    <div className="max-h-[166px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
-                                        {portalLogs.map((log) => (
-                                            <div key={log.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-xs font-bold text-black">{log.userName}</p>
-                                                        <p className="mt-1 text-[10px] leading-4 text-black">{log.action}</p>
+                                    <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
+                                        {portalLogs.map((log) => {
+                                            const activityTime = new Intl.DateTimeFormat('en-IN', {
+                                                dateStyle: 'medium',
+                                                timeStyle: 'short',
+                                            }).format(new Date(log.createdAt));
+                                            const successful = log.statusCode !== null && log.statusCode < 400;
+
+                                            return (
+                                                <details
+                                                    key={log.id}
+                                                    className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 open:bg-white"
+                                                >
+                                                    <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2.5 marker:hidden">
+                                                        <span
+                                                            className={`size-2 shrink-0 rounded-full ${successful ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                                        />
+                                                        <p className="min-w-0 flex-1 truncate text-[11px] text-slate-700">
+                                                            <span className="font-bold text-slate-900">{log.userName}</span>
+                                                            <span className="mx-1.5 text-slate-300">•</span>
+                                                            <span className="font-medium">{log.action}</span>
+                                                            <span className="mx-1.5 text-slate-300">•</span>
+                                                            <span className="text-slate-500">{activityTime}</span>
+                                                        </p>
+                                                        <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 ring-1 ring-slate-200">
+                                                            {log.method}
+                                                        </span>
+                                                        <span className="text-brand-teal flex shrink-0 items-center gap-1 text-[10px] font-semibold">
+                                                            <span className="hidden sm:inline sm:group-open:hidden">View more</span>
+                                                            <span className="hidden sm:group-open:inline">View less</span>
+                                                            <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+                                                        </span>
+                                                    </summary>
+                                                    <div className="border-t border-slate-200 bg-white px-3 py-3">
+                                                        <div className="grid gap-x-4 gap-y-2 text-[10px] sm:grid-cols-2">
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">Status</p>
+                                                                <p
+                                                                    className={
+                                                                        successful ? 'font-semibold text-emerald-600' : 'font-semibold text-amber-600'
+                                                                    }
+                                                                >
+                                                                    {log.statusCode ?? 'Not recorded'}
+                                                                </p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">Response time</p>
+                                                                <p className="font-medium text-slate-700">
+                                                                    {log.durationMs !== null ? `${log.durationMs} ms` : 'Not recorded'}
+                                                                </p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">Route</p>
+                                                                <p className="font-medium break-all text-slate-700">
+                                                                    {log.routeName ?? 'Unnamed route'}
+                                                                </p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">Request type</p>
+                                                                <p className="font-medium text-slate-700">
+                                                                    {log.isInertia ? 'Inertia navigation' : 'Standard request'}
+                                                                </p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">IP address</p>
+                                                                <p className="font-medium text-slate-700">{log.ipAddress ?? 'Not recorded'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-slate-400 uppercase">Date and time</p>
+                                                                <p className="font-medium text-slate-700">{activityTime}</p>
+                                                            </div>
+                                                            <div className="sm:col-span-2">
+                                                                <p className="font-semibold text-slate-400 uppercase">URL</p>
+                                                                <p className="font-medium break-all text-slate-700">{log.url ?? 'Not recorded'}</p>
+                                                            </div>
+                                                            <div className="sm:col-span-2">
+                                                                <p className="font-semibold text-slate-400 uppercase">Browser and device</p>
+                                                                <p className="leading-4 break-words text-slate-600">
+                                                                    {log.userAgent ?? 'Not recorded'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-black ring-1 ring-slate-200">
-                                                        {log.method}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-2 text-[9px] text-black">
-                                                    {new Intl.DateTimeFormat('en-IN', {
-                                                        dateStyle: 'medium',
-                                                        timeStyle: 'short',
-                                                    }).format(new Date(log.createdAt))}
-                                                    {log.statusCode ? ` · Status ${log.statusCode}` : ''}
-                                                </p>
-                                            </div>
-                                        ))}
+                                                </details>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
