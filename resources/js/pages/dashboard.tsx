@@ -1,3 +1,4 @@
+import { IndiaMapSilhouette } from '@/components/india-map-silhouette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -438,37 +439,9 @@ export default function Dashboard({
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5">
-                                <div className="relative mx-auto h-[330px] w-full overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-b from-sky-50 to-cyan-50">
-                                    <svg viewBox="0 0 300 360" className="absolute inset-0 size-full p-5" aria-label="Map of India" role="img">
-                                        <defs>
-                                            <linearGradient id="india-map-fill" x1="0" y1="0" x2="1" y2="1">
-                                                <stop offset="0%" stopColor="#dbeafe" />
-                                                <stop offset="100%" stopColor="#99f6e4" />
-                                            </linearGradient>
-                                        </defs>
-                                        <path
-                                            d="M91 18 119 26 142 20 163 35 188 39 203 57 232 65 247 87 232 103 211 105 218 127 204 148 190 154 184 181 170 205 163 235 150 265 138 294 128 329 114 307 105 276 88 254 79 224 62 210 66 186 49 169 55 147 40 128 50 105 68 94 65 72 78 55Z"
-                                            fill="url(#india-map-fill)"
-                                            stroke="#0e8ca6"
-                                            strokeWidth="3"
-                                            strokeLinejoin="round"
-                                        />
-                                        <path d="m213 108 19 10 12 22-18 7-17-14Z" fill="#bae6fd" stroke="#0e8ca6" strokeWidth="2" />
-                                        <path
-                                            d="M100 84 190 154M69 166l101 39M88 254l75-19"
-                                            fill="none"
-                                            stroke="#ffffff"
-                                            strokeWidth="1.5"
-                                            opacity=".8"
-                                        />
-                                        <path
-                                            d="M78 55l69 83 70-11M50 105l95 75 39 1M55 147l89 69 19 49M66 186l72 108M105 276l58-41M119 26l23 112M188 39l2 115"
-                                            fill="none"
-                                            stroke="#fff"
-                                            strokeWidth="1"
-                                            opacity=".55"
-                                        />
-                                    </svg>
+                                <div className="relative mx-auto h-[330px] w-full overflow-hidden rounded-2xl border border-cyan-100 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.95),transparent_36%),linear-gradient(145deg,#effaff,#dffafb)]">
+                                    <div className="absolute inset-0 bg-[linear-gradient(rgba(8,145,178,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(8,145,178,0.035)_1px,transparent_1px)] bg-[size:24px_24px]" />
+                                    <IndiaMapSilhouette className="absolute inset-0 size-full p-5 text-[#0e8ca6] drop-shadow-[0_12px_24px_rgba(14,140,166,0.12)]" />
                                     <span className="absolute top-3 left-3 rounded-md bg-white/90 px-2 py-1 text-[9px] font-bold tracking-widest text-slate-500 shadow-sm">
                                         INDIA
                                     </span>

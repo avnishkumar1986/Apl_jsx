@@ -1,3 +1,4 @@
+import { IndiaMapSilhouette } from '@/components/india-map-silhouette';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -63,8 +64,9 @@ export default function LocationReport({
             <Head title="Location report" />
             <div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto max-w-[1500px] space-y-4">
-                    <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#087c98] to-[#19a8bf] p-5 text-white shadow-lg">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#087c98] to-[#19a8bf] p-5 text-white shadow-lg">
+                        <IndiaMapSilhouette className="absolute -top-20 right-4 h-72 w-60 rotate-6 text-white opacity-30" />
+                        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                                 <span className="grid size-11 place-items-center rounded-xl border border-white/20 bg-white/10">
                                     <MapPin className="size-5" />
