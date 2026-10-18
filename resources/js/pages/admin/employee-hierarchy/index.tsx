@@ -100,12 +100,12 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                         />
                     </div>
 
-                    <section className="space-y-3">
+                    <section className="grid items-start gap-4 xl:grid-cols-2">
                         {Object.entries(hierarchy).map(([company, locations], companyIndex) => (
                             <details
                                 key={company}
-                                open={companyIndex === 0}
-                                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                                open={companyIndex < 2}
+                                className="group min-w-0 self-start overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                             >
                                 <summary className="flex cursor-pointer list-none items-center gap-3 bg-slate-50 px-4 py-4 marker:hidden">
                                     <span className="bg-brand-teal grid size-10 place-items-center rounded-xl text-white">
@@ -132,7 +132,7 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                                                             <Network className="size-4 text-indigo-500" />
                                                             {department}
                                                         </h3>
-                                                        <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                                                        <div className="grid gap-3 2xl:grid-cols-2">
                                                             {Object.entries(designations).map(([designation, employees]) => (
                                                                 <article
                                                                     key={designation}
