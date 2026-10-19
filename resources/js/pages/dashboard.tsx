@@ -610,7 +610,7 @@ export default function Dashboard({
                     </div>
 
                     <div className="min-w-0 space-y-6 xl:col-span-8">
-                        <section className="grid min-w-0 gap-4 min-[400px]:grid-cols-2 md:grid-cols-3">
+                        <section className="grid min-w-0 gap-4 min-[350px]:grid-cols-2 md:grid-cols-3">
                             {stats.map(({ label, value, href, icon: Icon, color, surface, accent }) => (
                                 <Link
                                     key={label}
