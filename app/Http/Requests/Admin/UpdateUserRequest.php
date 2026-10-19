@@ -11,6 +11,14 @@ use Illuminate\Validation\Validator;
 
 class UpdateUserRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'role' => $this->input('role', 'Viewer'),
+            'permanent_same_as_local' => $this->boolean('permanent_same_as_local'),
+        ]);
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

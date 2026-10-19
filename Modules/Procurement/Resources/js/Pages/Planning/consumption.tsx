@@ -1,6 +1,7 @@
 import InputError from '@/components/input-error';
 import { MasterDialogHeader } from '@/components/master/master-dialog-header';
 import ProcurementPageHeader from '@/components/procurement-page-header';
+import { RowExpandButton } from '@/components/row-expand-button';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
@@ -9,26 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import {
-    CalendarDays,
-    Check,
-    ChevronDown,
-    ChevronRight,
-    Database,
-    Edit3,
-    Eye,
-    PackageCheck,
-    Plus,
-    Search,
-    ShoppingCart,
-    Trash2,
-    TrendingUp,
-} from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, Database, Edit3, Eye, PackageCheck, Plus, Search, ShoppingCart, Trash2, TrendingUp } from 'lucide-react';
 import type { FormEventHandler, ReactNode } from 'react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-type Company = { id: number; company_code: string; company_name: string; record_type: number; parent_company_id: string | null };
+type Company = {
+    id: number;
+    company_code: string;
+    company_name: string;
+    record_type: number;
+    parent_company_id: string | null;
+};
 type Material = { matnr: string; maktx: string };
-type MaterialStock = { matnr: string; plant_code: string; current_stock: number };
+type MaterialStock = {
+    matnr: string;
+    plant_code: string;
+    current_stock: number;
+};
 type Purchase = {
     id: number;
     company_id: number;
@@ -116,8 +113,18 @@ const formatDisplayDate = (date: string) => {
 };
 const formatDate = (date: string) => formatDisplayDate(date) || date;
 const formatMt = (value: number | null, decimals = 3) =>
-    value === null ? 'N/A' : Number(value).toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-const emptyStats = { purchases: 0, purchase_mt: 0, planned_mt: 0, open_orders: 0 };
+    value === null
+        ? 'N/A'
+        : Number(value).toLocaleString('en-IN', {
+              minimumFractionDigits: decimals,
+              maximumFractionDigits: decimals,
+          });
+const emptyStats = {
+    purchases: 0,
+    purchase_mt: 0,
+    planned_mt: 0,
+    open_orders: 0,
+};
 export default function Procurement({
     purchases,
     consumptions,
@@ -130,7 +137,12 @@ export default function Procurement({
     purchases: Purchase[];
     consumptions: Consumption[];
     companies: Company[];
-    stats: { purchases: number; purchase_mt: number; planned_mt: number; open_orders: number };
+    stats: {
+        purchases: number;
+        purchase_mt: number;
+        planned_mt: number;
+        open_orders: number;
+    };
     filters: { search: string; tab: 'purchases' | 'consumptions' };
     canManagePurchases: boolean;
     canManageConsumptions: boolean;
@@ -161,7 +173,9 @@ export default function Procurement({
         if (materials.length > 0 || referenceLoading) return;
         setReferenceLoading(true);
         try {
-            const response = await fetch('/admin/procurement/reference-data', { headers: { Accept: 'application/json' } });
+            const response = await fetch('/admin/procurement/reference-data', {
+                headers: { Accept: 'application/json' },
+            });
             if (!response.ok) throw new Error('Unable to load material reference data.');
             const data = (await response.json()) as {
                 materials: Material[];
@@ -199,7 +213,13 @@ export default function Procurement({
             day_count: String(item.day_count ?? ''),
             material: item.material,
             common_remarks: item.remarks ?? '',
-            entries: [{ plant_id: String(item.plant_id), quantity_mt: String(item.quantity_mt), remarks: item.remarks ?? '' }],
+            entries: [
+                {
+                    plant_id: String(item.plant_id),
+                    quantity_mt: String(item.quantity_mt),
+                    remarks: item.remarks ?? '',
+                },
+            ],
         });
         setConsumptionOpen(true);
         void loadReferenceData();
@@ -342,7 +362,7 @@ export default function Procurement({
     return (
         <AppLayout breadcrumbs={[{ title: 'Procurement', href: '/admin/procurement' }]}>
             <Head title="Procurement" />
-            <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
+            <div className="procurement-compact mx-auto w-full max-w-[1680px] space-y-3 p-3 md:p-4">
                 <ProcurementPageHeader
                     title="Procurement"
                     subtitle="Purchase planning, material demand and delivery tracking"
@@ -373,7 +393,7 @@ export default function Procurement({
                         [CalendarDays, 'Planned consumption', `${Number(stats.planned_mt).toLocaleString()} MT`],
                         [ShoppingCart, 'Open orders', stats.open_orders],
                     ].map(([Icon, label, value]) => (
-                        <div key={String(label)} className="rounded-xl border bg-white p-4 shadow-sm">
+                        <div key={String(label)} className="rounded-xl border bg-white p-3 shadow-sm">
                             <div className="flex items-center gap-3">
                                 <span className="grid size-9 place-items-center rounded-lg bg-amber-50 text-amber-600">
                                     <Icon className="size-4" />
@@ -387,7 +407,7 @@ export default function Procurement({
                     ))}
                 </div>
                 <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-                    <div className="flex flex-col gap-3 border-b bg-slate-50/60 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-2 border-b bg-slate-50/60 px-4 py-2.5 md:flex-row md:items-center md:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
                             {tab === 'consumptions' && canManageConsumptions && (
                                 <>
@@ -553,9 +573,9 @@ export default function Procurement({
                                             <Fragment key={c.id}>
                                                 <tr className={`transition-colors hover:bg-cyan-50/40 ${expanded ? 'bg-cyan-50/30' : ''}`}>
                                                     <td className="px-3 py-3">
-                                                        <button
-                                                            type="button"
-                                                            aria-label={expanded ? 'Collapse calculation details' : 'Expand calculation details'}
+                                                        <RowExpandButton
+                                                            expanded={expanded}
+                                                            label={expanded ? 'Collapse calculation details' : 'Expand calculation details'}
                                                             onClick={() =>
                                                                 setExpandedConsumptionIds(
                                                                     expanded
@@ -563,12 +583,7 @@ export default function Procurement({
                                                                         : [...expandedConsumptionIds, c.id],
                                                                 )
                                                             }
-                                                            className="flex size-7 items-center justify-center rounded-full bg-[#ff8200] text-white shadow-[0_4px_10px_rgba(255,130,0,0.28)] transition hover:bg-[#e97500]"
-                                                        >
-                                                            <ChevronRight
-                                                                className={`size-4 stroke-[2.5] transition-transform ${expanded ? 'rotate-90' : ''}`}
-                                                            />
-                                                        </button>
+                                                        />
                                                     </td>
                                                     <td className="px-3 py-3">
                                                         <Checkbox
@@ -653,7 +668,7 @@ export default function Procurement({
                                                                         >
                                                                             <Eye className="size-4" />
                                                                         </Button>
-                                                    {canManageConsumptions && (
+                                                                        {canManageConsumptions && (
                                                                             <>
                                                                                 <Button
                                                                                     size="icon"
@@ -801,7 +816,7 @@ export default function Procurement({
                 <DialogContent className="h-dvh max-h-dvh w-full max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-[1100px] sm:rounded-xl sm:border sm:p-0 [&>button]:top-4 [&>button]:right-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:p-1.5 [&>button]:text-white/70 [&>button]:hover:bg-white/10 [&>button]:hover:text-white sm:[&>button]:top-5 sm:[&>button]:right-5">
                     <form className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:h-auto sm:max-h-[90dvh]" onSubmit={submitPurchase}>
                         <MasterDialogHeader title="Create purchase plan" />
-                        <div className="grid min-h-0 content-start gap-4 overflow-y-auto overscroll-contain bg-slate-50 p-4 sm:grid-cols-2 sm:overflow-visible sm:p-6 [&>label:nth-child(-n+3)>span:first-child]:sr-only [&>label>button]:h-14 [&>label>div>button]:h-14">
+                        <div className="grid min-h-0 content-start gap-3 overflow-y-auto overscroll-contain bg-slate-50 p-3 sm:grid-cols-2 sm:overflow-visible sm:p-5 [&>label:nth-child(-n+3)>span:first-child]:sr-only [&>label>button]:h-11 [&>label>div>button]:h-11">
                             <FieldSelect
                                 label="Company"
                                 value={purchase.data.company_id}
@@ -862,7 +877,7 @@ export default function Procurement({
                                         </span>
                                         <Input
                                             autoFocus
-                                            className="h-14 bg-white pt-5"
+                                            className="h-11 bg-white pt-4"
                                             placeholder="Enter vendor name"
                                             value={purchase.data.vendor_name}
                                             onChange={(event) => purchase.setData('vendor_name', event.target.value)}
@@ -875,7 +890,7 @@ export default function Procurement({
                                 </div>
                             )}
                             <Input
-                                className="h-14"
+                                className="h-11"
                                 type="number"
                                 step="0.001"
                                 placeholder="Quantity MT *"
@@ -887,7 +902,7 @@ export default function Procurement({
                                     Booking date
                                 </span>
                                 <Input
-                                    className="h-14 pt-5"
+                                    className="h-11 pt-4"
                                     type="date"
                                     value={purchase.data.purchase_date}
                                     onChange={(e) => purchase.setData('purchase_date', e.target.value)}
@@ -898,7 +913,7 @@ export default function Procurement({
                                     Delivery date
                                 </span>
                                 <Input
-                                    className="h-14 pt-5"
+                                    className="h-11 pt-4"
                                     type="date"
                                     value={purchase.data.expected_delivery_date}
                                     onChange={(e) => purchase.setData('expected_delivery_date', e.target.value)}
@@ -909,7 +924,7 @@ export default function Procurement({
                                     Order status
                                 </span>
                                 <Select value={purchase.data.delivery_status} onValueChange={(value) => purchase.setData('delivery_status', value)}>
-                                    <SelectTrigger className="h-14 pt-5 capitalize">
+                                    <SelectTrigger className="h-11 pt-4 capitalize">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -922,7 +937,7 @@ export default function Procurement({
                                 </Select>
                             </label>
                             <Textarea
-                                className="h-14 min-h-14 resize-none sm:col-span-2"
+                                className="h-11 min-h-11 resize-none sm:col-span-2"
                                 placeholder="Remarks"
                                 value={purchase.data.remarks}
                                 onChange={(e) => purchase.setData('remarks', e.target.value)}
@@ -946,11 +961,11 @@ export default function Procurement({
                     if (!open) setEditingConsumption(null);
                 }}
             >
-                <DialogContent className="h-dvh max-h-dvh w-full max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[94dvh] sm:w-[calc(100vw-2rem)] sm:max-w-[1500px] sm:rounded-xl sm:border sm:p-0 [&>button]:top-4 [&>button]:right-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:p-1.5 [&>button]:text-white/70 [&>button]:hover:bg-white/10 [&>button]:hover:text-white sm:[&>button]:top-5 sm:[&>button]:right-5">
+                <DialogContent className="h-dvh max-h-dvh w-full max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-[1400px] sm:rounded-xl sm:border sm:p-0 [&>button]:top-4 [&>button]:right-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:p-1.5 [&>button]:text-white/70 [&>button]:hover:bg-white/10 [&>button]:hover:text-white sm:[&>button]:top-5 sm:[&>button]:right-5">
                     <form className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]" onSubmit={submitConsumption}>
                         <MasterDialogHeader title={editingConsumption ? 'Edit Daily Consumption' : 'Add Daily Consumption'} />
-                        <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-slate-50 p-3 sm:space-y-4 sm:p-5">
-                            <div className="grid gap-x-4 gap-y-3 rounded-xl border bg-white p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-3 [&>label:nth-child(-n+5)]:relative [&>label:nth-child(-n+5)>button]:h-14 [&>label:nth-child(-n+5)>button]:pt-4 [&>label:nth-child(-n+5)>div>button]:h-14 [&>label:nth-child(-n+5)>div>button]:pt-4 [&>label:nth-child(-n+5)>input]:h-14 [&>label:nth-child(-n+5)>input]:pt-5 [&>label:nth-child(-n+5)>span:first-child]:pointer-events-none [&>label:nth-child(-n+5)>span:first-child]:absolute [&>label:nth-child(-n+5)>span:first-child]:top-1.5 [&>label:nth-child(-n+5)>span:first-child]:left-3 [&>label:nth-child(-n+5)>span:first-child]:z-10 [&>label:nth-child(-n+5)>span:first-child]:text-[10px] [&>label:nth-child(-n+5)>span:first-child]:font-medium [&>label:nth-child(-n+5)>span:first-child]:text-slate-500">
+                        <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain bg-slate-50 p-2 sm:space-y-3 sm:p-3">
+                            <div className="grid gap-2 rounded-lg border bg-white p-2.5 sm:grid-cols-2 sm:p-3 lg:grid-cols-3 [&>label:nth-child(-n+5)]:relative [&>label:nth-child(-n+5)>button]:h-11 [&>label:nth-child(-n+5)>button]:pt-3.5 [&>label:nth-child(-n+5)>div>button]:h-11 [&>label:nth-child(-n+5)>div>button]:pt-3.5 [&>label:nth-child(-n+5)>input]:h-11 [&>label:nth-child(-n+5)>input]:pt-4 [&>label:nth-child(-n+5)>span:first-child]:pointer-events-none [&>label:nth-child(-n+5)>span:first-child]:absolute [&>label:nth-child(-n+5)>span:first-child]:top-1 [&>label:nth-child(-n+5)>span:first-child]:left-3 [&>label:nth-child(-n+5)>span:first-child]:z-10 [&>label:nth-child(-n+5)>span:first-child]:text-[9px] [&>label:nth-child(-n+5)>span:first-child]:font-medium [&>label:nth-child(-n+5)>span:first-child]:text-slate-500">
                                 <FieldSelect
                                     label="Company"
                                     value={consumption.data.company_id}
@@ -1016,7 +1031,7 @@ export default function Procurement({
                                     />
                                 </FormField>
                                 <Textarea
-                                    className="min-h-[74px] resize-none"
+                                    className="min-h-14 resize-none sm:min-h-11 lg:h-11"
                                     placeholder="Common remarks for all selected plant entries (optional)"
                                     value={consumption.data.common_remarks}
                                     onChange={(e) => consumption.setData('common_remarks', e.target.value)}
@@ -1261,7 +1276,7 @@ function VendorSelect({
                 type="button"
                 disabled={disabled}
                 onClick={() => setOpen((current) => !current)}
-                className="border-input focus-visible:ring-ring flex h-14 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-left text-sm shadow-xs outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                className="border-input focus-visible:ring-ring flex h-11 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-left text-sm shadow-xs outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
             >
                 <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>
                     {value || (disabled ? 'Select plant and material first' : loading ? 'Loading vendors...' : 'Select vendor')}

@@ -1,5 +1,6 @@
 import { DataTableSortHeader } from '@/components/master/data-table-sort-header';
 import ProcurementPageHeader from '@/components/procurement-page-header';
+import { RowExpandButton } from '@/components/row-expand-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -8,7 +9,6 @@ import {
     AlertTriangle,
     Boxes,
     CalendarDays,
-    ChevronRight,
     Factory,
     FileSpreadsheet,
     Filter,
@@ -50,8 +50,20 @@ type Page<T> = {
     prev_page_url: string | null;
     next_page_url: string | null;
 };
-type Filters = { month: string; plant_code: string; material: string; search: string; per_page: number; sort: string; direction: 'asc' | 'desc' };
-const number = (value: number) => Number(value).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+type Filters = {
+    month: string;
+    plant_code: string;
+    material: string;
+    search: string;
+    per_page: number;
+    sort: string;
+    direction: 'asc' | 'desc';
+};
+const number = (value: number) =>
+    Number(value).toLocaleString('en-IN', {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+    });
 
 export default function AllBalanceSheet({
     rows,
@@ -64,9 +76,16 @@ export default function AllBalanceSheet({
     plants: { id: number; company_code: string; company_name: string }[];
     materials: { matnr: string; maktx: string; meins: string | null }[];
     filters: Filters;
-    summary: { plants: number; materials: number; opening_stock: number; consumption: number; closing_stock: number; shortage: number };
+    summary: {
+        plants: number;
+        materials: number;
+        opening_stock: number;
+        consumption: number;
+        closing_stock: number;
+        shortage: number;
+    };
 }) {
-    const [month, setMonth] = useState(filters.month);
+    const month = filters.month;
     const [plantCode, setPlantCode] = useState(filters.plant_code || 'all');
     const [material, setMaterial] = useState(filters.material || 'all');
     const [search, setSearch] = useState(filters.search);
@@ -142,36 +161,96 @@ export default function AllBalanceSheet({
         <AppLayout
             breadcrumbs={[
                 { title: 'Procurement', href: '/admin/procurement' },
-                { title: 'All Materials Balance Sheet', href: '/admin/procurement/all-balance-sheet' },
+                {
+                    title: 'All Materials Balance Sheet',
+                    href: '/admin/procurement/all-balance-sheet',
+                },
             ]}
         >
             <Head title="All Materials Balance Sheet" />
-            <main className="w-full min-w-0 space-y-4 p-3 sm:p-4 lg:p-6">
-                <ProcurementPageHeader
-                    title="All Materials Balance Sheet"
-                    subtitle="Consolidated monthly balance across every plant and material"
-                    icon={FileSpreadsheet}
-                    actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="outline"
-                                className="border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900"
-                                onClick={exportCurrent}
-                            >
-                                <FileSpreadsheet className="size-4" />
-                                Export page
+            <main className="procurement-compact w-full min-w-0 space-y-3 p-3 sm:p-4">
+                <div className="relative z-30 grid items-stretch overflow-visible rounded-xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-2.5 shadow-md shadow-slate-900/10 xl:grid-cols-[minmax(390px,0.8fr)_minmax(0,2fr)] xl:gap-3 print:hidden">
+                    <ProcurementPageHeader
+                        title="All Materials Balance Sheet"
+                        subtitle="Consolidated monthly balance across every plant and material"
+                        icon={FileSpreadsheet}
+                        embedded
+                        actions={
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="size-9 border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                    onClick={exportCurrent}
+                                    aria-label="Export balance sheet"
+                                    title="Export balance sheet"
+                                >
+                                    <FileSpreadsheet className="size-4" />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="size-9 border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                    onClick={() => window.print()}
+                                    aria-label="Print balance sheet"
+                                    title="Print balance sheet"
+                                >
+                                    <Printer className="size-4" />
+                                </Button>
+                            </div>
+                        }
+                    />
+                    <section className="rounded-lg border border-white/15 bg-white/8 p-2.5 shadow-inner shadow-black/5 backdrop-blur-sm">
+                        <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1.2fr_auto] xl:items-end">
+                            <label className="space-y-1 text-xs font-semibold text-white/90">
+                                Plant
+                                <select
+                                    className="border-input flex h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900"
+                                    value={plantCode}
+                                    onChange={(e) => setPlantCode(e.target.value)}
+                                >
+                                    <option value="all">All Plants</option>
+                                    {plants.map((plant) => (
+                                        <option key={plant.id} value={plant.company_code}>
+                                            {plant.company_code} · {plant.company_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="space-y-1 text-xs font-semibold text-white/90">
+                                Material
+                                <select
+                                    className="border-input flex h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900"
+                                    value={material}
+                                    onChange={(e) => setMaterial(e.target.value)}
+                                >
+                                    <option value="all">All Materials</option>
+                                    {materials.map((item) => (
+                                        <option key={item.matnr} value={item.matnr}>
+                                            {item.matnr} · {item.maktx}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="space-y-1 text-xs font-semibold text-white/90">
+                                Search
+                                <div className="relative">
+                                    <Search className="absolute top-2.5 left-3 size-4 text-slate-400" />
+                                    <Input
+                                        className="h-9 bg-white pl-9 text-slate-900"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Material or plant..."
+                                    />
+                                </div>
+                            </label>
+                            <Button className="bg-brand-teal h-9 text-white hover:bg-cyan-600">
+                                <Filter className="size-4" />
+                                Apply
                             </Button>
-                            <Button
-                                variant="outline"
-                                className="border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900"
-                                onClick={() => window.print()}
-                            >
-                                <Printer className="size-4" />
-                                Print
-                            </Button>
-                        </div>
-                    }
-                />
+                        </form>
+                    </section>
+                </div>
                 <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                     {[
                         [Factory, 'Plants', summary.plants, 'In report scope', 'text-cyan-700 bg-cyan-50'],
@@ -194,60 +273,6 @@ export default function AllBalanceSheet({
                             </div>
                         </article>
                     ))}
-                </section>
-                <section className="rounded-xl border bg-white p-4 shadow-sm print:hidden">
-                    <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[170px_1fr_1.4fr_1.2fr_auto] xl:items-end">
-                        <label className="space-y-1.5 text-xs font-semibold text-slate-600">
-                            Month
-                            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-                        </label>
-                        <label className="space-y-1.5 text-xs font-semibold text-slate-600">
-                            Plant
-                            <select
-                                className="border-input flex h-10 w-full rounded-md border bg-white px-3 text-sm"
-                                value={plantCode}
-                                onChange={(e) => setPlantCode(e.target.value)}
-                            >
-                                <option value="all">All Plants</option>
-                                {plants.map((plant) => (
-                                    <option key={plant.id} value={plant.company_code}>
-                                        {plant.company_code} · {plant.company_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="space-y-1.5 text-xs font-semibold text-slate-600">
-                            Material
-                            <select
-                                className="border-input flex h-10 w-full rounded-md border bg-white px-3 text-sm"
-                                value={material}
-                                onChange={(e) => setMaterial(e.target.value)}
-                            >
-                                <option value="all">All Materials</option>
-                                {materials.map((item) => (
-                                    <option key={item.matnr} value={item.matnr}>
-                                        {item.matnr} · {item.maktx}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="space-y-1.5 text-xs font-semibold text-slate-600">
-                            Search
-                            <div className="relative">
-                                <Search className="absolute top-3 left-3 size-4 text-slate-400" />
-                                <Input
-                                    className="pl-9"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Material or plant..."
-                                />
-                            </div>
-                        </label>
-                        <Button className="bg-brand-teal text-white">
-                            <Filter className="size-4" />
-                            Apply
-                        </Button>
-                    </form>
                 </section>
                 <section
                     ref={tableRef}
@@ -315,19 +340,25 @@ export default function AllBalanceSheet({
                                     const rowOpen = expandedRow === rowKey;
                                     return (
                                         <Fragment key={rowKey}>
-                                            <tr className={`hover:bg-cyan-50/30 ${rowOpen ? 'bg-orange-50/40' : ''}`}>
+                                            <tr
+                                                tabIndex={0}
+                                                aria-expanded={rowOpen}
+                                                onClick={() => setExpandedRow(rowOpen ? null : rowKey)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter' || event.key === ' ') {
+                                                        event.preventDefault();
+                                                        setExpandedRow(rowOpen ? null : rowKey);
+                                                    }
+                                                }}
+                                                className={`cursor-pointer transition-colors hover:bg-cyan-50/40 focus-visible:bg-cyan-50/40 focus-visible:outline-none ${rowOpen ? 'bg-cyan-50/30' : ''}`}
+                                            >
                                                 <td className="sticky left-0 z-10 w-14 min-w-14 bg-white px-1 py-2 text-center">
-                                                    <button
-                                                        type="button"
+                                                    <RowExpandButton
+                                                        expanded={rowOpen}
                                                         onClick={() => setExpandedRow(rowOpen ? null : rowKey)}
-                                                        className="mx-auto grid size-6 place-items-center rounded-full bg-orange-500 text-white shadow-[0_2px_6px_rgba(249,115,22,0.25)] transition-all hover:scale-105 hover:bg-orange-600 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1 focus-visible:outline-none"
-                                                        aria-label={`${rowOpen ? 'Collapse' : 'Expand'} ${row.material_name} at ${row.plant_name}`}
-                                                        aria-expanded={rowOpen}
-                                                    >
-                                                        <ChevronRight
-                                                            className={`size-3 transition-transform duration-200 ${rowOpen ? 'rotate-90' : ''}`}
-                                                        />
-                                                    </button>
+                                                        label={`${rowOpen ? 'Collapse' : 'Expand'} ${row.material_name} at ${row.plant_name}`}
+                                                        className="mx-auto"
+                                                    />
                                                 </td>
                                                 <td className="sticky left-14 z-10 w-16 min-w-16 bg-white px-3 py-3 text-center text-slate-500 hover:bg-cyan-50">
                                                     {(rows.from || 1) + index}

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Boxes, Clock3, PackageCheck, ShoppingCart, TrendingUp } from 'lucide-react';
-import { FormEvent, memo, useMemo, useState } from 'react';
+import { FormEvent, memo, useEffect, useMemo, useState } from 'react';
 
 type MetricRow = { label: string | null; value: number };
 type MaterialDemand = { code: string; name: string | null; value: number };
@@ -73,6 +73,10 @@ export default function ProcurementDashboard({
         setMaterialCode('all');
         router.get('/admin/procurement/dashboard', {}, { preserveState: false, replace: true });
     };
+    useEffect(() => {
+        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        if (navigation?.type === 'reload' && window.location.search) resetFilters();
+    }, []);
     const plantDemandGraph = useMemo(
         () => plantDemand.map((item) => ({ label: item.label ?? 'Unknown plant', value: Number(item.value) })),
         [plantDemand],
@@ -115,35 +119,39 @@ export default function ProcurementDashboard({
             ]}
         >
             <Head title="Procurement Dashboard" />
-            <div className="mx-auto w-full max-w-[1680px] space-y-5 p-3 md:p-5 lg:p-6">
-                <ProcurementPageHeader
-                    title="Procurement Dashboard"
-                    subtitle="Live demand, purchasing, inventory and delivery overview"
-                    icon={PackageCheck}
-                    meta={`Updated ${updatedAt}`}
-                />
+            <div className="procurement-compact mx-auto w-full max-w-[1680px] space-y-3 p-3 md:p-4">
+                <div className="relative z-30 grid items-stretch overflow-visible rounded-xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-2.5 shadow-md shadow-slate-900/10 xl:grid-cols-[minmax(380px,0.8fr)_minmax(0,2fr)] xl:gap-3">
+                    <ProcurementPageHeader
+                        title="Procurement Dashboard"
+                        subtitle="Live demand, purchasing, inventory and delivery overview"
+                        icon={PackageCheck}
+                        meta={`Updated ${updatedAt}`}
+                        embedded
+                    />
 
-                <ProcurementFilterBar
-                    companyCode={companyCode}
-                    plantCode={plantCode}
-                    materialCode={materialCode}
-                    companies={companies}
-                    plants={plants}
-                    materials={materials}
-                    onCompanyChange={(value) => {
-                        setCompanyCode(value);
-                        setPlantCode('all');
-                    }}
-                    onPlantChange={setPlantCode}
-                    onMaterialChange={setMaterialCode}
-                    onApply={applyFilters}
-                    onReset={resetFilters}
-                />
+                    <ProcurementFilterBar
+                        companyCode={companyCode}
+                        plantCode={plantCode}
+                        materialCode={materialCode}
+                        companies={companies}
+                        plants={plants}
+                        materials={materials}
+                        onCompanyChange={(value) => {
+                            setCompanyCode(value);
+                            setPlantCode('all');
+                        }}
+                        onPlantChange={setPlantCode}
+                        onMaterialChange={setMaterialCode}
+                        onApply={applyFilters}
+                        onReset={resetFilters}
+                        embedded
+                    />
+                </div>
 
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {cards.map(({ title, value, note, icon: Icon }) => (
                         <Card key={title} className="border-slate-200 shadow-sm">
-                            <CardContent className="p-5">
+                            <CardContent className="p-4">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
                                         <p className="text-xs font-medium text-slate-500">{title}</p>

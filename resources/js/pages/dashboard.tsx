@@ -1,9 +1,8 @@
 import { IndiaMapSilhouette } from '@/components/india-map-silhouette';
-import ProjectPageHeader from '@/components/project-page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -17,7 +16,7 @@ import {
     MapPin,
     Package,
     Pencil,
-    Settings2,
+    RefreshCw,
     ShieldCheck,
     ShoppingCart,
     Store,
@@ -46,7 +45,12 @@ export default function Dashboard({
     userLocations,
     portalLogs,
 }: {
-    organizationStats: { companies: number; plants: number; materials: number; employees: number };
+    organizationStats: {
+        companies: number;
+        plants: number;
+        materials: number;
+        employees: number;
+    };
     userTypes: Array<{ uid: string; name: string }>;
     portalSecurity: {
         score: number;
@@ -117,19 +121,44 @@ export default function Dashboard({
 }) {
     const { auth, activeModules } = usePage<SharedData>().props;
     const isSuperAdmin = auth.roles.includes('Super Admin');
-    const isActive = auth.user.status;
     const procurementActive = activeModules.includes('procurement');
     const salesActive = activeModules.includes('sales');
     const canViewProcurement = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('procurement.'));
     const canViewSales = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('sales.'));
     const [selectedUserType, setSelectedUserType] = useState('all');
+    const [securityScanRunning, setSecurityScanRunning] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState(1);
     const [activeOffers, setActiveOffers] = useState([
-        { id: 1, title: 'Festive Purchase Offer', detail: '10% discount on selected materials', validUntil: '31 Oct 2026' },
-        { id: 2, title: 'Bulk Order Benefit', detail: 'Additional savings on bulk quantities', validUntil: '15 Nov 2026' },
-        { id: 3, title: 'Priority Distributor Offer', detail: 'Special pricing for approved distributors', validUntil: '30 Nov 2026' },
-        { id: 4, title: 'Early Payment Reward', detail: '2% benefit on early invoice payment', validUntil: '31 Dec 2026' },
-        { id: 5, title: 'Year-end Material Offer', detail: 'Limited pricing on available stock', validUntil: '15 Jan 2027' },
+        {
+            id: 1,
+            title: 'Festive Purchase Offer',
+            detail: '10% discount on selected materials',
+            validUntil: '31 Oct 2026',
+        },
+        {
+            id: 2,
+            title: 'Bulk Order Benefit',
+            detail: 'Additional savings on bulk quantities',
+            validUntil: '15 Nov 2026',
+        },
+        {
+            id: 3,
+            title: 'Priority Distributor Offer',
+            detail: 'Special pricing for approved distributors',
+            validUntil: '30 Nov 2026',
+        },
+        {
+            id: 4,
+            title: 'Early Payment Reward',
+            detail: '2% benefit on early invoice payment',
+            validUntil: '31 Dec 2026',
+        },
+        {
+            id: 5,
+            title: 'Year-end Material Offer',
+            detail: 'Limited pricing on available stock',
+            validUntil: '15 Jan 2027',
+        },
     ]);
     const editDummyOffer = (offerId: number) => {
         const offer = activeOffers.find((activeOffer) => activeOffer.id === offerId);
@@ -144,7 +173,21 @@ export default function Dashboard({
             setActiveOffers((offers) => offers.map((activeOffer) => (activeOffer.id === offerId ? { ...activeOffer, title } : activeOffer)));
         }
     };
-    const postureScore = Math.min(100, (isActive ? 40 : 0) + (auth.roles.length ? 30 : 0) + (isSuperAdmin || auth.permissions.length ? 30 : 0));
+    const profileFields = [
+        auth.user.first_name,
+        auth.user.last_name,
+        auth.user.email,
+        auth.user.email_verified_at,
+        auth.user.unique_id,
+        auth.user.gender,
+        auth.user.date_of_birth,
+        auth.user.company,
+        auth.user.department_id,
+        auth.user.designation_id,
+    ];
+    const completedProfileFields = profileFields.filter((value) => value !== null && value !== undefined && value !== '').length;
+    const profileScore = Math.round((completedProfileFields / profileFields.length) * 100);
+    const remainingProfileFields = profileFields.length - completedProfileFields;
     const visibleUserLocations = userLocations;
     const currentUserLocation = userLocations.find((location) => location.userId === auth.user.id);
     const mapLocationGroups = Object.values(
@@ -194,7 +237,11 @@ export default function Dashboard({
     });
     const downloadSecurityReport = async () => {
         const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-        const document = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const document = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+        });
         const generatedAt = new Intl.DateTimeFormat('en-IN', {
             dateStyle: 'medium',
             timeStyle: 'short',
@@ -274,7 +321,12 @@ export default function Dashboard({
                   ])
                 : [['-', '-', 'No vulnerable libraries detected', '-', 'SECURE', '-']],
             headStyles: { fillColor: [15, 118, 145], textColor: 255 },
-            styles: { fontSize: 7.5, cellPadding: 2.5, valign: 'middle', overflow: 'linebreak' },
+            styles: {
+                fontSize: 7.5,
+                cellPadding: 2.5,
+                valign: 'middle',
+                overflow: 'linebreak',
+            },
             columnStyles: {
                 0: { cellWidth: 8 },
                 1: { cellWidth: 20 },
@@ -346,42 +398,28 @@ export default function Dashboard({
         ? [
               { resource: 'Users', capability: 'Full access', source: 'Super Admin' },
               { resource: 'Roles', capability: 'Full access', source: 'Super Admin' },
-              { resource: 'Permissions', capability: 'Full access', source: 'Super Admin' },
+              {
+                  resource: 'Permissions',
+                  capability: 'Full access',
+                  source: 'Super Admin',
+              },
               { resource: 'Profile', capability: 'Manage own', source: 'Account' },
           ]
         : auth.permissions.slice(0, 6).map((permission) => {
               const [resource, capability = 'access'] = permission.split('.');
-              return { resource: resource.replaceAll('_', ' '), capability: capability.replaceAll('_', ' '), source: 'Assigned role' };
+              return {
+                  resource: resource.replaceAll('_', ' '),
+                  capability: capability.replaceAll('_', ' '),
+                  source: 'Assigned role',
+              };
           });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
-            <div className="min-h-full flex-1 bg-[#f1f3f8] p-4 md:p-5 lg:p-6">
-                <div className="mb-5">
-                    <ProjectPageHeader
-                        eyebrow="Dashboard"
-                        title={`Welcome back, ${auth.user.name.split(' ')[0]}!`}
-                        subtitle="Monitor your access, permissions, and administrative workspace."
-                        actions={
-                            <>
-                                <span className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-2 text-xs font-medium text-white shadow-sm">
-                                    <span className={`size-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-orange-500'}`} />
-                                    Systems operational
-                                </span>
-                                <Link
-                                    href="/settings/profile"
-                                    className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
-                                >
-                                    <Settings2 className="size-4" /> Settings
-                                </Link>
-                            </>
-                        }
-                    />
-                </div>
-
+            <div className="dashboard-shell mx-auto min-h-full w-full max-w-[1760px] flex-1 bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] p-4 md:p-6 xl:p-7">
                 {((procurementActive && canViewProcurement) || (salesActive && canViewSales)) && (
-                    <nav className="mb-5 flex flex-wrap items-center gap-2" aria-label="Business modules">
+                    <nav className="mb-6 flex flex-wrap items-center gap-2.5" aria-label="Business modules">
                         {procurementActive && canViewProcurement && (
                             <Link
                                 href="/admin/procurement/dashboard"
@@ -411,32 +449,58 @@ export default function Dashboard({
                     </nav>
                 )}
 
-                <div className="grid gap-5 xl:grid-cols-[0.72fr_1.48fr_0.8fr]">
-                    <div className="space-y-5">
-                        <Card className="bg-brand-plum overflow-hidden border-0 text-white shadow-sm">
-                            <CardContent className="relative p-6">
-                                <div className="bg-brand-aqua/25 absolute -top-14 -right-10 size-44 rounded-full" />
-                                <div className="bg-brand-gold/15 absolute -right-4 -bottom-16 size-36 rounded-full" />
-                                <div className="relative">
-                                    <div className="mb-5 grid size-10 place-items-center rounded-full bg-white/15 ring-1 ring-white/20">
-                                        <ShieldCheck className="size-5" />
+                <div className="grid items-start gap-6 xl:grid-cols-12">
+                    <div className="space-y-6 xl:col-span-4">
+                        <Card className="border-brand-teal/30 relative overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#023047_0%,#075b6d_58%,#0e8294_100%)] text-white shadow-[0_18px_40px_-24px_rgba(2,48,71,0.85)]">
+                            <div className="absolute inset-0 bg-[linear-gradient(rgba(142,202,230,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(142,202,230,0.08)_1px,transparent_1px)] bg-[size:32px_32px]" />
+                            <div className="border-brand-gold/15 absolute -top-20 right-16 size-52 rounded-full border-[24px]" />
+                            <div className="border-brand-aqua/15 absolute -right-16 -bottom-24 size-60 rounded-full border-[24px]" />
+                            <CardContent className="relative p-5 sm:p-6">
+                                <div className="flex items-center gap-5">
+                                    <div
+                                        className="relative grid size-24 shrink-0 place-items-center"
+                                        aria-label={`Profile ${profileScore}% complete`}
+                                    >
+                                        <svg viewBox="0 0 88 88" className="size-24 -rotate-90" aria-hidden="true">
+                                            <circle cx="44" cy="44" r="36" fill="none" stroke="#164e63" strokeWidth="7" />
+                                            <circle
+                                                cx="44"
+                                                cy="44"
+                                                r="36"
+                                                fill="none"
+                                                stroke="url(#profile-progress)"
+                                                strokeWidth="7"
+                                                strokeLinecap="round"
+                                                strokeDasharray="226.2"
+                                                strokeDashoffset={226.2 - (226.2 * profileScore) / 100}
+                                            />
+                                            <defs>
+                                                <linearGradient id="profile-progress" x1="0" y1="0" x2="88" y2="88">
+                                                    <stop stopColor="var(--brand-aqua)" />
+                                                    <stop offset="1" stopColor="var(--brand-teal)" />
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
+                                        <div className="absolute text-center">
+                                            <span className="block text-xl font-bold tracking-tight text-white">{profileScore}%</span>
+                                            <span className="text-brand-aqua block text-[9px] font-bold tracking-wide uppercase">Complete</span>
+                                        </div>
                                     </div>
-                                    <h2 className="text-xl font-semibold">
-                                        Your access is {postureScore === 100 ? 'fully configured' : 'being configured'}
-                                    </h2>
-                                    <p className="mt-2 text-sm leading-6 text-white/70">
-                                        Identity, account status, and permission coverage combine into your security posture.
-                                    </p>
-                                    <div className="mt-6 flex items-end justify-between">
+
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-brand-aqua text-[10px] font-bold tracking-[0.16em] uppercase">Profile overview</p>
+                                        <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Welcome, {auth.user.name.split(' ')[0]}!</h2>
+                                        <p className="mt-1.5 text-xs leading-5 text-white/75">
+                                            {profileScore === 100
+                                                ? 'Your profile is complete and up to date.'
+                                                : `Your profile is ${profileScore}% complete. ${remainingProfileFields} essential ${remainingProfileFields === 1 ? 'detail remains' : 'details remain'}.`}
+                                        </p>
                                         <Link
                                             href="/settings/profile"
-                                            className="decoration-brand-gold inline-flex items-center gap-1 text-sm font-semibold underline decoration-2 underline-offset-4"
+                                            className="bg-brand-gold text-brand-plum hover:bg-brand-berry mt-3 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold shadow-sm transition hover:text-white"
                                         >
-                                            Review profile <ArrowRight className="size-4" />
+                                            View profile <ArrowRight className="size-3.5" />
                                         </Link>
-                                        <div className="border-t-brand-gold grid size-16 place-items-center rounded-full border-[5px] border-white/20 text-sm font-bold">
-                                            {postureScore}%
-                                        </div>
                                     </div>
                                 </div>
                             </CardContent>
@@ -545,37 +609,84 @@ export default function Dashboard({
                         </Card>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-6 xl:col-span-8">
                         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            {stats.map(({ label, value, href, icon: Icon, color, surface, accent, halo }) => (
+                            {stats.map(({ label, value, href, icon: Icon, color, surface, accent }) => (
                                 <Link
                                     key={label}
                                     href={href}
                                     className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
                                 >
-                                    <Card className="corporate-card relative overflow-hidden rounded-2xl transition-all duration-300 group-hover:-translate-y-1 group-hover:border-slate-300 group-hover:shadow-lg">
+                                    <Card className="corporate-card relative h-full min-h-[132px] overflow-hidden rounded-2xl transition-all duration-300 group-hover:-translate-y-1 group-hover:border-slate-300 group-hover:shadow-xl">
                                         <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
-                                        <div
-                                            className={`absolute -top-12 -right-12 size-32 rounded-full opacity-60 transition-transform duration-300 group-hover:scale-110 ${halo}`}
-                                        />
-                                        <CardContent className="relative p-5 sm:p-6">
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className={`grid size-12 place-items-center rounded-xl shadow-sm ${surface}`} style={{ color }}>
-                                                    <Icon className="size-6" strokeWidth={1.8} />
-                                                </div>
-                                                <span className="grid size-9 place-items-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition-all duration-300 group-hover:border-transparent group-hover:bg-slate-900 group-hover:text-white">
-                                                    <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                                                </span>
+                                        <CardContent className="relative flex min-h-[132px] items-center gap-4 p-5">
+                                            <div
+                                                className={`grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm ${surface}`}
+                                                style={{ color }}
+                                            >
+                                                <Icon className="size-6" strokeWidth={1.8} />
                                             </div>
-                                            <div className="mt-6">
-                                                <p className="text-sm font-semibold text-slate-500">{label}</p>
-                                                <p className="mt-1 text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
                                                     {value.toLocaleString()}
                                                 </p>
+                                                <p className="mt-1 truncate text-xs font-semibold text-slate-500">{label}</p>
                                             </div>
+                                            <ArrowRight className="size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-slate-700" />
                                         </CardContent>
                                     </Card>
                                 </Link>
+                            ))}
+                            {[
+                                {
+                                    label: 'Total vendors',
+                                    value: 24,
+                                    color: 'text-pink-700',
+                                    surface: 'bg-pink-100',
+                                    accent: 'from-pink-500 to-rose-500',
+                                },
+                                {
+                                    label: 'Distributors',
+                                    value: 16,
+                                    color: 'text-violet-700',
+                                    surface: 'bg-violet-100',
+                                    accent: 'from-violet-500 to-purple-600',
+                                },
+                                {
+                                    label: 'Plumbers',
+                                    value: 8,
+                                    color: 'text-amber-700',
+                                    surface: 'bg-amber-100',
+                                    accent: 'from-amber-400 to-orange-500',
+                                },
+                                {
+                                    label: 'Active users',
+                                    value: visibleUserLocations.length,
+                                    color: 'text-cyan-700',
+                                    surface: 'bg-cyan-100',
+                                    accent: 'from-cyan-500 to-blue-600',
+                                },
+                            ].map((metric) => (
+                                <Card key={metric.label} className="corporate-card relative min-h-[132px] overflow-hidden">
+                                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${metric.accent}`} />
+                                    <CardContent className="relative flex min-h-[132px] items-center gap-4 p-5">
+                                        <div
+                                            className={`grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm ${metric.surface} ${metric.color}`}
+                                        >
+                                            {metric.label === 'Active users' ? (
+                                                <MapPin className="size-6" strokeWidth={1.8} />
+                                            ) : (
+                                                <Store className="size-6" strokeWidth={1.8} />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
+                                                {metric.value.toLocaleString()}
+                                            </p>
+                                            <p className="mt-1 truncate text-xs font-semibold text-slate-500">{metric.label}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             ))}
                         </section>
                         <Card className="corporate-card min-h-[324px]">
@@ -584,25 +695,43 @@ export default function Dashboard({
                                     <span className="bg-brand-gold h-4 w-1 rounded-full" />
                                     Product sales
                                 </CardTitle>
-                                <span className="text-xs text-slate-400">Dummy monthly data</span>
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+                                    Monthly performance
+                                </span>
                             </CardHeader>
                             <CardContent className="p-6">
                                 <div className="flex flex-col gap-5 sm:flex-row">
-                                    <div className="shrink-0 sm:w-36">
-                                        <p className="mb-2 text-[10px] font-bold tracking-wide text-slate-400 uppercase">Products</p>
-                                        <div className="flex max-h-56 gap-2 overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin] sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1">
+                                    <div className="shrink-0 sm:w-44">
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <p className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase">Product portfolio</p>
+                                            <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-bold text-cyan-700">
+                                                {dummyProducts.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex max-h-60 gap-2 overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin] sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1">
                                             {dummyProducts.map((product) => (
                                                 <button
                                                     key={product.id}
                                                     type="button"
                                                     onClick={() => setSelectedProductId(product.id)}
-                                                    className={`shrink-0 rounded-lg px-3 py-2 text-left text-[10px] font-semibold transition ${
+                                                    aria-pressed={product.id === selectedProductId}
+                                                    className={`group/product flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left text-[10px] font-semibold transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
                                                         product.id === selectedProductId
-                                                            ? 'bg-brand-teal text-white shadow-sm'
-                                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                            ? 'border-brand-teal bg-brand-teal text-white shadow-sm'
+                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/70 hover:text-cyan-800'
                                                     }`}
                                                 >
-                                                    {product.name}
+                                                    <span
+                                                        className={`grid size-6 shrink-0 place-items-center rounded-lg ${
+                                                            product.id === selectedProductId
+                                                                ? 'bg-white/15 text-white'
+                                                                : 'bg-slate-100 text-slate-400 group-hover/product:bg-white group-hover/product:text-cyan-600'
+                                                        }`}
+                                                    >
+                                                        <Package className="size-3.5" strokeWidth={1.8} />
+                                                    </span>
+                                                    <span className="min-w-0 flex-1 truncate">{product.name}</span>
+                                                    {product.id === selectedProductId && <CheckCircle2 className="size-3.5 shrink-0 text-white/90" />}
                                                 </button>
                                             ))}
                                         </div>
@@ -633,28 +762,10 @@ export default function Dashboard({
                                 </div>
                             </CardContent>
                         </Card>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            {[
-                                { label: 'Total vendors', value: 24, color: 'bg-pink-100 text-pink-700', accent: 'bg-pink-500' },
-                                { label: 'Distributors', value: 16, color: 'bg-violet-100 text-violet-700', accent: 'bg-violet-500' },
-                                { label: 'Plumbers', value: 8, color: 'bg-amber-100 text-amber-700', accent: 'bg-amber-500' },
-                            ].map((vendor) => (
-                                <Card key={vendor.label} className="corporate-card relative overflow-hidden">
-                                    <span className={`absolute inset-x-0 top-0 h-1 ${vendor.accent}`} />
-                                    <CardContent className="p-5">
-                                        <div className={`grid size-10 place-items-center rounded-xl ${vendor.color}`}>
-                                            <Store className="size-5" />
-                                        </div>
-                                        <p className="mt-5 text-3xl font-bold text-slate-900">{vendor.value}</p>
-                                        <p className="mt-1 text-xs font-semibold text-slate-500">{vendor.label}</p>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
                     </div>
 
-                    <div className="space-y-5">
-                        <Card className="corporate-card overflow-hidden">
+                    <div className="grid grid-cols-1 items-stretch gap-6 xl:col-span-12 xl:grid-cols-2">
+                        <Card className="corporate-card h-full overflow-hidden">
                             <CardHeader className="border-b border-slate-100 px-5 py-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <CardTitle className="flex items-center gap-2 text-sm">
@@ -678,85 +789,112 @@ export default function Dashboard({
                                         >
                                             <Download className="size-4" />
                                         </button>
+                                        {isSuperAdmin && (
+                                            <button
+                                                type="button"
+                                                disabled={securityScanRunning}
+                                                onClick={() => {
+                                                    setSecurityScanRunning(true);
+                                                    router.post(
+                                                        '/api/security-audits/run',
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                            onFinish: () => setSecurityScanRunning(false),
+                                                        },
+                                                    );
+                                                }}
+                                                className="hover:bg-brand-aqua/15 hover:text-brand-teal grid size-8 place-items-center rounded-md text-slate-400 transition disabled:cursor-wait disabled:opacity-50"
+                                                aria-label="Run OWASP security audit"
+                                                title="Run security audit"
+                                            >
+                                                <RefreshCw className={`size-4 ${securityScanRunning ? 'animate-spin' : ''}`} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5">
-                                <div
-                                    className="mx-auto grid size-36 place-items-center rounded-full border-[13px] bg-white"
-                                    style={{
-                                        borderColor: portalSecurity.score >= 80 ? '#10b981' : portalSecurity.score >= 50 ? '#f59e0b' : '#ef4444',
-                                    }}
-                                >
-                                    <div className="grid size-full place-items-center rounded-full bg-white text-center shadow-inner">
-                                        <div>
-                                            <p className="text-xs text-slate-500">Score</p>
-                                            <p className="text-3xl font-bold text-slate-900">{portalSecurity.score}</p>
-                                            <p className="text-[10px] font-semibold text-slate-500">OUT OF 100</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {portalSecurity.latestScan && (
-                                    <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="grid size-9 place-items-center rounded-full bg-emerald-100 text-emerald-600">
-                                                <ShieldCheck className="size-5" />
-                                            </span>
-                                            <div>
-                                                <p className="text-xs font-semibold text-emerald-800">Latest library audit</p>
-                                                <p className="mt-0.5 text-[10px] text-emerald-600">
-                                                    {portalSecurity.latestScan.totalFindings === 0
-                                                        ? 'No vulnerable libraries detected'
-                                                        : `${portalSecurity.latestScan.totalFindings} findings detected`}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <p className="text-xl font-bold text-emerald-700">
-                                            {portalSecurity.latestScan.score}
-                                            <span className="text-xs font-semibold">/100</span>
-                                        </p>
-                                    </div>
-                                )}
-                                <div className="mt-5 max-h-[174px] space-y-2 overflow-y-auto border-t border-slate-100 pt-4 pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
-                                    {portalSecurity.checks.map((check) => (
+                                <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)] lg:items-stretch">
+                                    <div className="flex flex-col justify-center rounded-2xl bg-slate-50/70 p-5">
                                         <div
-                                            key={check.title}
-                                            className={`flex gap-3 rounded-lg border p-3 ${
-                                                check.passed ? 'border-emerald-100 bg-emerald-50/60' : 'border-red-100 bg-red-50/50'
-                                            }`}
+                                            className="mx-auto grid size-36 place-items-center rounded-full border-[13px] bg-white"
+                                            style={{
+                                                borderColor:
+                                                    portalSecurity.score >= 80 ? '#10b981' : portalSecurity.score >= 50 ? '#f59e0b' : '#ef4444',
+                                            }}
                                         >
-                                            {check.passed ? (
-                                                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                            ) : (
-                                                <AlertTriangle
-                                                    className={`mt-0.5 size-4 shrink-0 ${
-                                                        ['critical', 'high'].includes(check.severity) ? 'text-red-500' : 'text-amber-500'
-                                                    }`}
-                                                />
-                                            )}
-                                            <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="text-xs font-semibold text-slate-700">{check.title}</p>
-                                                    <span
-                                                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                                                            check.passed
-                                                                ? 'bg-emerald-100 text-emerald-700'
-                                                                : ['critical', 'high'].includes(check.severity)
-                                                                  ? 'bg-red-100 text-red-600'
-                                                                  : 'bg-amber-100 text-amber-700'
-                                                        }`}
-                                                    >
-                                                        {check.passed ? 'Passed' : `${check.severity} risk`}
-                                                    </span>
+                                            <div className="grid size-full place-items-center rounded-full bg-white text-center shadow-inner">
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Score</p>
+                                                    <p className="text-3xl font-bold text-slate-900">{portalSecurity.score}</p>
+                                                    <p className="text-[10px] font-semibold text-slate-500">OUT OF 100</p>
                                                 </div>
-                                                <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                                                    {check.passed
-                                                        ? (check.passedDescription ?? 'Security control is configured correctly.')
-                                                        : check.description}
-                                                </p>
                                             </div>
                                         </div>
-                                    ))}
+                                        {portalSecurity.latestScan && (
+                                            <div className="mt-5 flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="grid size-9 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+                                                        <ShieldCheck className="size-5" />
+                                                    </span>
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-emerald-800">Latest library audit</p>
+                                                        <p className="mt-0.5 text-[10px] text-emerald-600">
+                                                            {portalSecurity.latestScan.totalFindings === 0
+                                                                ? 'No vulnerable libraries detected'
+                                                                : `${portalSecurity.latestScan.totalFindings} findings detected`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xl font-bold text-emerald-700">
+                                                    {portalSecurity.latestScan.score}
+                                                    <span className="text-xs font-semibold">/100</span>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[310px] space-y-2 overflow-y-auto border-t border-slate-100 pt-4 pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin] lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+                                        {portalSecurity.checks.map((check) => (
+                                            <div
+                                                key={check.title}
+                                                className={`flex gap-3 rounded-lg border p-3 ${
+                                                    check.passed ? 'border-emerald-100 bg-emerald-50/60' : 'border-red-100 bg-red-50/50'
+                                                }`}
+                                            >
+                                                {check.passed ? (
+                                                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                                                ) : (
+                                                    <AlertTriangle
+                                                        className={`mt-0.5 size-4 shrink-0 ${
+                                                            ['critical', 'high'].includes(check.severity) ? 'text-red-500' : 'text-amber-500'
+                                                        }`}
+                                                    />
+                                                )}
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="text-xs font-semibold text-slate-700">{check.title}</p>
+                                                        <span
+                                                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                                                check.passed
+                                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                                    : ['critical', 'high'].includes(check.severity)
+                                                                      ? 'bg-red-100 text-red-600'
+                                                                      : 'bg-amber-100 text-amber-700'
+                                                            }`}
+                                                        >
+                                                            {check.passed ? 'Passed' : `${check.severity} risk`}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                                                        {check.passed
+                                                            ? (check.passedDescription ?? 'Security control is configured correctly.')
+                                                            : check.description}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="mt-3 border-t border-slate-100 pt-3 text-[10px] text-slate-400">
                                     {portalSecurity.latestScan ? (
@@ -780,7 +918,7 @@ export default function Dashboard({
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="corporate-card overflow-hidden">
+                        <Card className="corporate-card h-full overflow-hidden">
                             <CardHeader className="flex-row items-center justify-between border-b border-slate-100 px-5 py-4">
                                 <CardTitle className="flex items-center gap-2 text-sm">
                                     <span className="bg-brand-teal h-4 w-1 rounded-full" />
@@ -795,7 +933,7 @@ export default function Dashboard({
                             </CardHeader>
                             <CardContent className="p-3">
                                 {portalLogs.length ? (
-                                    <div className="max-h-[216px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
+                                    <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
                                         {portalLogs.map((log) => {
                                             const activityTime = new Intl.DateTimeFormat('en-IN', {
                                                 dateStyle: 'medium',
@@ -893,7 +1031,7 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                <div className="mt-5 grid gap-5 xl:grid-cols-[2fr_0.8fr]">
+                <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.7fr)]">
                     <Card className="corporate-card overflow-hidden">
                         <CardHeader className="flex-row items-center justify-between border-b border-slate-100 px-5 py-4">
                             <CardTitle className="flex items-center gap-2 text-sm">
@@ -918,7 +1056,13 @@ export default function Dashboard({
                                 <tbody className="divide-y divide-slate-100">
                                     {(accessRows.length
                                         ? accessRows
-                                        : [{ resource: 'No permissions', capability: 'Pending', source: 'Administrator' }]
+                                        : [
+                                              {
+                                                  resource: 'No permissions',
+                                                  capability: 'Pending',
+                                                  source: 'Administrator',
+                                              },
+                                          ]
                                     ).map((row) => (
                                         <tr key={`${row.resource}-${row.capability}`} className="text-black transition hover:bg-slate-50/70">
                                             <td className="px-5 py-3.5">

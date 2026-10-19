@@ -56,6 +56,7 @@ export function AppSidebar() {
     const canViewQualityApi = isSuperAdmin || auth.permissions.includes('procurement.api.quality.view');
     const canViewStockApi = isSuperAdmin || auth.permissions.includes('procurement.api.stock.view');
     const canViewVendorApi = isSuperAdmin || auth.permissions.includes('procurement.api.vendor.view');
+    const canViewEmployeeApi = canViewUsers;
     const canViewMaterials = isSuperAdmin || auth.permissions.includes('procurement.inventory.materials.view');
     const canViewMaterialStock = isSuperAdmin || auth.permissions.includes('procurement.inventory.material_stock.view');
     const canViewMaterialInventory = isSuperAdmin || auth.permissions.includes('procurement.overview.view');
@@ -65,6 +66,8 @@ export function AppSidebar() {
         ...(canViewQualityApi ? [{ title: 'Quality API', href: '/admin/api-integrations?search=quality', icon: PlugZap }] : []),
         ...(canViewStockApi ? [{ title: 'Stock API', href: '/admin/api-integrations?search=stock', icon: PlugZap }] : []),
         ...(canViewVendorApi ? [{ title: 'Vendor API', href: '/admin/api-integrations?search=vendor', icon: PlugZap }] : []),
+        ...(canViewEmployeeApi ? [{ title: 'Employee API', href: '/admin/api-integrations?search=employee', icon: PlugZap }] : []),
+        ...(isSuperAdmin ? [{ title: 'Security Audit API', href: '/admin/api-integrations?search=security', icon: ShieldCheck }] : []),
     ];
     const procurementInventoryTools = [
         ...(canViewMaterials ? [{ title: 'Materials', href: '/admin/materials', icon: Package }] : []),
@@ -270,6 +273,7 @@ export function AppSidebar() {
                                                 defaultOpen={
                                                     currentPath === '/admin/procurement' ||
                                                     currentPath.includes('/admin/procurement/daily-consumption') ||
+                                                    currentPath.includes('/admin/procurement/balance-overview') ||
                                                     currentPath.includes('/admin/procurement/balance-sheet')
                                                 }
                                                 className="group/planning"
@@ -292,6 +296,12 @@ export function AppSidebar() {
                                                                     active:
                                                                         currentPath === '/admin/procurement' ||
                                                                         currentPath === '/admin/procurement/daily-consumption',
+                                                                },
+                                                                {
+                                                                    title: 'Balance Sheet View',
+                                                                    href: '/admin/procurement/balance-overview',
+                                                                    icon: TrendingUp,
+                                                                    active: currentPath.startsWith('/admin/procurement/balance-overview'),
                                                                 },
                                                                 {
                                                                     title: 'Balance Sheet',

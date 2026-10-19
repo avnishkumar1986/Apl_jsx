@@ -10,6 +10,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -274,7 +275,11 @@ class ProcurementController extends Controller
 
     public function balanceSheet(Request $request): Response
     {
-        $companies = DB::table('tbl_company')->where('status', 1)->where('record_type', 1)->orderBy('company_name')->get(['id', 'company_code', 'company_name']);
+        $companies = Cache::remember('procurement:balance-companies', now()->addMinutes(5), fn () => DB::table('tbl_company')
+            ->where('status', 1)
+            ->where('record_type', 1)
+            ->orderBy('company_name')
+            ->get(['id', 'company_code', 'company_name']));
         $companyCode = trim((string) $request->string('company_code'));
         $selectedCompany = $companyCode !== '' ? $companies->firstWhere('company_code', $companyCode) : null;
         if (! $selectedCompany && $request->integer('company_id') > 0) {
@@ -283,7 +288,11 @@ class ProcurementController extends Controller
         $selectedCompany ??= $companies->first();
         $companyId = (int) ($selectedCompany->id ?? 0);
         $companyCode = (string) ($selectedCompany->company_code ?? '');
-        $materials = DB::table('tbl_materials')->where('status', 1)->orderBy('maktx')->limit(5000)->get(['matnr', 'maktx', 'mtart', 'matkl', 'meins']);
+        $materials = Cache::remember('procurement:balance-materials', now()->addMinutes(2), fn () => DB::table('tbl_materials')
+            ->where('status', 1)
+            ->orderBy('maktx')
+            ->limit(5000)
+            ->get(['matnr', 'maktx', 'mtart', 'matkl', 'meins']));
         $materialCode = trim((string) $request->string('material')) ?: (string) ($materials->first()->matnr ?? '');
         $selectedMaterial = $materials->firstWhere('matnr', $materialCode);
         $requestedMonth = trim((string) $request->string('month'));
@@ -316,7 +325,9 @@ class ProcurementController extends Controller
             ->map(fn (int $offset) => $monthStart->addMonths($offset));
         $horizonEnd = $periods->last()->endOfMonth();
 
-        if ($materialCode !== '') {
+        // The visual balance workspace must remain instant when switching tabs.
+        // API imports are managed by the integration runner; do not block this GET.
+        if ($materialCode !== '' && ! $request->routeIs('admin.procurement.balance-overview')) {
             $this->syncVendorPurchaseOrdersForMaterial($materialCode);
         }
         $stocks = DB::table('tbl_material_stocks')
@@ -377,16 +388,23 @@ class ProcurementController extends Controller
                 $isPlanStartMonth = $activePlan && CarbonImmutable::parse($activePlan->consumption_date)->format('Y-m') === $periodKey;
                 $days = $activePlan ? ($activePlan->period_type === 'datewise' ? 1 : ($isPlanStartMonth ? max(1, (int) $activePlan->day_count) : $periodEnd->day)) : $periodEnd->day;
                 $plannedBuying = (float) ($activePlan?->planned_buying_mt ?? 0);
-                $imports = (float) ($activePlan?->imports_mt ?? 0);
-                // Every non-cancelled PO is mapped to the month of its expected-delivery date.
-                // This represents the supplier receipts expected during that planning month.
-                $supplierReceipts = (float) $calculationPurchases->sum('quantity_mt');
+                // Buying / Imports is the combined local + SAP PO total. To Buy
+                // remains the separately entered planned-buying quantity.
+                $localPurchases = $calculationPurchases->where('source', 'local');
+                $supplierPurchases = $calculationPurchases->where('source', '!=', 'local');
+                $localPurchaseQuantity = (float) $localPurchases->sum('quantity_mt');
+                $sapPurchaseQuantity = (float) $supplierPurchases->sum('quantity_mt');
+                $toBuy = $plannedBuying;
+                $imports = $localPurchaseQuantity + $sapPurchaseQuantity;
+                $supplierReceipts = $imports;
                 $consumption = $dailyConsumption * $days;
-                $totalBuying = $plannedBuying + $imports + $supplierReceipts;
+                // Local and SAP POs are already represented by Imports; do not add
+                // the To Buy/Supplier rows again when calculating the total.
+                $totalBuying = $plannedBuying + $imports;
                 $totalAvailability = $openingStock + $totalBuying;
                 $closingStock = $totalAvailability - $consumption;
-                $grossShortage = max(0, $consumption - ($openingStock + $plannedBuying + $imports));
-                $remainingShortage = max(0, $grossShortage - $supplierReceipts);
+                $grossShortage = max(0, $consumption - ($openingStock + $plannedBuying));
+                $remainingShortage = max(0, $grossShortage - $imports);
                 $purchaseOrders = $plantPurchases->map(fn ($purchase) => [
                     'po_number' => $purchase->reference ?: 'Manual PO',
                     'vendor_name' => $purchase->vendor_name ?: 'Vendor not provided',
@@ -408,7 +426,7 @@ class ProcurementController extends Controller
                     'consumption_id' => $activePlan?->id,
                     'opening_stock' => $openingStock,
                     'cover_days' => $dailyConsumption > 0 ? $openingStock / $dailyConsumption : null,
-                    'to_buy' => $plannedBuying,
+                    'to_buy' => $toBuy,
                     'supplier_receipts' => $supplierReceipts,
                     'purchase_orders' => $purchaseOrders,
                     'buying_imports' => $imports,
@@ -425,7 +443,11 @@ class ProcurementController extends Controller
             });
         })->values();
 
-        return Inertia::render('modules/procurement/planning/balance-sheet', [
+        $page = $request->routeIs('admin.procurement.balance-overview')
+            ? 'modules/procurement/planning/balance-overview'
+            : 'modules/procurement/planning/balance-sheet';
+
+        return Inertia::render($page, [
             'companies' => $companies,
             'plants' => $plants,
             'materials' => $materials,

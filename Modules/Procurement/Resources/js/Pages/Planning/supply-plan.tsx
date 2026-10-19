@@ -83,7 +83,7 @@ export default function SupplyPlan({
             ]}
         >
             <Head title="Monthly supply planning" />
-            <div className="mx-auto w-full max-w-full space-y-4 p-4 lg:p-6">
+            <div className="procurement-compact mx-auto w-full max-w-full space-y-3 p-3 sm:p-4">
                 <ProcurementPageHeader
                     title={`${material?.matnr} · ${material?.maktx}`}
                     subtitle={`${month} · ${plant?.company_name} · ${company?.company_name}`}
@@ -110,7 +110,7 @@ export default function SupplyPlan({
                     <Kpi label="Stock cover" value={summary.stock_cover} note="Days" />
                 </div>
                 <section className="overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <div className="border-b border-slate-100 px-4 py-2.5">
                         <h2 className="text-base font-bold text-slate-900">Create purchase order manually</h2>
                         <p className="mt-1 text-xs leading-5 text-slate-500">
                             The remaining shortage is suggested automatically; no purchase order is created until you save.

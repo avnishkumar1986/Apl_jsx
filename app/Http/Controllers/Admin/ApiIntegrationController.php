@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportMaterialsFromApi;
 use App\Models\ApiIntegration;
+use App\Services\Security\ProjectSecurityAuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,19 @@ class ApiIntegrationController extends Controller
         $allowedCodes = collect(['material', 'production', 'quality', 'stock', 'vendor'])
             ->filter(fn (string $code): bool => $user?->can("procurement.api.{$code}.view") ?? false)
             ->values();
+        if ($user?->can('users.view')) {
+            $allowedCodes->push('employee');
+        }
+        if ($user?->hasRole('Super Admin')) {
+            $allowedCodes->push('security');
+        }
+        $manageableCodes = $allowedCodes
+            ->filter(fn (string $code): bool => match ($code) {
+                'employee' => $user?->can('users.manage') ?? false,
+                'security' => $user?->hasRole('Super Admin') ?? false,
+                default => $user?->can("procurement.api.{$code}.manage") ?? false,
+            })
+            ->values();
         $query = ApiIntegration::query()
             ->whereIn('code', $allowedCodes)
             ->with(['logs' => fn ($q) => $q->latest('id')->limit(20)]);
@@ -39,10 +53,8 @@ class ApiIntegrationController extends Controller
                 'total' => ApiIntegration::whereIn('code', $allowedCodes)->count(),
                 'active' => ApiIntegration::whereIn('code', $allowedCodes)->where('status', true)->count(),
             ],
-            'canManage' => $allowedCodes->contains(fn (string $code): bool => $user?->can("procurement.api.{$code}.manage") ?? false),
-            'manageableCodes' => $allowedCodes
-                ->filter(fn (string $code): bool => $user?->can("procurement.api.{$code}.manage") ?? false)
-                ->values(),
+            'canManage' => $manageableCodes->isNotEmpty(),
+            'manageableCodes' => $manageableCodes,
         ]);
     }
 
@@ -87,6 +99,26 @@ class ApiIntegrationController extends Controller
         }
         if (! filled($apiIntegration->endpoint)) {
             return back()->withErrors(['run' => 'Endpoint must be configured.']);
+        }
+
+        if (strtolower($apiIntegration->code) === 'security') {
+            $scan = app(ProjectSecurityAuditService::class)->run();
+            $apiIntegration->logs()->create([
+                'run_id' => (string) \Illuminate\Support\Str::uuid(),
+                'status' => $scan->status === 'completed' ? 'success' : 'warning',
+                'http_status' => 200,
+                'attempt' => 1,
+                'records_received' => $scan->total_findings,
+                'message' => "OWASP-aligned audit completed with score {$scan->score}/100 and {$scan->total_findings} finding(s).",
+                'created_by' => auth()->id(),
+                'created_at' => now(),
+            ]);
+            $apiIntegration->update([
+                'last_run_status' => $scan->status,
+                'last_run_at' => $scan->completed_at ?? now(),
+            ]);
+
+            return back()->with('success', "Security audit completed: {$scan->score}/100.");
         }
 
         if (! in_array(strtolower($apiIntegration->code), ['material', 'stock', 'vendor', 'employee'], true)) {
@@ -138,6 +170,18 @@ class ApiIntegrationController extends Controller
     private function authorizeCode(Request $request, string $code): void
     {
         $code = strtolower($code);
+        if ($code === 'employee') {
+            abort_unless($request->user()?->can('users.manage'), 403);
+
+            return;
+        }
+
+        if ($code === 'security') {
+            abort_unless($request->user()?->hasRole('Super Admin'), 403);
+
+            return;
+        }
+
         abort_unless(in_array($code, ['material', 'production', 'quality', 'stock', 'vendor'], true), 403);
         abort_unless($request->user()?->can("procurement.api.{$code}.manage"), 403);
     }

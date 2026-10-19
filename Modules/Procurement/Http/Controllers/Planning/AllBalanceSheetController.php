@@ -54,7 +54,12 @@ class AllBalanceSheetController extends Controller
         $purchases = DB::table('vw_procurement_purchase_receipts')->where('status', 1)
             ->where('delivery_status', '!=', 'cancelled')->whereIn('plant_id', $plantIds)->whereIn('material', $materialCodes)
             ->whereBetween('expected_delivery_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->select('material', 'plant_id', DB::raw('SUM(quantity_mt) as quantity_mt'))
+            ->select(
+                'material',
+                'plant_id',
+                DB::raw("SUM(CASE WHEN source = 'local' THEN quantity_mt ELSE 0 END) as local_quantity_mt"),
+                DB::raw("SUM(CASE WHEN source <> 'local' THEN quantity_mt ELSE 0 END) as sap_quantity_mt"),
+            )
             ->groupBy('material', 'plant_id')->get()->keyBy(fn ($row) => $row->material.'|'.$row->plant_id);
 
         $rows = $selectedMaterials->flatMap(function ($material) use ($selectedPlants, $stocks, $consumptions, $purchases, $monthStart, $monthEnd) {
@@ -67,9 +72,11 @@ class AllBalanceSheetController extends Controller
                 $days = $activePlan ? ($activePlan->period_type === 'datewise' ? 1 : ($isStartMonth ? max(1, (int) $activePlan->day_count) : $monthEnd->day)) : $monthEnd->day;
                 $consumption = $dailyConsumption * $days;
                 $plannedBuying = (float) ($activePlan?->planned_buying_mt ?? 0);
-                $imports = (float) ($activePlan?->imports_mt ?? 0);
-                $supplierReceipts = (float) ($purchases->get($key)?->quantity_mt ?? 0);
-                $totalBuying = $plannedBuying + $imports + $supplierReceipts;
+                $localPurchases = (float) ($purchases->get($key)?->local_quantity_mt ?? 0);
+                $sapPurchases = (float) ($purchases->get($key)?->sap_quantity_mt ?? 0);
+                $imports = $localPurchases + $sapPurchases;
+                $supplierReceipts = $imports;
+                $totalBuying = $plannedBuying + $imports;
                 $availability = $openingStock + $totalBuying;
                 $closingStock = $availability - $consumption;
 
@@ -80,7 +87,7 @@ class AllBalanceSheetController extends Controller
                     'consumption' => $consumption, 'planned_buying' => $plannedBuying, 'imports' => $imports,
                     'supplier_receipts' => $supplierReceipts, 'total_buying' => $totalBuying,
                     'total_availability' => $availability, 'closing_stock' => $closingStock,
-                    'shortage' => max(0, -$closingStock),
+                    'shortage' => max(0, $consumption - $availability),
                 ];
             });
         })->filter(fn (array $row) => $search === '' || str_contains(strtolower(implode(' ', [$row['material'], $row['material_name'], $row['plant_code'], $row['plant_name']])), strtolower($search)));

@@ -99,6 +99,7 @@ class ProfileController extends Controller
                         'contact_type' => 'primary',
                         'email' => $request->validated('email'),
                         'is_verified' => false,
+                        'email_verified_at' => null,
                         'status' => true,
                         'updated_by' => $request->user()->id,
                     ],
@@ -106,6 +107,7 @@ class ProfileController extends Controller
             }
 
             $request->user()->save();
+            $request->user()->unsetRelation('login')->unsetRelation('primaryEmail');
         });
 
         return to_route('profile.edit');

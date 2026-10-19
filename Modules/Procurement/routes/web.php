@@ -18,6 +18,7 @@ Route::middleware(['auth', 'module.active:procurement'])
         Route::get('reference-data', [ConsumptionController::class, 'referenceData'])->middleware('permission:procurement.overview.view')->name('reference-data');
         Route::get('vendors', [ConsumptionController::class, 'vendors'])->middleware('permission:procurement.overview.view')->name('vendors');
         Route::get('balance-sheet', [BalanceSheetController::class, 'balanceSheet'])->middleware('permission:procurement.overview.view')->name('balance-sheet');
+        Route::get('balance-overview', [BalanceSheetController::class, 'balanceSheet'])->middleware('permission:procurement.overview.view')->name('balance-overview');
         Route::get('all-balance-sheet', [AllBalanceSheetController::class, 'index'])->middleware('permission:procurement.overview.view')->name('all-balance-sheet');
         Route::put('balance-sheet/remarks', [BalanceSheetController::class, 'updateBalanceRemark'])->middleware('permission:procurement.daily_consumption.create')->name('balance-sheet.remarks');
         Route::get('material-inventory', [MaterialInventoryController::class, 'inventory'])->middleware('permission:procurement.overview.view')->name('material-inventory');

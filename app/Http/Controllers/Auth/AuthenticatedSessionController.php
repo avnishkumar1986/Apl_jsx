@@ -49,11 +49,7 @@ class AuthenticatedSessionController extends Controller
             ])->save();
         }
 
-        $destination = $request->user()->can('dashboard.view')
-            ? route('dashboard', absolute: false)
-            : route('profile.edit', absolute: false);
-
-        return redirect()->intended($destination);
+        return redirect()->intended(route('dashboard', absolute: false));
     }
 
     /**

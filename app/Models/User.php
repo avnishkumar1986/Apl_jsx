@@ -232,7 +232,9 @@ class User extends Authenticatable implements JWTSubject
 
     public function getEmailAttribute(): ?string
     {
-        return $this->primaryEmail?->email ?? $this->login?->login_name ?? $this->pendingEmail;
+        return $this->primaryEmail?->email
+            ?? $this->login?->login_name
+            ?? $this->pendingEmail;
     }
 
     public function getNameAttribute(): string
@@ -249,7 +251,9 @@ class User extends Authenticatable implements JWTSubject
 
     public function getEmailVerifiedAtAttribute(): mixed
     {
-        return $this->primaryEmail?->is_verified ? $this->primaryEmail->updated_at : $this->pendingEmailVerifiedAt;
+        return $this->primaryEmail?->is_verified
+            ? ($this->primaryEmail->email_verified_at ?? $this->primaryEmail->updated_at)
+            : $this->pendingEmailVerifiedAt;
     }
 
     public function setEmailAttribute(?string $value): void
@@ -265,6 +269,23 @@ class User extends Authenticatable implements JWTSubject
     public function setEmailVerifiedAtAttribute(mixed $value): void
     {
         $this->pendingEmailVerifiedAt = $value;
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    public function markEmailAsVerified(): bool
+    {
+        $verifiedAt = now();
+        $this->primaryEmail()->update([
+            'is_verified' => true,
+            'email_verified_at' => $verifiedAt,
+        ]);
+        $this->unsetRelation('primaryEmail');
+
+        return true;
     }
 
     public function setRememberTokenAttribute(?string $value): void

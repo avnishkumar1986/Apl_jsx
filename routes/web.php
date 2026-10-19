@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\UserTypeController;
 use App\Http\Controllers\DashboardLocationController;
 use App\Http\Controllers\PortalActivityController;
+use App\Http\Controllers\SecurityAuditController;
 use App\Models\Company;
 use App\Models\Material;
 use App\Models\PortalLog;
@@ -222,7 +223,7 @@ Route::middleware(['auth'])->group(function () {
                     'createdAt' => $log->created_at->toIso8601String(),
                 ]),
         ]);
-    })->middleware('permission:dashboard.view')->name('dashboard');
+    })->name('dashboard');
 
     Route::post('dashboard/location', [DashboardLocationController::class, 'store'])->middleware('permission:dashboard.view')->name('dashboard.location.store');
     Route::get('dashboard/location-report', [DashboardLocationController::class, 'report'])
@@ -234,6 +235,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('dashboard/session-closing', [DashboardLocationController::class, 'markSessionClosing'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.session-closing');
+    Route::get('api/security-audits/latest', [SecurityAuditController::class, 'latest'])
+        ->middleware('throttle:30,1')
+        ->name('api.security-audits.latest');
+    Route::post('api/security-audits/run', [SecurityAuditController::class, 'run'])
+        ->middleware('throttle:3,1')
+        ->name('api.security-audits.run');
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('employee-hierarchy', [EmployeeHierarchyController::class, 'index'])
@@ -260,12 +267,12 @@ Route::middleware(['auth'])->group(function () {
         Route::put('material-stocks/{materialStock}', [MaterialStockController::class, 'update'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.update');
         Route::patch('material-stocks/{materialStock}/status', [MaterialStockController::class, 'toggleStatus'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.status');
         Route::delete('material-stocks/{materialStock}', [MaterialStockController::class, 'destroy'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.destroy');
-        Route::get('api-integrations', [ApiIntegrationController::class, 'index'])->middleware('permission:procurement.api.material.view|procurement.api.production.view|procurement.api.quality.view|procurement.api.stock.view|procurement.api.vendor.view')->name('api-integrations.index');
-        Route::post('api-integrations', [ApiIntegrationController::class, 'store'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage')->name('api-integrations.store');
-        Route::put('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'update'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage')->name('api-integrations.update');
-        Route::patch('api-integrations/{apiIntegration}/status', [ApiIntegrationController::class, 'toggleStatus'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage')->name('api-integrations.status');
-        Route::post('api-integrations/{apiIntegration}/run', [ApiIntegrationController::class, 'run'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage')->name('api-integrations.run');
-        Route::delete('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'destroy'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage')->name('api-integrations.destroy');
+        Route::get('api-integrations', [ApiIntegrationController::class, 'index'])->middleware('permission:procurement.api.material.view|procurement.api.production.view|procurement.api.quality.view|procurement.api.stock.view|procurement.api.vendor.view|users.view')->name('api-integrations.index');
+        Route::post('api-integrations', [ApiIntegrationController::class, 'store'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.store');
+        Route::put('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'update'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.update');
+        Route::patch('api-integrations/{apiIntegration}/status', [ApiIntegrationController::class, 'toggleStatus'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.status');
+        Route::post('api-integrations/{apiIntegration}/run', [ApiIntegrationController::class, 'run'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.run');
+        Route::delete('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'destroy'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.destroy');
         Route::get('companies', [CompanyController::class, 'index'])->middleware('permission:users.view')->name('companies.index');
         Route::get('companies/hierarchy', [CompanyController::class, 'hierarchy'])->middleware('permission:users.view')->name('companies.hierarchy');
         Route::post('companies', [CompanyController::class, 'store'])->middleware('permission:users.manage')->name('companies.store');

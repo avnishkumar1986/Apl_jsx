@@ -51,7 +51,7 @@ function SearchSelect({
                 type="button"
                 disabled={disabled}
                 onClick={() => setOpen((current) => !current)}
-                className="border-input focus:border-ring focus:ring-ring/50 flex h-10 w-full items-center justify-between rounded-md border bg-white px-3 text-left text-sm shadow-xs outline-none focus:ring-[3px] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                className="border-input focus:border-ring focus:ring-ring/50 flex h-9 w-full items-center justify-between rounded-md border bg-white px-3 text-left text-sm shadow-xs outline-none focus:ring-[3px] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
             >
                 <span className="truncate">{disabled ? disabledLabel : selected ? `${selected.value} - ${selected.label}` : allLabel}</span>
                 <ChevronDown className="size-4 shrink-0 text-slate-500" />
@@ -65,7 +65,7 @@ function SearchSelect({
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder={searchLabel}
-                            className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+                            className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
                         />
                     </div>
                     <div className="max-h-64 overflow-y-auto p-1">
@@ -98,10 +98,10 @@ function SearchSelect({
     );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, dark = false }: { label: string; children: ReactNode; dark?: boolean }) {
     return (
-        <div className="min-w-0 space-y-1.5">
-            <span className="block text-xs font-semibold text-slate-700">{label}</span>
+        <div className="min-w-0 space-y-1">
+            <span className={`block text-xs font-semibold ${dark ? 'text-white/90' : 'text-slate-700'}`}>{label}</span>
             {children}
         </div>
     );
@@ -119,6 +119,8 @@ export default function ProcurementFilterBar({
     onMaterialChange,
     onApply,
     onReset,
+    embedded = false,
+    showReset = false,
 }: {
     companyCode: string;
     plantCode: string;
@@ -131,13 +133,24 @@ export default function ProcurementFilterBar({
     onMaterialChange: (value: string) => void;
     onApply: (event: FormEvent) => void;
     onReset: () => void;
+    embedded?: boolean;
+    showReset?: boolean;
 }) {
     const availablePlants =
         companyCode === 'all' ? [] : plants.filter((plant) => !plant.parent_company_id || plant.parent_company_id === companyCode);
     return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <form onSubmit={onApply} className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.5fr_auto_auto] xl:items-end">
-                <Field label="Company">
+        <section
+            className={
+                embedded
+                    ? 'rounded-lg border border-white/15 bg-white/8 p-2.5 shadow-inner shadow-black/5 backdrop-blur-sm'
+                    : 'rounded-xl border border-slate-200 bg-white p-3 shadow-sm'
+            }
+        >
+            <form
+                onSubmit={onApply}
+                className={`grid gap-3 md:grid-cols-2 ${showReset ? 'xl:grid-cols-[1fr_1fr_1.5fr_auto_auto]' : 'xl:grid-cols-[1fr_1fr_1.5fr_auto]'} xl:items-end`}
+            >
+                <Field label="Company" dark={embedded}>
                     <SearchSelect
                         value={companyCode}
                         options={companies.map((item) => ({ value: item.company_code, label: item.company_name }))}
@@ -146,7 +159,7 @@ export default function ProcurementFilterBar({
                         onChange={onCompanyChange}
                     />
                 </Field>
-                <Field label="Plant">
+                <Field label="Plant" dark={embedded}>
                     <SearchSelect
                         value={plantCode}
                         options={availablePlants.map((item) => ({ value: item.company_code, label: item.company_name }))}
@@ -157,7 +170,7 @@ export default function ProcurementFilterBar({
                         onChange={onPlantChange}
                     />
                 </Field>
-                <Field label="Material">
+                <Field label="Material" dark={embedded}>
                     <SearchSelect
                         value={materialCode}
                         options={materials.map((item) => ({ value: item.matnr, label: item.maktx || 'No description' }))}
@@ -169,9 +182,11 @@ export default function ProcurementFilterBar({
                 <Button type="submit" className="bg-brand-teal hover:bg-brand-teal/90 gap-2">
                     <Filter className="size-4" /> Apply
                 </Button>
-                <Button type="button" variant="outline" className="gap-2" onClick={onReset}>
-                    <RotateCcw className="size-4" /> Reset
-                </Button>
+                {showReset && (
+                    <Button type="button" variant="outline" className="gap-2" onClick={onReset}>
+                        <RotateCcw className="size-4" /> Reset
+                    </Button>
+                )}
             </form>
         </section>
     );

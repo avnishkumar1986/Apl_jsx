@@ -15,18 +15,16 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $emailRules = ['required', 'string', 'lowercase', 'email', 'max:255'];
+        if ($this->input('email') !== $this->user()->email) {
+            $emailRules[] = Rule::unique('tbl_usrlogin', 'login_name')->ignore($this->user()->login?->id);
+            $emailRules[] = Rule::unique('tbl_usrcontact', 'email')->ignore($this->user()->primaryEmail?->id);
+        }
+
         return [
             'name' => ['required', 'string', 'max:255'],
 
-            'email' => [
-                'required',
-                'string',
-                'lowercase',
-                'email',
-                'max:255',
-                Rule::unique('tbl_usrlogin', 'login_name')->ignore($this->user()->login?->id),
-                Rule::unique('tbl_usrcontact', 'email')->ignore($this->user()->primaryEmail?->id),
-            ],
+            'email' => $emailRules,
         ];
     }
 }

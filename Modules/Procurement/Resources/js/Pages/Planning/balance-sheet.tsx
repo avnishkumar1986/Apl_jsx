@@ -55,9 +55,8 @@ type PdfHookData = {
 const rows: { key: Metric; label: string; unit: string; highlight?: boolean; labelHighlight?: boolean }[] = [
     { key: 'opening_stock', label: 'O/s', unit: 'mtn' },
     { key: 'cover_days', label: 'Cover for No. of Days', unit: 'days' },
-    { key: 'to_buy', label: 'To Buy from RIL / Chemplast / DCW / Local', unit: 'mtn' },
-    { key: 'supplier_receipts', label: 'Supplier receipts', unit: 'mtn' },
-    { key: 'buying_imports', label: 'Imports', unit: 'mtn' },
+    { key: 'to_buy', label: 'To Buy', unit: 'mtn' },
+    { key: 'buying_imports', label: 'Buying / Imports', unit: 'mtn' },
     { key: 'total_buying', label: 'Total Buying', unit: 'mtn' },
     { key: 'total_availability', label: 'Total Availability', unit: 'mtn' },
     { key: 'average_consumption', label: 'Expected Average Consp/day', unit: 'mtn/day' },
@@ -101,6 +100,12 @@ export default function BalanceSheet({
         const sync = () => setExpanded(document.fullscreenElement === balanceRef.current);
         document.addEventListener('fullscreenchange', sync);
         return () => document.removeEventListener('fullscreenchange', sync);
+    }, []);
+    useEffect(() => {
+        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        if (navigation?.type === 'reload' && window.location.search) {
+            router.get('/admin/procurement/balance-sheet', {}, { preserveState: false, replace: true });
+        }
     }, []);
     const columnTints = [
         { header: 'bg-cyan-100/70', body: 'bg-cyan-50/45' },
@@ -154,7 +159,7 @@ export default function BalanceSheet({
     };
     const formatExportValue = (plant: PlantColumn, row: (typeof rows)[number]) => {
         const total = formatValue(plant[row.key], row.unit);
-        if (row.key !== 'supplier_receipts' || !plant.purchase_orders?.length) return total;
+        if (row.key !== 'buying_imports' || !plant.purchase_orders?.length) return total;
 
         const purchaseLines = plant.purchase_orders.map((purchase) =>
             [
@@ -249,7 +254,7 @@ export default function BalanceSheet({
                 if (Number(plant[row.key]) < 0) {
                     excelRow.getCell(valueColumn).font = { bold: true, color: { argb: 'FFDC2626' } };
                 }
-                if (row.key === 'supplier_receipts') {
+                if (row.key === 'buying_imports') {
                     excelRow.getCell(valueColumn).font = { size: 9, color: { argb: 'FF023249' } };
                     excelRow.getCell(valueColumn).alignment = { vertical: 'top', horizontal: 'left', wrapText: true, indent: 1 };
                 }
@@ -262,7 +267,7 @@ export default function BalanceSheet({
                     excelRow.getCell(valueColumn + 1).font = { color: { argb: 'FFFF8500' } };
                 }
             });
-            if (row.key === 'supplier_receipts') {
+            if (row.key === 'buying_imports') {
                 excelRow.height = Math.max(32, 18 + Math.max(...columns.map((plant) => plant.purchase_orders?.length || 0)) * 26);
             }
         });
@@ -367,7 +372,7 @@ export default function BalanceSheet({
                     data.cell.styles.fillColor = pdfTints[tintIndex % pdfTints.length];
                 }
                 if (row?.highlight && isValueColumn) data.cell.styles.fillColor = [252, 231, 243];
-                if (row?.key === 'supplier_receipts' && isValueColumn) {
+                if (row?.key === 'buying_imports' && isValueColumn) {
                     data.cell.styles.fontSize = 5.5;
                     data.cell.styles.cellPadding = 2;
                     data.cell.styles.halign = 'left';
@@ -415,39 +420,43 @@ export default function BalanceSheet({
             ]}
         >
             <Head title="Procurement balance sheet" />
-            <div className="mx-auto w-full max-w-full min-w-0 space-y-4 p-[clamp(12px,2vw,32px)]">
-                <ProcurementPageHeader
-                    title="Procurement Balance Sheet"
-                    subtitle="Plant-wise demand, availability, purchasing, and closing stock planning"
-                    icon={FileText}
-                    meta={monthLabel}
-                />
-                <ProcurementFilterBar
-                    companyCode={companyCode}
-                    plantCode={plantCode}
-                    materialCode={material}
-                    companies={companies}
-                    plants={plants}
-                    materials={materials}
-                    onCompanyChange={(value) => {
-                        setCompanyCode(value);
-                        setPlantCode('all');
-                        router.get(
-                            '/admin/procurement/balance-sheet',
-                            {
-                                company_code: value === 'all' ? undefined : value,
-                                material,
-                                month: filters.month,
-                                months: filters.months,
-                            },
-                            { preserveState: true, replace: true },
-                        );
-                    }}
-                    onPlantChange={setPlantCode}
-                    onMaterialChange={setMaterial}
-                    onApply={applyFilters}
-                    onReset={() => router.get('/admin/procurement/balance-sheet', {}, { preserveState: false, replace: true })}
-                />
+            <div className="procurement-compact mx-auto w-full max-w-full min-w-0 space-y-3 p-[clamp(10px,1.5vw,20px)]">
+                <div className="relative z-30 grid items-stretch overflow-visible rounded-2xl border-t-4 border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10 xl:grid-cols-[minmax(420px,0.8fr)_minmax(0,2fr)] xl:gap-3">
+                    <ProcurementPageHeader
+                        title="Procurement Balance Sheet"
+                        subtitle="Plant-wise demand, availability, purchasing, and closing stock planning"
+                        icon={FileText}
+                        embedded
+                    />
+                    <ProcurementFilterBar
+                        companyCode={companyCode}
+                        plantCode={plantCode}
+                        materialCode={material}
+                        companies={companies}
+                        plants={plants}
+                        materials={materials}
+                        onCompanyChange={(value) => {
+                            setCompanyCode(value);
+                            setPlantCode('all');
+                            router.get(
+                                '/admin/procurement/balance-sheet',
+                                {
+                                    company_code: value === 'all' ? undefined : value,
+                                    material,
+                                    month: filters.month,
+                                    months: filters.months,
+                                },
+                                { preserveState: true, replace: true },
+                            );
+                        }}
+                        onPlantChange={setPlantCode}
+                        onMaterialChange={setMaterial}
+                        onApply={applyFilters}
+                        onReset={() => router.get('/admin/procurement/balance-sheet', {}, { preserveState: false, replace: true })}
+                        embedded
+                        showReset={false}
+                    />
+                </div>
 
                 <section
                     ref={balanceRef}
@@ -537,35 +546,32 @@ export default function BalanceSheet({
                                             {columns.map((plant, plantIndex) => (
                                                 <Fragment key={`${plant.column_key}-${row.key}`}>
                                                     <td
-                                                        className={`w-48 max-w-48 min-w-48 border px-3 py-3 tabular-nums ${row.key === 'supplier_receipts' ? 'text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
+                                                        className={`w-48 max-w-48 min-w-48 border px-3 py-3 tabular-nums ${row.key === 'buying_imports' ? '!py-1.5 text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
                                                     >
-                                                        {row.key === 'supplier_receipts' && plant.purchase_orders?.length ? (
-                                                            <div className="space-y-2">
-                                                                <div className="rounded-lg border border-cyan-100 bg-gradient-to-br from-cyan-50 to-white px-2.5 py-2 shadow-sm">
-                                                                    <span className="block text-[9px] font-bold tracking-[0.12em] text-cyan-700 uppercase">
-                                                                        Total receipts
+                                                        {row.key === 'buying_imports' && plant.purchase_orders?.length ? (
+                                                            <div className="space-y-1.5">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <span className="font-black text-slate-900">
+                                                                        {formatValue(plant.buying_imports, row.unit)}
                                                                     </span>
-                                                                    <span className="mt-0.5 block text-right text-sm font-black text-slate-900">
-                                                                        {formatValue(plant.supplier_receipts, row.unit)}
-                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleReceipts(plant.column_key)}
+                                                                        className="text-brand-teal inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[9px] font-bold tracking-wide uppercase transition-colors hover:bg-cyan-50"
+                                                                        aria-expanded={expandedReceipts.has(plant.column_key)}
+                                                                    >
+                                                                        {expandedReceipts.has(plant.column_key) ? (
+                                                                            <>
+                                                                                Less <ChevronUp className="size-3" />
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                More ({plant.purchase_orders.length}){' '}
+                                                                                <ChevronDown className="size-3" />
+                                                                            </>
+                                                                        )}
+                                                                    </button>
                                                                 </div>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => toggleReceipts(plant.column_key)}
-                                                                    className="text-brand-teal flex w-full items-center justify-center gap-1.5 rounded-md border border-cyan-200 bg-white px-2 py-1.5 text-[10px] font-bold tracking-wide uppercase transition-colors hover:bg-cyan-50"
-                                                                    aria-expanded={expandedReceipts.has(plant.column_key)}
-                                                                >
-                                                                    {expandedReceipts.has(plant.column_key) ? (
-                                                                        <>
-                                                                            Show less <ChevronUp className="size-3.5" />
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            Show more ({plant.purchase_orders.length}){' '}
-                                                                            <ChevronDown className="size-3.5" />
-                                                                        </>
-                                                                    )}
-                                                                </button>
                                                                 {expandedReceipts.has(plant.column_key) && (
                                                                     <div className="space-y-2">
                                                                         {plant.purchase_orders.map((purchase, purchaseIndex) => (
