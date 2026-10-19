@@ -765,53 +765,55 @@ export default function BalanceOverview({
                     </div>
                 </section>
                 <section className="w-full max-w-2xl overflow-hidden rounded-xl border bg-white shadow-sm">
-                    <div className="flex items-end justify-between border-b bg-cyan-50/60 px-4 py-3">
+                    <div className="flex flex-col gap-1 border-b bg-cyan-50/60 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <p className="text-brand-berry text-[9px] font-bold tracking-[.15em] uppercase">Supplier commitments</p>
                             <h2 className="font-bold">MOU Lifting Plan</h2>
                         </div>
                         <p className="text-[10px] text-slate-500">Monthly committed quantities across the planning horizon</p>
                     </div>
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="bg-slate-50 text-[10px] uppercase">
-                                <th className="px-4 py-3 text-left">Supplier</th>
-                                <th className="px-4 py-3 text-right">{monthLabel}</th>
-                                <th className="px-4 py-3 text-right">Horizon total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {mouPlans.length === 0 ? (
-                                <tr>
-                                    <td className="px-4 py-3 text-slate-500" colSpan={3}>
-                                        No MOU vendor plan available
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[26rem] text-xs">
+                            <thead>
+                                <tr className="bg-slate-50 text-[10px] uppercase">
+                                    <th className="px-4 py-3 text-left">Supplier</th>
+                                    <th className="px-4 py-3 text-right">{monthLabel}</th>
+                                    <th className="px-4 py-3 text-right">Horizon total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {mouPlans.length === 0 ? (
+                                    <tr>
+                                        <td className="px-4 py-3 text-slate-500" colSpan={3}>
+                                            No MOU vendor plan available
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    mouPlans.map((plan) => (
+                                        <tr key={`${plan.vendor_code}-${plan.vendor_name}`} className="border-t">
+                                            <td className="px-4 py-3 font-medium">
+                                                {plan.vendor_name}
+                                                <span className="ml-2 text-slate-400">{plan.vendor_code}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right tabular-nums">{Number(plan.quantity_mt).toFixed(3)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold tabular-nums">{Number(plan.quantity_mt).toFixed(3)}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                            <tfoot>
+                                <tr className="border-t bg-fuchsia-50 font-bold">
+                                    <td className="px-4 py-3 text-right">TOTAL QTY.</td>
+                                    <td className="px-4 py-3 text-right tabular-nums">
+                                        {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
+                                    </td>
+                                    <td className="text-brand-berry px-4 py-3 text-right tabular-nums">
+                                        {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
                                     </td>
                                 </tr>
-                            ) : (
-                                mouPlans.map((plan) => (
-                                    <tr key={`${plan.vendor_code}-${plan.vendor_name}`} className="border-t">
-                                        <td className="px-4 py-3 font-medium">
-                                            {plan.vendor_name}
-                                            <span className="ml-2 text-slate-400">{plan.vendor_code}</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right tabular-nums">{Number(plan.quantity_mt).toFixed(3)}</td>
-                                        <td className="px-4 py-3 text-right font-semibold tabular-nums">{Number(plan.quantity_mt).toFixed(3)}</td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                        <tfoot>
-                            <tr className="border-t bg-fuchsia-50 font-bold">
-                                <td className="px-4 py-3 text-right">TOTAL QTY.</td>
-                                <td className="px-4 py-3 text-right tabular-nums">
-                                    {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
-                                </td>
-                                <td className="text-brand-berry px-4 py-3 text-right tabular-nums">
-                                    {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                            </tfoot>
+                        </table>
+                    </div>
                 </section>
             </div>
             {editing && (

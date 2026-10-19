@@ -16,7 +16,7 @@ export function TopbarUserMenu() {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="ml-2 flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50 data-[state=open]:bg-slate-50"
+                    className="ml-0.5 flex min-w-0 items-center gap-2 rounded-lg px-1 py-1.5 text-left transition hover:bg-slate-50 data-[state=open]:bg-slate-50 sm:ml-2 sm:px-2"
                     aria-label="Open user menu"
                 >
                     <span className="relative shrink-0">

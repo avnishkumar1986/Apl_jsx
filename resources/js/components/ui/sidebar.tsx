@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 const SIDEBAR_COOKIE_NAME = 'sidebar:state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = '14rem';
-const SIDEBAR_WIDTH_MOBILE = '16rem';
+const SIDEBAR_WIDTH_MOBILE = 'min(16rem, calc(100vw - 1rem))';
 const SIDEBAR_WIDTH_ICON = '4rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
 
@@ -170,7 +170,7 @@ const Sidebar = React.forwardRef<
                             '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
                         } as React.CSSProperties
                     }
-                    side="right"
+                    side="left"
                 >
                     <SheetTitle className="sr-only">Sidebar Navigation</SheetTitle>
                     <div className="flex h-full w-full flex-col">{children}</div>

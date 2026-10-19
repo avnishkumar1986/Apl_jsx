@@ -13,13 +13,15 @@ import { Bell, Languages, Moon, Search, Sun } from 'lucide-react';
 export function TopbarActions() {
     const { appearance, updateAppearance } = useAppearance();
     return (
-        <div className="flex items-center gap-0.5">
-            <TopbarIconButton label="Search" icon={Search} />
+        <div className="flex min-w-0 items-center gap-0.5">
+            <span className="hidden min-[360px]:inline-flex">
+                <TopbarIconButton label="Search" icon={Search} />
+            </span>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        className="hover:bg-brand-aqua/15 hover:text-brand-teal flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-600"
+                        className="hover:bg-brand-aqua/15 hover:text-brand-teal flex h-9 items-center gap-1.5 rounded-md px-1.5 text-xs font-semibold text-slate-600 sm:px-2"
                         aria-label="Language"
                     >
                         <span className="bg-brand-teal grid size-5 place-items-center rounded-full text-[8px] font-bold text-white">EN</span>

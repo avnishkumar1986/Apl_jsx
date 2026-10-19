@@ -417,7 +417,7 @@ export default function Dashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
-            <div className="dashboard-shell mx-auto min-h-full w-full max-w-[1760px] flex-1 bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] p-4 md:p-6 xl:p-7">
+            <div className="dashboard-shell mx-auto min-h-full w-full max-w-[1760px] flex-1 bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] p-3 sm:p-4 md:p-6 xl:p-7">
                 {((procurementActive && canViewProcurement) || (salesActive && canViewSales)) && (
                     <nav className="mb-6 flex flex-wrap items-center gap-2.5" aria-label="Business modules">
                         {procurementActive && canViewProcurement && (
@@ -450,18 +450,18 @@ export default function Dashboard({
                 )}
 
                 <div className="grid items-start gap-6 xl:grid-cols-12">
-                    <div className="space-y-6 xl:col-span-4">
+                    <div className="min-w-0 space-y-6 xl:col-span-4">
                         <Card className="border-brand-teal/30 relative overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#023047_0%,#075b6d_58%,#0e8294_100%)] text-white shadow-[0_18px_40px_-24px_rgba(2,48,71,0.85)]">
                             <div className="absolute inset-0 bg-[linear-gradient(rgba(142,202,230,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(142,202,230,0.08)_1px,transparent_1px)] bg-[size:32px_32px]" />
                             <div className="border-brand-gold/15 absolute -top-20 right-16 size-52 rounded-full border-[24px]" />
                             <div className="border-brand-aqua/15 absolute -right-16 -bottom-24 size-60 rounded-full border-[24px]" />
                             <CardContent className="relative p-5 sm:p-6">
-                                <div className="flex items-center gap-5">
+                                <div className="flex flex-col items-start gap-4 min-[380px]:flex-row min-[380px]:items-center min-[380px]:gap-5">
                                     <div
-                                        className="relative grid size-24 shrink-0 place-items-center"
+                                        className="relative grid size-20 shrink-0 place-items-center min-[380px]:size-24"
                                         aria-label={`Profile ${profileScore}% complete`}
                                     >
-                                        <svg viewBox="0 0 88 88" className="size-24 -rotate-90" aria-hidden="true">
+                                        <svg viewBox="0 0 88 88" className="size-20 -rotate-90 min-[380px]:size-24" aria-hidden="true">
                                             <circle cx="44" cy="44" r="36" fill="none" stroke="#164e63" strokeWidth="7" />
                                             <circle
                                                 cx="44"
@@ -609,17 +609,17 @@ export default function Dashboard({
                         </Card>
                     </div>
 
-                    <div className="space-y-6 xl:col-span-8">
-                        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="min-w-0 space-y-6 xl:col-span-8">
+                        <section className="grid min-w-0 gap-4 min-[400px]:grid-cols-2 md:grid-cols-3">
                             {stats.map(({ label, value, href, icon: Icon, color, surface, accent }) => (
                                 <Link
                                     key={label}
                                     href={href}
-                                    className="group block rounded-2xl focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
+                                    className="group block min-w-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
                                 >
                                     <Card className="corporate-card relative h-full min-h-[132px] overflow-hidden rounded-2xl transition-all duration-300 group-hover:-translate-y-1 group-hover:border-slate-300 group-hover:shadow-xl">
                                         <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
-                                        <CardContent className="relative flex min-h-[132px] items-center gap-4 p-5">
+                                        <CardContent className="relative flex min-h-[132px] items-center gap-3 p-4 sm:gap-4 sm:p-5">
                                             <div
                                                 className={`grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm ${surface}`}
                                                 style={{ color }}
@@ -630,7 +630,7 @@ export default function Dashboard({
                                                 <p className="text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
                                                     {value.toLocaleString()}
                                                 </p>
-                                                <p className="mt-1 truncate text-xs font-semibold text-slate-500">{label}</p>
+                                                <p className="mt-1 text-xs leading-4 font-semibold break-words text-slate-500">{label}</p>
                                             </div>
                                             <ArrowRight className="size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-slate-700" />
                                         </CardContent>
@@ -667,9 +667,9 @@ export default function Dashboard({
                                     accent: 'from-cyan-500 to-blue-600',
                                 },
                             ].map((metric) => (
-                                <Card key={metric.label} className="corporate-card relative min-h-[132px] overflow-hidden">
+                                <Card key={metric.label} className="corporate-card relative min-h-[132px] min-w-0 overflow-hidden">
                                     <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${metric.accent}`} />
-                                    <CardContent className="relative flex min-h-[132px] items-center gap-4 p-5">
+                                    <CardContent className="relative flex min-h-[132px] items-center gap-3 p-4 sm:gap-4 sm:p-5">
                                         <div
                                             className={`grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm ${metric.surface} ${metric.color}`}
                                         >
@@ -683,7 +683,7 @@ export default function Dashboard({
                                             <p className="text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
                                                 {metric.value.toLocaleString()}
                                             </p>
-                                            <p className="mt-1 truncate text-xs font-semibold text-slate-500">{metric.label}</p>
+                                            <p className="mt-1 text-xs leading-4 font-semibold break-words text-slate-500">{metric.label}</p>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -730,7 +730,7 @@ export default function Dashboard({
                                                     >
                                                         <Package className="size-3.5" strokeWidth={1.8} />
                                                     </span>
-                                                    <span className="min-w-0 flex-1 truncate">{product.name}</span>
+                                                    <span className="min-w-0 flex-1 leading-4 break-words">{product.name}</span>
                                                     {product.id === selectedProductId && <CheckCircle2 className="size-3.5 shrink-0 text-white/90" />}
                                                 </button>
                                             ))}
@@ -946,11 +946,11 @@ export default function Dashboard({
                                                     key={log.id}
                                                     className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 open:bg-white"
                                                 >
-                                                    <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2.5 marker:hidden">
+                                                    <summary className="flex min-h-11 cursor-pointer list-none items-start gap-2 px-3 py-2.5 marker:hidden sm:items-center">
                                                         <span
                                                             className={`size-2 shrink-0 rounded-full ${successful ? 'bg-emerald-500' : 'bg-amber-500'}`}
                                                         />
-                                                        <p className="min-w-0 flex-1 truncate text-[11px] text-slate-700">
+                                                        <p className="min-w-0 flex-1 text-[11px] leading-4 break-words text-slate-700">
                                                             <span className="font-bold text-slate-900">{log.userName}</span>
                                                             <span className="mx-1.5 text-slate-300">•</span>
                                                             <span className="font-medium">{log.action}</span>
