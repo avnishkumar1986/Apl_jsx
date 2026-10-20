@@ -66,6 +66,10 @@ const rows: { key: Metric; label: string; unit: string; highlight?: boolean; lab
     { key: 'closing_stock', label: 'Closing Stock', unit: 'mtn', labelHighlight: true },
     { key: 'remaining_shortage', label: 'Remaining Shortage (MT)', unit: 'mtn' },
 ];
+const purchaseTotalBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
+    plant.purchase_orders
+        .filter((purchase) => (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'))
+        .reduce((total, purchase) => total + Number(purchase.quantity_mt), 0);
 
 export default function BalanceSheet({
     companies,
@@ -555,7 +559,18 @@ export default function BalanceSheet({
                                                             {canManage && <Pencil className="size-2.5 shrink-0 text-slate-300 transition-colors group-hover:text-cyan-600" />}
                                                         </p>
                                                         <div className={`text-right text-xs font-black tabular-nums ${Number(plant[row.key]) < 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                                                            {plant.consumption_id ? (
+                                                            {row.key === 'to_buy' && plant.consumption_id ? (
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    <span>{formatValue(plant.to_buy, row.unit)}</span>
+                                                                    <Link
+                                                                        onClick={(event) => event.stopPropagation()}
+                                                                        className="inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
+                                                                        href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
+                                                                    >
+                                                                        + Add local PO
+                                                                    </Link>
+                                                                </div>
+                                                            ) : plant.consumption_id ? (
                                                                 <Link
                                                                     onClick={(event) => event.stopPropagation()}
                                                                     className="hover:text-brand-berry hover:underline"
@@ -565,17 +580,23 @@ export default function BalanceSheet({
                                                                 </Link>
                                                             ) : formatValue(plant[row.key], row.unit)}
                                                             {row.key === 'buying_imports' && plant.purchase_orders?.length > 0 && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(event) => {
-                                                                        event.stopPropagation();
-                                                                        toggleReceipts(plant.column_key);
-                                                                    }}
-                                                                    className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
-                                                                >
-                                                                    {expandedReceipts.has(plant.column_key) ? 'Hide orders' : `${plant.purchase_orders.length} orders`}
-                                                                    {expandedReceipts.has(plant.column_key) ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                                                                </button>
+                                                                            <>
+                                                                                <div className="mt-1 flex justify-end gap-1 text-[8px] font-bold">
+                                                                                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">SAP {purchaseTotalBySource(plant, 'sap').toFixed(3)}</span>
+                                                                                    <span className="rounded bg-orange-50 px-1.5 py-0.5 text-orange-700">Local {purchaseTotalBySource(plant, 'local').toFixed(3)}</span>
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(event) => {
+                                                                                        event.stopPropagation();
+                                                                                        toggleReceipts(plant.column_key);
+                                                                                    }}
+                                                                                    className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
+                                                                                >
+                                                                                    {expandedReceipts.has(plant.column_key) ? 'Hide orders' : `${plant.purchase_orders.length} orders`}
+                                                                                    {expandedReceipts.has(plant.column_key) ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                                                                                </button>
+                                                                            </>
                                                             )}
                                                         </div>
                                                         {row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) && plant.purchase_orders?.length > 0 && (
@@ -699,6 +720,10 @@ export default function BalanceSheet({
                                                                         )}
                                                                     </button>
                                                                 </div>
+                                                                <div className="flex justify-end gap-1 text-[8px] font-bold">
+                                                                    <span className="rounded bg-blue-100/70 px-1.5 py-0.5 text-blue-700">SAP {purchaseTotalBySource(plant, 'sap').toFixed(3)} MT</span>
+                                                                    <span className="rounded bg-orange-100/70 px-1.5 py-0.5 text-orange-700">Local {purchaseTotalBySource(plant, 'local').toFixed(3)} MT</span>
+                                                                </div>
                                                                 {expandedReceipts.has(plant.column_key) && (
                                                                     <div className="space-y-2">
                                                                         {plant.purchase_orders.map((purchase, purchaseIndex) => (
@@ -738,6 +763,16 @@ export default function BalanceSheet({
                                                                         ))}
                                                                     </div>
                                                                 )}
+                                                            </div>
+                                                        ) : row.key === 'to_buy' && plant.consumption_id ? (
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <span className="font-black text-slate-900">{formatValue(plant.to_buy, row.unit)}</span>
+                                                                <Link
+                                                                    className="inline-flex h-7 shrink-0 items-center rounded-md border border-orange-200 bg-orange-50 px-2 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
+                                                                    href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
+                                                                >
+                                                                    + Local PO
+                                                                </Link>
                                                             </div>
                                                         ) : plant.consumption_id ? (
                                                             <Link
