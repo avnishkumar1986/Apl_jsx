@@ -81,13 +81,14 @@ const rows: { key: Metric; label: string; unit: string; highlight?: boolean; lab
     { key: 'remaining_shortage', label: 'Remaining Shortage (MT)', unit: 'mtn' },
 ];
 const purchaseTotalBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
-    plant.purchase_orders
-        .filter(
-            (purchase) =>
-                purchase.status !== 'cancelled' &&
-                (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'),
-        )
+    purchaseOrdersBySource(plant, source)
         .reduce((total, purchase) => total + Number(purchase.quantity_mt), 0);
+const purchaseOrdersBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
+    plant.purchase_orders.filter(
+        (purchase) =>
+            purchase.status !== 'cancelled' &&
+            (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'),
+    );
 
 export default function BalanceOverview({
     companies,
@@ -702,6 +703,7 @@ export default function BalanceOverview({
                                                                                     >
                                                                                         + Add local PO
                                                                                     </Link>
+                                                                                    <PurchaseOrderCards orders={purchaseOrdersBySource(plant, 'local')} limit={1} tone="local" />
                                                                                 </div>
                                                                             ) : plant.consumption_id ? (
                                                                             <Link onClick={(event) => event.stopPropagation()} className="hover:text-brand-berry hover:underline" href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}>
@@ -710,10 +712,6 @@ export default function BalanceOverview({
                                                                         ) : formatValue(plant[row.key], row.unit)}
                                                                         {row.key === 'buying_imports' && plant.purchase_orders?.length > 0 && (
                                                                                 <>
-                                                                                    <div className="mt-1 flex justify-end gap-1 text-[8px] font-bold">
-                                                                                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">SAP {purchaseTotalBySource(plant, 'sap').toFixed(3)}</span>
-                                                                                        <span className="rounded bg-orange-50 px-1.5 py-0.5 text-orange-700">Local {purchaseTotalBySource(plant, 'local').toFixed(3)}</span>
-                                                                                    </div>
                                                                                     <button
                                                                                         type="button"
                                                                                         onClick={(event) => {
@@ -722,15 +720,15 @@ export default function BalanceOverview({
                                                                                         }}
                                                                                         className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
                                                                                     >
-                                                                                        {expandedReceipts.has(plant.column_key) ? 'Hide orders' : `${plant.purchase_orders.length} orders`}
+                                                                                        View SAP orders ({purchaseOrdersBySource(plant, 'sap').length})
                                                                                         {expandedReceipts.has(plant.column_key) ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
                                                                                     </button>
                                                                                 </>
                                                                         )}
                                                                     </div>
-                                                                    {row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) && plant.purchase_orders?.length > 0 && (
+                                                                    {row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) && purchaseOrdersBySource(plant, 'sap').length > 0 && (
                                                                         <div className="col-span-2 space-y-2 pt-1">
-                                                                            {plant.purchase_orders.map((purchase, purchaseIndex) => (
+                                                                            {purchaseOrdersBySource(plant, 'sap').map((purchase, purchaseIndex) => (
                                                                                 <div key={`${purchase.po_number}-mobile-${purchaseIndex}`} className="rounded-lg border bg-slate-50 p-2.5 text-[9px]">
                                                                                     <div className="flex justify-between gap-3 font-bold text-slate-800">
                                                                                         <span className="min-w-0 truncate">{purchase.vendor_name}</span>
@@ -858,19 +856,15 @@ export default function BalanceOverview({
                                                                                 </>
                                                                             ) : (
                                                                                 <>
-                                                                                    More ({plant.purchase_orders.length}){' '}
+                                                                                    More ({purchaseOrdersBySource(plant, 'sap').length}){' '}
                                                                                     <ChevronDown className="size-3" />
                                                                                 </>
                                                                             )}
                                                                         </button>
                                                                     </div>
-                                                                    <div className="flex justify-end gap-1 text-[8px] font-bold">
-                                                                        <span className="rounded bg-blue-100/70 px-1.5 py-0.5 text-blue-700">SAP {purchaseTotalBySource(plant, 'sap').toFixed(3)} MT</span>
-                                                                        <span className="rounded bg-orange-100/70 px-1.5 py-0.5 text-orange-700">Local {purchaseTotalBySource(plant, 'local').toFixed(3)} MT</span>
-                                                                    </div>
                                                                     {expandedReceipts.has(plant.column_key) && (
                                                                         <div className="space-y-2">
-                                                                            {plant.purchase_orders.map((purchase, purchaseIndex) => (
+                                                                            {purchaseOrdersBySource(plant, 'sap').map((purchase, purchaseIndex) => (
                                                                                 <div
                                                                                     key={`${purchase.po_number}-${purchaseIndex}`}
                                                                                     className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] leading-4 shadow-sm transition-all hover:border-cyan-200 hover:shadow-md"
@@ -922,6 +916,7 @@ export default function BalanceOverview({
                                                                     <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
                                                                         Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                     </span>
+                                                                    <PurchaseOrderCards orders={purchaseOrdersBySource(plant, 'local')} limit={2} tone="local" />
                                                                 </div>
                                                             ) : plant.consumption_id ? (
                                                                 <Link
@@ -1089,6 +1084,27 @@ function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: 
                     ))}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function PurchaseOrderCards({ orders, limit, tone }: { orders: PlantColumn['purchase_orders']; limit: number; tone: 'local' | 'sap' }) {
+    const visibleOrders = orders.slice(0, limit);
+    if (!visibleOrders.length) return null;
+
+    return (
+        <div className="w-full space-y-1.5 pt-1 text-left whitespace-normal">
+            {visibleOrders.map((purchase, index) => (
+                <div key={`${tone}-${purchase.po_number}-${index}`} className={`rounded-lg border bg-white px-2.5 py-2 text-[9px] leading-4 shadow-sm ${tone === 'local' ? 'border-orange-200' : 'border-blue-200'}`}>
+                    <div className="font-bold break-words text-slate-900">{purchase.vendor_name}</div>
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-slate-500">{purchase.po_number}</span>
+                        <span className="shrink-0 font-black text-slate-900">{Number(purchase.quantity_mt).toFixed(3)} MT</span>
+                    </div>
+                    <div className="text-[8px] text-slate-500">ETA {formatDateForDisplay(purchase.eta)}</div>
+                </div>
+            ))}
+            {orders.length > limit && <p className="text-right text-[9px] font-bold text-orange-700">+ {orders.length - limit} more portal POs</p>}
         </div>
     );
 }
