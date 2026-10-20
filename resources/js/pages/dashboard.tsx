@@ -610,7 +610,7 @@ export default function Dashboard({
                     </div>
 
                     <div className="min-w-0 space-y-6 xl:col-span-8">
-                        <section className="grid min-w-0 gap-4 min-[350px]:grid-cols-2 md:grid-cols-3">
+                        <section className="grid min-w-0 gap-4 min-[350px]:grid-cols-2 md:grid-cols-4">
                             {stats.map(({ label, value, href, icon: Icon, color, surface, accent }) => (
                                 <Link
                                     key={label}
@@ -689,7 +689,7 @@ export default function Dashboard({
                                 </Card>
                             ))}
                         </section>
-                        <Card className="corporate-card min-h-[324px]">
+                        <Card className="corporate-card flex min-h-[420px] flex-col">
                             <CardHeader className="flex-row items-center justify-between border-b border-slate-100 px-5 py-4">
                                 <CardTitle className="flex items-center gap-2 text-sm">
                                     <span className="bg-brand-gold h-4 w-1 rounded-full" />
@@ -699,23 +699,23 @@ export default function Dashboard({
                                     Monthly performance
                                 </span>
                             </CardHeader>
-                            <CardContent className="p-6">
-                                <div className="flex flex-col gap-5 sm:flex-row">
-                                    <div className="shrink-0 sm:w-44">
+                            <CardContent className="flex-1 p-6">
+                                <div className="flex h-full flex-col items-stretch gap-5 sm:flex-row">
+                                    <div className="min-w-0 shrink-0 sm:w-44 sm:max-w-44">
                                         <div className="mb-3 flex items-center justify-between gap-2">
                                             <p className="text-[10px] font-bold tracking-[0.12em] text-slate-500 uppercase">Product portfolio</p>
                                             <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-bold text-cyan-700">
                                                 {dummyProducts.length}
                                             </span>
                                         </div>
-                                        <div className="flex max-h-60 gap-2 overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin] sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1">
+                                        <div className="grid grid-cols-2 gap-2 pb-1 min-[430px]:grid-cols-3 sm:flex sm:max-h-80 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
                                             {dummyProducts.map((product) => (
                                                 <button
                                                     key={product.id}
                                                     type="button"
                                                     onClick={() => setSelectedProductId(product.id)}
                                                     aria-pressed={product.id === selectedProductId}
-                                                    className={`group/product flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left text-[10px] font-semibold transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
+                                                    className={`group/product flex min-h-10 min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[10px] font-semibold transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none sm:shrink-0 sm:px-3 ${
                                                         product.id === selectedProductId
                                                             ? 'border-brand-teal bg-brand-teal text-white shadow-sm'
                                                             : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/70 hover:text-cyan-800'
@@ -736,8 +736,8 @@ export default function Dashboard({
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
-                                        <div className="flex h-52 min-w-[430px] items-end gap-2 border-b border-l border-slate-200 px-3">
+                                    <div className="flex min-w-0 flex-1 flex-col overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
+                                        <div className="flex h-64 min-w-full flex-none items-end gap-1 border-b border-l border-slate-200 px-1 sm:h-auto sm:min-h-80 sm:min-w-[430px] sm:flex-1 sm:gap-2 sm:px-3">
                                             {monthlyProductSales.map((sale) => (
                                                 <div key={sale.month} className="group flex h-full min-w-0 flex-1 flex-col justify-end text-center">
                                                     <span className="mb-1 text-[9px] font-semibold text-slate-500 opacity-0 transition group-hover:opacity-100">
@@ -748,7 +748,7 @@ export default function Dashboard({
                                                         style={{ height: `${sale.value}%` }}
                                                         title={`${sale.month}: ${sale.value}K units`}
                                                     />
-                                                    <span className="mt-2 text-[9px] font-semibold text-slate-500">{sale.month}</span>
+                                                    <span className="mt-2 text-[8px] font-semibold text-slate-500 sm:text-[9px]">{sale.month}</span>
                                                 </div>
                                             ))}
                                         </div>

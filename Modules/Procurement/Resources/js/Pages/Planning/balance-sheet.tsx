@@ -3,7 +3,7 @@ import ProcurementPageHeader from '@/components/procurement-page-header';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, FileDown, FileSpreadsheet, FileText, Maximize2, Minimize2, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, EyeOff, FileDown, FileSpreadsheet, FileText, Maximize2, Minimize2, Pencil } from 'lucide-react';
 import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 type Company = { id: number; company_code: string; company_name: string };
@@ -95,6 +95,21 @@ export default function BalanceSheet({
     const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(() => new Set());
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
     const [remark, setRemark] = useState('');
+    const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
+    const mobilePlantSlider = useRef<HTMLDivElement>(null);
+    const showMobilePlant = (index: number) => {
+        const nextIndex = Math.max(0, Math.min(index, columns.length - 1));
+        mobilePlantSlider.current?.scrollTo({ left: nextIndex * mobilePlantSlider.current.clientWidth, behavior: 'smooth' });
+        setMobilePlantIndex(nextIndex);
+    };
+    const syncMobilePlant = () => {
+        const slider = mobilePlantSlider.current;
+        if (!slider?.clientWidth) return;
+        setMobilePlantIndex(Math.max(0, Math.min(Math.round(slider.scrollLeft / slider.clientWidth), columns.length - 1)));
+    };
+    useEffect(() => {
+        setMobilePlantIndex((current) => Math.max(0, Math.min(current, columns.length - 1)));
+    }, [columns.length]);
     const toggleExpanded = async () => (document.fullscreenElement ? document.exitFullscreen() : balanceRef.current?.requestFullscreen());
     useEffect(() => {
         const sync = () => setExpanded(document.fullscreenElement === balanceRef.current);
@@ -494,8 +509,120 @@ export default function BalanceSheet({
                     {columns.length === 0 ? (
                         <div className="p-12 text-center text-sm text-slate-500">No active plants were found for the selected company.</div>
                     ) : (
+                        <>
+                        <div className="min-w-0 bg-slate-50/70 lg:hidden">
+                            <div
+                                ref={mobilePlantSlider}
+                                onScroll={syncMobilePlant}
+                                className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                aria-label="Plant balance sheets"
+                            >
+                                {columns.map((plant, plantIndex) => (
+                                    <article key={plant.column_key} className="w-full min-w-full snap-center p-3 sm:p-4">
+                                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                            <header className={`${columnTints[plantIndex % columnTints.length].header} border-b px-4 py-3.5`}>
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[9px] font-black tracking-[.16em] text-cyan-800 uppercase">Procurement balance sheet</p>
+                                                        <h3 className="mt-1 truncate text-sm font-black text-slate-900" title={plant.name}>{plant.name}</h3>
+                                                        <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                                                            {selectedMaterial?.maktx || filters.material} · {selectedMaterial?.meins || 'UNIT'}
+                                                        </p>
+                                                    </div>
+                                                    <span className="shrink-0 rounded-full border border-white/80 bg-white/75 px-2.5 py-1 text-[10px] font-black text-slate-700 shadow-sm">
+                                                        {plantIndex + 1}/{columns.length}
+                                                    </span>
+                                                </div>
+                                            </header>
+                                            <div className="divide-y divide-slate-100">
+                                                {rows.map((row) => (
+                                                    <div
+                                                        key={`${plant.column_key}-mobile-${row.key}`}
+                                                        role={canManage ? 'button' : undefined}
+                                                        tabIndex={canManage ? 0 : undefined}
+                                                        title={canManage ? 'Tap to add or edit remark' : undefined}
+                                                        onClick={() => canManage && openRemark(plant, row.key)}
+                                                        onKeyDown={(event) => {
+                                                            if (canManage && (event.key === 'Enter' || event.key === ' ')) {
+                                                                event.preventDefault();
+                                                                openRemark(plant, row.key);
+                                                            }
+                                                        }}
+                                                        className={`group grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 transition-colors ${canManage ? 'cursor-pointer hover:bg-cyan-50/60 focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:outline-offset-[-2px]' : ''} ${row.highlight ? 'bg-fuchsia-50' : row.labelHighlight ? 'bg-orange-50' : ''}`}
+                                                    >
+                                                        <p className={`flex min-w-0 items-center gap-1.5 text-[11px] font-semibold leading-4 ${row.labelHighlight ? 'text-orange-700' : 'text-slate-600'}`}>
+                                                            <span>{row.label}</span>
+                                                            {canManage && <Pencil className="size-2.5 shrink-0 text-slate-300 transition-colors group-hover:text-cyan-600" />}
+                                                        </p>
+                                                        <div className={`text-right text-xs font-black tabular-nums ${Number(plant[row.key]) < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                                                            {plant.consumption_id ? (
+                                                                <Link
+                                                                    onClick={(event) => event.stopPropagation()}
+                                                                    className="hover:text-brand-berry hover:underline"
+                                                                    href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
+                                                                >
+                                                                    {formatValue(plant[row.key], row.unit)}
+                                                                </Link>
+                                                            ) : formatValue(plant[row.key], row.unit)}
+                                                            {row.key === 'buying_imports' && plant.purchase_orders?.length > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        toggleReceipts(plant.column_key);
+                                                                    }}
+                                                                    className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
+                                                                >
+                                                                    {expandedReceipts.has(plant.column_key) ? 'Hide orders' : `${plant.purchase_orders.length} orders`}
+                                                                    {expandedReceipts.has(plant.column_key) ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        {row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) && plant.purchase_orders?.length > 0 && (
+                                                            <div className="col-span-2 space-y-2 pt-1" onClick={(event) => event.stopPropagation()}>
+                                                                {plant.purchase_orders.map((purchase, purchaseIndex) => (
+                                                                    <div key={`${purchase.po_number}-mobile-${purchaseIndex}`} className="rounded-lg border bg-slate-50 p-2.5 text-[9px]">
+                                                                        <div className="flex justify-between gap-3 font-bold text-slate-800">
+                                                                            <span className="min-w-0 truncate">{purchase.vendor_name}</span>
+                                                                            <span className="shrink-0">{Number(purchase.quantity_mt).toFixed(3)} MT</span>
+                                                                        </div>
+                                                                        <div className="mt-1 flex justify-between gap-3 text-slate-500">
+                                                                            <span>{purchase.source.toUpperCase()} · {purchase.po_number}</span>
+                                                                            <span className="shrink-0">ETA {formatDateForDisplay(purchase.eta)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                            <div className="flex items-center justify-between border-t bg-white px-3 py-3 sm:px-4">
+                                <Button type="button" size="sm" variant="outline" onClick={() => showMobilePlant(mobilePlantIndex - 1)} disabled={mobilePlantIndex === 0} className="gap-1.5">
+                                    <ChevronLeft className="size-4" /> Previous
+                                </Button>
+                                <div className="flex max-w-32 items-center justify-center gap-1.5" aria-label={`Plant ${mobilePlantIndex + 1} of ${columns.length}`}>
+                                    {columns.map((plant, index) => (
+                                        <button
+                                            key={`${plant.column_key}-dot`}
+                                            type="button"
+                                            onClick={() => showMobilePlant(index)}
+                                            aria-label={`Show ${plant.name}`}
+                                            className={`h-1.5 rounded-full transition-all ${index === mobilePlantIndex ? 'w-5 bg-cyan-600' : 'w-1.5 bg-slate-300'}`}
+                                        />
+                                    ))}
+                                </div>
+                                <Button type="button" size="sm" variant="outline" onClick={() => showMobilePlant(mobilePlantIndex + 1)} disabled={mobilePlantIndex === columns.length - 1} className="gap-1.5">
+                                    Next <ChevronRight className="size-4" />
+                                </Button>
+                            </div>
+                        </div>
                         <div
-                            className={`w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] ${expanded ? 'min-h-0 flex-1' : ''}`}
+                            className={`hidden w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block ${expanded ? 'min-h-0 flex-1' : ''}`}
                         >
                             <table className="w-max min-w-full border-collapse text-xs">
                                 <thead>
@@ -647,6 +774,7 @@ export default function BalanceSheet({
                                 </tbody>
                             </table>
                         </div>
+                        </>
                     )}
                 </section>
                 <section className="w-full max-w-2xl overflow-hidden rounded-xl border bg-white shadow-sm">

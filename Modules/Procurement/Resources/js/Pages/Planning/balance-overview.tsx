@@ -2,8 +2,23 @@ import ProcurementPageHeader from '@/components/procurement-page-header';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Boxes, ChevronDown, ChevronUp, Eye, EyeOff, FileDown, FileSpreadsheet, FileText, Maximize2, Minimize2, Pencil, Search } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import {
+    Boxes,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronUp,
+    Eye,
+    EyeOff,
+    FileDown,
+    FileSpreadsheet,
+    FileText,
+    Maximize2,
+    Minimize2,
+    Pencil,
+    Search,
+} from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 type Company = { id: number; company_code: string; company_name: string };
 type Plant = Company & { record_type: number };
@@ -94,6 +109,8 @@ export default function BalanceOverview({
     const [foldedPlants, setFoldedPlants] = useState<Set<number>>(() => new Set());
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
     const [remark, setRemark] = useState('');
+    const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
+    const mobilePlantSlider = useRef<HTMLDivElement>(null);
     const materialTabs = useMemo(() => {
         const selected = materials.find((item) => item.matnr === filters.material);
         const query = materialSearch.trim().toLowerCase();
@@ -110,9 +127,22 @@ export default function BalanceOverview({
         [columns],
     );
     const visibleColumns = useMemo(() => columns.filter((column) => !foldedPlants.has(column.id)), [columns, foldedPlants]);
+    const showMobilePlant = (index: number) => {
+        const nextIndex = Math.max(0, Math.min(index, visibleColumns.length - 1));
+        mobilePlantSlider.current?.scrollTo({ left: nextIndex * mobilePlantSlider.current.clientWidth, behavior: 'smooth' });
+        setMobilePlantIndex(nextIndex);
+    };
+    const syncMobilePlant = () => {
+        const slider = mobilePlantSlider.current;
+        if (!slider?.clientWidth) return;
+        setMobilePlantIndex(Math.max(0, Math.min(Math.round(slider.scrollLeft / slider.clientWidth), visibleColumns.length - 1)));
+    };
     useEffect(() => {
         setFoldedPlants(new Set());
     }, [filters.material]);
+    useEffect(() => {
+        setMobilePlantIndex((current) => Math.max(0, Math.min(current, visibleColumns.length - 1)));
+    }, [visibleColumns.length]);
     const togglePlantFold = (plantId: number) =>
         setFoldedPlants((current) => {
             const next = new Set(current);
@@ -437,10 +467,18 @@ export default function BalanceOverview({
 
                 <section
                     className={`min-w-0 overflow-hidden border bg-white shadow-sm ${
-                        expanded ? 'fixed inset-0 z-50 flex h-dvh rounded-none' : 'relative z-10 flex min-h-[560px] rounded-xl'
+                        expanded
+                            ? 'fixed inset-0 z-50 flex h-dvh rounded-none'
+                            : 'relative z-10 flex min-h-[560px] flex-col rounded-xl md:flex-row'
                     }`}
                 >
-                    <aside className="flex w-56 shrink-0 flex-col border-r bg-gradient-to-b from-slate-50 to-cyan-50/50 sm:w-64">
+                    <aside
+                        className={`flex shrink-0 flex-col bg-gradient-to-b from-slate-50 to-cyan-50/50 ${
+                            expanded
+                                ? 'w-56 border-r sm:w-64'
+                                : 'max-h-[22rem] w-full border-b md:max-h-none md:w-64 md:border-r md:border-b-0'
+                        }`}
+                    >
                         <div className="border-b px-3 py-3">
                             <div>
                                 <p className="text-[10px] font-black tracking-[0.14em] text-cyan-800 uppercase">Material balance sheets</p>
@@ -597,20 +635,136 @@ export default function BalanceOverview({
                         {columns.length === 0 ? (
                             <div className="p-12 text-center text-sm text-slate-500">No active plants were found for the selected company.</div>
                         ) : (
+                            <>
+                            <div className="min-w-0 bg-slate-50/70 lg:hidden">
+                                {visibleColumns.length ? (
+                                    <>
+                                        <div
+                                            ref={mobilePlantSlider}
+                                            onScroll={syncMobilePlant}
+                                            className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                            aria-label="Plant balance sheets"
+                                        >
+                                            {visibleColumns.map((plant, plantIndex) => (
+                                                <article key={plant.column_key} className="w-full min-w-full snap-center p-3 sm:p-4">
+                                                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                                        <header className={`${columnTints[plantIndex % columnTints.length].header} border-b px-4 py-3.5`}>
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-[9px] font-black tracking-[.16em] text-cyan-800 uppercase">Procurement balance sheet</p>
+                                                                    <h3 className="mt-1 truncate text-sm font-black text-slate-900" title={plant.name}>{plant.name}</h3>
+                                                                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                                                                        {selectedMaterial?.maktx || filters.material} · {selectedMaterial?.meins || 'UNIT'}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="shrink-0 rounded-full border border-white/80 bg-white/75 px-2.5 py-1 text-[10px] font-black text-slate-700 shadow-sm">
+                                                                    {plantIndex + 1}/{visibleColumns.length}
+                                                                </span>
+                                                            </div>
+                                                        </header>
+                                                        <div className="divide-y divide-slate-100">
+                                                            {rows.map((row) => (
+                                                                <div
+                                                                    key={`${plant.column_key}-mobile-${row.key}`}
+                                                                    role={canManage ? 'button' : undefined}
+                                                                    tabIndex={canManage ? 0 : undefined}
+                                                                    title={canManage ? 'Tap to add or edit remark' : undefined}
+                                                                    onClick={() => canManage && openRemark(plant, row.key)}
+                                                                    onKeyDown={(event) => {
+                                                                        if (canManage && (event.key === 'Enter' || event.key === ' ')) {
+                                                                            event.preventDefault();
+                                                                            openRemark(plant, row.key);
+                                                                        }
+                                                                    }}
+                                                                    className={`group grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 transition-colors ${canManage ? 'cursor-pointer hover:bg-cyan-50/60 focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:outline-offset-[-2px]' : ''} ${row.highlight ? 'bg-fuchsia-50' : row.labelHighlight ? 'bg-orange-50' : ''}`}
+                                                                >
+                                                                    <div className="min-w-0">
+                                                                        <p className={`flex items-center gap-1.5 text-[11px] font-semibold leading-4 ${row.labelHighlight ? 'text-orange-700' : 'text-slate-600'}`}>
+                                                                            <span>{row.label}</span>
+                                                                            {canManage && <Pencil className="size-2.5 shrink-0 text-slate-300 transition-colors group-hover:text-cyan-600" />}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className={`text-right text-xs font-black tabular-nums ${Number(plant[row.key]) < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                                                                        {plant.consumption_id ? (
+                                                                            <Link onClick={(event) => event.stopPropagation()} className="hover:text-brand-berry hover:underline" href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}>
+                                                                                {formatValue(plant[row.key], row.unit)}
+                                                                            </Link>
+                                                                        ) : formatValue(plant[row.key], row.unit)}
+                                                                        {row.key === 'buying_imports' && plant.purchase_orders?.length > 0 && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(event) => {
+                                                                                    event.stopPropagation();
+                                                                                    toggleReceipts(plant.column_key);
+                                                                                }}
+                                                                                className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
+                                                                            >
+                                                                                {expandedReceipts.has(plant.column_key) ? 'Hide orders' : `${plant.purchase_orders.length} orders`}
+                                                                                {expandedReceipts.has(plant.column_key) ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    {row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) && plant.purchase_orders?.length > 0 && (
+                                                                        <div className="col-span-2 space-y-2 pt-1">
+                                                                            {plant.purchase_orders.map((purchase, purchaseIndex) => (
+                                                                                <div key={`${purchase.po_number}-mobile-${purchaseIndex}`} className="rounded-lg border bg-slate-50 p-2.5 text-[9px]">
+                                                                                    <div className="flex justify-between gap-3 font-bold text-slate-800">
+                                                                                        <span className="min-w-0 truncate">{purchase.vendor_name}</span>
+                                                                                        <span className="shrink-0">{Number(purchase.quantity_mt).toFixed(3)} MT</span>
+                                                                                    </div>
+                                                                                    <div className="mt-1 flex justify-between gap-3 text-slate-500">
+                                                                                        <span>{purchase.source.toUpperCase()} · {purchase.po_number}</span>
+                                                                                        <span className="shrink-0">ETA {formatDateForDisplay(purchase.eta)}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </article>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between border-t bg-white px-3 py-3 sm:px-4">
+                                            <Button type="button" size="sm" variant="outline" onClick={() => showMobilePlant(mobilePlantIndex - 1)} disabled={mobilePlantIndex === 0} className="gap-1.5">
+                                                <ChevronLeft className="size-4" /> Previous
+                                            </Button>
+                                            <div className="flex max-w-32 items-center justify-center gap-1.5" aria-label={`Plant ${mobilePlantIndex + 1} of ${visibleColumns.length}`}>
+                                                {visibleColumns.map((plant, index) => (
+                                                    <button
+                                                        key={`${plant.column_key}-dot`}
+                                                        type="button"
+                                                        onClick={() => showMobilePlant(index)}
+                                                        aria-label={`Show ${plant.name}`}
+                                                        className={`h-1.5 rounded-full transition-all ${index === mobilePlantIndex ? 'w-5 bg-cyan-600' : 'w-1.5 bg-slate-300'}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <Button type="button" size="sm" variant="outline" onClick={() => showMobilePlant(mobilePlantIndex + 1)} disabled={mobilePlantIndex === visibleColumns.length - 1} className="gap-1.5">
+                                                Next <ChevronRight className="size-4" />
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="p-10 text-center text-sm text-slate-500">Select at least one plant column to continue.</div>
+                                )}
+                            </div>
                             <div
-                                className={`w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] ${expanded ? 'min-h-0 flex-1' : ''}`}
+                                className={`hidden w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block ${expanded ? 'min-h-0 flex-1' : ''}`}
                             >
                                 <table className="w-max min-w-full border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-amber-50/60">
-                                            <th className="sticky left-0 z-20 w-72 max-w-72 min-w-72 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
+                                            <th className="sticky left-0 z-20 w-44 max-w-44 min-w-44 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal sm:w-56 sm:max-w-56 sm:min-w-56 lg:w-72 lg:max-w-72 lg:min-w-72">
                                                 PROCUREMENT BALANCE SHEET · {selectedMaterial?.maktx || filters.material}
                                             </th>
                                             {visibleColumns.map((plant, plantIndex) => (
                                                 <th
                                                     key={plant.column_key}
                                                     colSpan={showRemarks ? 2 : 1}
-                                                    className={`relative ${showRemarks ? 'min-w-[304px]' : 'min-w-40'} ${columnTints[plantIndex % columnTints.length].header} border px-10 py-3 text-center whitespace-nowrap uppercase`}
+                                                    className={`relative ${showRemarks ? 'min-w-[304px]' : 'min-w-32 sm:min-w-40'} ${columnTints[plantIndex % columnTints.length].header} border px-10 py-3 text-center whitespace-nowrap uppercase`}
                                                 >
                                                     <span className="block truncate font-bold" title={plant.name}>
                                                         {plant.name}
@@ -628,13 +782,13 @@ export default function BalanceOverview({
                                             ))}
                                         </tr>
                                         <tr className="bg-slate-50">
-                                            <th className="sticky left-0 z-20 w-72 max-w-72 min-w-72 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
+                                            <th className="sticky left-0 z-20 w-44 max-w-44 min-w-44 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal sm:w-56 sm:max-w-56 sm:min-w-56 lg:w-72 lg:max-w-72 lg:min-w-72">
                                                 {selectedMaterial?.mtart || 'MATERIAL'} · {selectedMaterial?.meins || 'UNIT'}
                                             </th>
                                             {visibleColumns.map((plant, plantIndex) => (
                                                 <Fragment key={plant.column_key}>
                                                     <th
-                                                        className={`${columnTints[plantIndex % columnTints.length].body} w-48 max-w-48 min-w-48 border px-3 py-3 text-right whitespace-nowrap`}
+                                                        className={`${columnTints[plantIndex % columnTints.length].body} w-32 max-w-32 min-w-32 border px-3 py-3 text-right whitespace-nowrap sm:w-48 sm:max-w-48 sm:min-w-48`}
                                                     >
                                                         VALUE
                                                     </th>
@@ -653,14 +807,14 @@ export default function BalanceOverview({
                                         {rows.map((row) => (
                                             <tr key={row.key}>
                                                 <th
-                                                    className={`sticky left-0 z-10 w-72 max-w-72 min-w-72 border px-3 py-3 text-left font-semibold break-words whitespace-normal ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
+                                                    className={`sticky left-0 z-10 w-44 max-w-44 min-w-44 border px-3 py-3 text-left font-semibold break-words whitespace-normal sm:w-56 sm:max-w-56 sm:min-w-56 lg:w-72 lg:max-w-72 lg:min-w-72 ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
                                                 >
                                                     {row.label}
                                                 </th>
                                                 {visibleColumns.map((plant, plantIndex) => (
                                                     <Fragment key={`${plant.column_key}-${row.key}`}>
                                                         <td
-                                                            className={`w-48 max-w-48 min-w-48 border px-3 py-3 tabular-nums ${row.key === 'buying_imports' ? '!py-1.5 text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
+                                                            className={`w-32 max-w-32 min-w-32 border px-3 py-3 tabular-nums sm:w-48 sm:max-w-48 sm:min-w-48 ${row.key === 'buying_imports' ? '!py-1.5 text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
                                                         >
                                                             {row.key === 'buying_imports' && plant.purchase_orders?.length ? (
                                                                 <div className="space-y-1.5">
@@ -761,11 +915,12 @@ export default function BalanceOverview({
                                     </tbody>
                                 </table>
                             </div>
+                            </>
                         )}
                     </div>
                 </section>
                 <section className="w-full max-w-2xl overflow-hidden rounded-xl border bg-white shadow-sm">
-                    <div className="flex flex-col gap-1 border-b bg-cyan-50/60 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex flex-col gap-1 border-b bg-cyan-50/60 px-4 py-3 md:flex-row md:items-end md:justify-between">
                         <div>
                             <p className="text-brand-berry text-[9px] font-bold tracking-[.15em] uppercase">Supplier commitments</p>
                             <h2 className="font-bold">MOU Lifting Plan</h2>
