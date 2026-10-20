@@ -102,7 +102,7 @@ export default function BalanceSheet({
     const [expanded, setExpanded] = useState(false);
     const balanceRef = useRef<HTMLElement>(null);
     const expandedReceipts = useMemo(() => new Set<string>(), []);
-    const [viewingOrders, setViewingOrders] = useState<PlantColumn | null>(null);
+    const [viewingOrders, setViewingOrders] = useState<{ plant: PlantColumn; source: 'sap' | 'local' } | null>(null);
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
     const [remark, setRemark] = useState('');
     const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
@@ -174,8 +174,9 @@ export default function BalanceSheet({
             { preserveScroll: true, onSuccess: () => setEditing(null) },
         );
     };
-    const toggleReceipts = (columnKey: string) => {
-        setViewingOrders(columns.find((plant) => plant.column_key === columnKey) || null);
+    const toggleReceipts = (columnKey: string, source: 'sap' | 'local' = 'sap') => {
+        const plant = columns.find((item) => item.column_key === columnKey);
+        setViewingOrders(plant ? { plant, source } : null);
     };
     const formatExportValue = (plant: PlantColumn, row: (typeof rows)[number]) => {
         const total = formatValue(plant[row.key], row.unit);
@@ -566,6 +567,11 @@ export default function BalanceSheet({
                                                                     <span className="rounded bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700">
                                                                         Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                     </span>
+                                                                    {purchaseOrdersBySource(plant, 'local').length > 0 && (
+                                                                        <button type="button" onClick={(event) => { event.stopPropagation(); toggleReceipts(plant.column_key, 'local'); }} className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-white px-2 py-1 text-[9px] font-bold text-orange-700">
+                                                                            More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
+                                                                        </button>
+                                                                    )}
                                                                     <Link
                                                                         onClick={(event) => event.stopPropagation()}
                                                                         className="inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
@@ -590,7 +596,7 @@ export default function BalanceSheet({
                                                                                     type="button"
                                                                                     onClick={(event) => {
                                                                                         event.stopPropagation();
-                                                                                        toggleReceipts(plant.column_key);
+                                                                                            toggleReceipts(plant.column_key, 'sap');
                                                                                     }}
                                                                                     className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
                                                                                 >
@@ -705,7 +711,7 @@ export default function BalanceSheet({
                                                                     </span>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => toggleReceipts(plant.column_key)}
+                                                                        onClick={() => toggleReceipts(plant.column_key, 'sap')}
                                                                         className="text-brand-teal inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[9px] font-bold tracking-wide uppercase transition-colors hover:bg-cyan-50"
                                                                         aria-expanded={expandedReceipts.has(plant.column_key)}
                                                                     >
@@ -775,6 +781,11 @@ export default function BalanceSheet({
                                                                 <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
                                                                     Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                 </span>
+                                                                {purchaseOrdersBySource(plant, 'local').length > 0 && (
+                                                                    <button type="button" onClick={() => toggleReceipts(plant.column_key, 'local')} className="inline-flex h-7 items-center gap-1 rounded-md border border-orange-200 bg-white px-2 text-[9px] font-bold uppercase text-orange-700">
+                                                                        More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
+                                                                    </button>
+                                                                )}
                                                                 <PurchaseOrderCards orders={purchaseOrdersBySource(plant, 'local')} limit={2} tone="local" />
                                                             </div>
                                                         ) : plant.consumption_id ? (
@@ -892,15 +903,17 @@ export default function BalanceSheet({
                 </div>
             )}
             {viewingOrders && (
-                <PurchaseOrdersModal plant={viewingOrders} onClose={() => setViewingOrders(null)} />
+                <PurchaseOrdersModal plant={viewingOrders.plant} source={viewingOrders.source} onClose={() => setViewingOrders(null)} />
             )}
         </AppLayout>
     );
 }
 
-function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: () => void }) {
+function PurchaseOrdersModal({ plant, source, onClose }: { plant: PlantColumn; source: 'sap' | 'local'; onClose: () => void }) {
     const groups = [
-        { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: purchaseOrdersBySource(plant, 'sap') },
+        source === 'local'
+            ? { key: 'local', label: 'Portal purchase orders', color: 'border-orange-200 bg-orange-50 text-orange-700', orders: purchaseOrdersBySource(plant, 'local') }
+            : { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: purchaseOrdersBySource(plant, 'sap') },
     ];
 
     return (
@@ -908,8 +921,8 @@ function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: 
             <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
                 <div className="flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5">
                     <div className="min-w-0">
-                        <h2 className="font-black text-slate-900">SAP purchase orders</h2>
-                        <p className="truncate text-xs text-slate-500">{plant.name} · SAP total {Number(plant.buying_imports).toFixed(3)} MT</p>
+                        <h2 className="font-black text-slate-900">{source === 'local' ? 'Portal purchase orders' : 'SAP purchase orders'}</h2>
+                        <p className="truncate text-xs text-slate-500">{plant.name} · {source === 'local' ? 'Portal' : 'SAP'} total {purchaseTotalBySource(plant, source).toFixed(3)} MT</p>
                     </div>
                     <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
                 </div>
