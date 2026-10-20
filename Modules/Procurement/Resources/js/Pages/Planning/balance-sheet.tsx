@@ -574,13 +574,6 @@ export default function BalanceSheet({
                                                                     {purchaseOrdersBySource(plant, 'local').length > 0 && (
                                                                         <span className="text-[8px] font-bold text-orange-700">LOCAL PORTAL POs</span>
                                                                     )}
-                                                                    <Link
-                                                                        onClick={(event) => event.stopPropagation()}
-                                                                        className="inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
-                                                                        href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
-                                                                    >
-                                                                        + Add local PO
-                                                                    </Link>
                                                                 </div>
                                                             ) : plant.consumption_id ? (
                                                                 <Link
@@ -777,12 +770,6 @@ export default function BalanceSheet({
                                                                             More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
                                                                         </button>
                                                                     )}
-                                                                    <Link
-                                                                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-orange-200 bg-orange-50 px-2 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
-                                                                        href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
-                                                                    >
-                                                                        + Local PO
-                                                                    </Link>
                                                                 </div>
                                                             </div>
                                                         ) : plant.consumption_id ? (
