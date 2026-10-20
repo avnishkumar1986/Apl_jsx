@@ -388,23 +388,24 @@ class ProcurementController extends Controller
                 $isPlanStartMonth = $activePlan && CarbonImmutable::parse($activePlan->consumption_date)->format('Y-m') === $periodKey;
                 $days = $activePlan ? ($activePlan->period_type === 'datewise' ? 1 : ($isPlanStartMonth ? max(1, (int) $activePlan->day_count) : $periodEnd->day)) : $periodEnd->day;
                 $plannedBuying = (float) ($activePlan?->planned_buying_mt ?? 0);
-                // Buying / Imports is the combined local + SAP PO total. To Buy
-                // remains the separately entered planned-buying quantity.
+                // Buying / Imports represents SAP-generated POs only. Portal POs
+                // are displayed separately under To Buy, but both sources still
+                // contribute to Total Buying and stock availability.
                 $localPurchases = $calculationPurchases->where('source', 'local');
                 $supplierPurchases = $calculationPurchases->where('source', '!=', 'local');
                 $localPurchaseQuantity = (float) $localPurchases->sum('quantity_mt');
                 $sapPurchaseQuantity = (float) $supplierPurchases->sum('quantity_mt');
                 $toBuy = $plannedBuying;
-                $imports = $localPurchaseQuantity + $sapPurchaseQuantity;
+                $imports = $sapPurchaseQuantity;
                 $supplierReceipts = $imports;
                 $consumption = $dailyConsumption * $days;
-                // Local and SAP POs are already represented by Imports; do not add
-                // the To Buy/Supplier rows again when calculating the total.
-                $totalBuying = $plannedBuying + $imports;
+                // Total Buying and shortage calculations include both categorized
+                // PO sources even though Buying / Imports displays SAP only.
+                $totalBuying = $plannedBuying + $localPurchaseQuantity + $sapPurchaseQuantity;
                 $totalAvailability = $openingStock + $totalBuying;
                 $closingStock = $totalAvailability - $consumption;
                 $grossShortage = max(0, $consumption - ($openingStock + $plannedBuying));
-                $remainingShortage = max(0, $grossShortage - $imports);
+                $remainingShortage = max(0, $grossShortage - $localPurchaseQuantity - $sapPurchaseQuantity);
                 $purchaseOrders = $plantPurchases->map(fn ($purchase) => [
                     'po_number' => $purchase->reference ?: 'Manual PO',
                     'vendor_name' => $purchase->vendor_name ?: 'Vendor not provided',

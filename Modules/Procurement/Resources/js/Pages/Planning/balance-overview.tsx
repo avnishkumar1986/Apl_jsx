@@ -201,7 +201,7 @@ export default function BalanceOverview({
         const total = formatValue(plant[row.key], row.unit);
         if (row.key !== 'buying_imports' || !plant.purchase_orders?.length) return total;
 
-        const purchaseLines = plant.purchase_orders.map((purchase) =>
+        const purchaseLines = purchaseOrdersBySource(plant, 'sap').map((purchase) =>
             [
                 purchase.vendor_name.toUpperCase(),
                 `${purchase.source.toUpperCase()} PO ${purchase.po_number}  •  ${Number(purchase.quantity_mt).toFixed(3)} MT`,
@@ -1044,8 +1044,7 @@ export default function BalanceOverview({
 
 function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: () => void }) {
     const groups = [
-        { key: 'local', label: 'Local purchase orders', color: 'border-orange-200 bg-orange-50 text-orange-700', orders: plant.purchase_orders.filter((order) => order.source === 'local') },
-        { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: plant.purchase_orders.filter((order) => order.source !== 'local') },
+        { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: purchaseOrdersBySource(plant, 'sap') },
     ];
 
     return (
@@ -1053,12 +1052,12 @@ function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: 
             <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
                 <div className="flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5">
                     <div className="min-w-0">
-                        <h2 className="font-black text-slate-900">Purchase orders</h2>
-                        <p className="truncate text-xs text-slate-500">{plant.name} · Total {Number(plant.buying_imports).toFixed(3)} MT</p>
+                        <h2 className="font-black text-slate-900">SAP purchase orders</h2>
+                        <p className="truncate text-xs text-slate-500">{plant.name} · SAP total {Number(plant.buying_imports).toFixed(3)} MT</p>
                     </div>
                     <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
                 </div>
-                <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-2 sm:p-5">
+                <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-5">
                     {groups.map((group) => (
                         <section key={group.key} className="min-w-0">
                             <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${group.color}`}>
