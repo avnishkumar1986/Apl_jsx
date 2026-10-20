@@ -1076,47 +1076,26 @@ function FormulaModal({ metric, onClose }: { metric: Metric; onClose: () => void
 }
 
 function PurchaseOrdersModal({ plant, source, onClose }: { plant: PlantColumn; source: 'sap' | 'local'; onClose: () => void }) {
-    const groups = [
-        source === 'local'
-            ? { key: 'local', label: 'Portal purchase orders', color: 'border-orange-200 bg-orange-50 text-orange-700', orders: purchaseOrdersBySource(plant, 'local') }
-            : { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: purchaseOrdersBySource(plant, 'sap') },
-    ];
+    const orders = purchaseOrdersBySource(plant, source);
+    const total = orders.reduce((sum, order) => sum + Number(order.quantity_mt), 0);
+    const isLocal = source === 'local';
+    useEffect(() => {
+        const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+        document.addEventListener('keydown', closeOnEscape);
+        return () => document.removeEventListener('keydown', closeOnEscape);
+    }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/55 p-3 sm:p-6" onMouseDown={onClose}>
-            <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-                <div className="flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5">
-                    <div className="min-w-0">
-                        <h2 className="font-black text-slate-900">{source === 'local' ? 'Portal purchase orders' : 'SAP purchase orders'}</h2>
-                        <p className="truncate text-xs text-slate-500">{plant.name} · {source === 'local' ? 'Portal' : 'SAP'} total {purchaseTotalBySource(plant, source).toFixed(3)} MT</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" onMouseDown={onClose} role="dialog" aria-modal="true">
+            <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border bg-slate-50 shadow-2xl sm:rounded-3xl" onMouseDown={(event) => event.stopPropagation()}>
+                <header className={`relative overflow-hidden px-5 py-5 text-white sm:px-6 ${isLocal ? 'bg-gradient-to-r from-orange-700 via-orange-600 to-amber-500' : 'bg-gradient-to-r from-blue-900 via-blue-800 to-cyan-700'}`}><div className="absolute -top-14 -right-10 size-40 rounded-full bg-white/10" /><div className="relative flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl border border-white/25 bg-white/15"><FileText className="size-5" /></div><div className="min-w-0 flex-1"><p className="text-[10px] font-black tracking-[.18em] text-white/75 uppercase">{isLocal ? 'Portal procurement' : 'SAP procurement'}</p><h2 className="mt-1 text-xl font-black">{isLocal ? 'Local Purchase Orders' : 'SAP Purchase Orders'}</h2><p className="mt-1 truncate text-xs text-white/80">{plant.name}</p></div><button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 hover:bg-white/20" aria-label="Close"><X className="size-4" /></button></div></header>
+                <div className="grid grid-cols-2 gap-3 border-b bg-white p-4 sm:grid-cols-3 sm:px-6"><div className="rounded-xl border bg-slate-50 p-3"><p className="text-[9px] font-black tracking-wider text-slate-400 uppercase">Total quantity</p><p className="mt-1 text-lg font-black tabular-nums text-slate-900">{total.toFixed(3)} <span className="text-xs text-slate-500">MT</span></p></div><div className="rounded-xl border bg-slate-50 p-3"><p className="text-[9px] font-black tracking-wider text-slate-400 uppercase">Purchase orders</p><p className="mt-1 text-lg font-black text-slate-900">{orders.length}</p></div><div className="col-span-2 rounded-xl border bg-slate-50 p-3 sm:col-span-1"><p className="text-[9px] font-black tracking-wider text-slate-400 uppercase">Source</p><p className={`mt-1 text-sm font-black ${isLocal ? 'text-orange-700' : 'text-blue-700'}`}>{isLocal ? 'Portal / Local' : 'SAP'}</p></div></div>
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+                    {orders.length ? orders.map((order, index) => (
+                        <article key={`${source}-${order.po_number}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md"><div className="flex items-start gap-3 p-4"><div className={`grid size-9 shrink-0 place-items-center rounded-lg text-xs font-black ${isLocal ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700'}`}>{String(index + 1).padStart(2, '0')}</div><div className="min-w-0 flex-1"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><h3 className="font-black leading-5 text-slate-900">{order.vendor_name}</h3><p className="shrink-0 text-lg font-black tabular-nums text-slate-950">{Number(order.quantity_mt).toFixed(3)} <span className="text-xs text-slate-500">MT</span></p></div><div className="mt-3 grid gap-2 text-[10px] sm:grid-cols-3"><div><p className="font-bold text-slate-400 uppercase">PO reference</p><p className="mt-0.5 font-semibold text-slate-700">{order.po_number}</p></div><div><p className="font-bold text-slate-400 uppercase">Expected delivery</p><p className="mt-0.5 font-semibold text-slate-700">{formatDateForDisplay(order.eta)}</p></div><div className="sm:text-right"><p className="font-bold text-slate-400 uppercase">Status</p><span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${order.status === 'received' ? 'bg-emerald-50 text-emerald-700' : order.status === 'cancelled' ? 'bg-red-50 text-red-700' : order.status === 'in_transit' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{order.status.replaceAll('_', ' ')}</span></div></div></div></div></article>
+                    )) : <div className="rounded-2xl border border-dashed bg-white p-10 text-center"><FileText className="mx-auto size-8 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-500">No active purchase orders</p></div>}
                 </div>
-                <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-5">
-                    {groups.map((group) => (
-                        <section key={group.key} className="min-w-0">
-                            <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${group.color}`}>
-                                <h3 className="text-xs font-black uppercase">{group.label}</h3>
-                                <span className="text-[10px] font-bold">{group.orders.reduce((sum, order) => sum + Number(order.quantity_mt), 0).toFixed(3)} MT · {group.orders.length}</span>
-                            </div>
-                            <div className="mt-2 space-y-2">
-                                {group.orders.length ? group.orders.map((order, index) => (
-                                    <div key={`${group.key}-${order.po_number}-${index}`} className="rounded-xl border border-slate-200 p-3 shadow-sm">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <p className="min-w-0 font-bold break-words text-slate-900">{order.vendor_name}</p>
-                                            <span className="shrink-0 font-black tabular-nums">{Number(order.quantity_mt).toFixed(3)} MT</span>
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
-                                            <span>{order.po_number}</span>
-                                            <span>ETA {formatDateForDisplay(order.eta)}</span>
-                                            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700 uppercase">{order.status.replaceAll('_', ' ')}</span>
-                                        </div>
-                                    </div>
-                                )) : <p className="rounded-lg border border-dashed p-5 text-center text-xs text-slate-400">No {group.label.toLowerCase()}</p>}
-                            </div>
-                        </section>
-                    ))}
-                </div>
+                <footer className="border-t bg-white p-4 sm:px-6"><Button className="w-full bg-slate-900 hover:bg-slate-800 sm:ml-auto sm:block sm:w-auto" onClick={onClose}>Done</Button></footer>
             </div>
         </div>
     );
