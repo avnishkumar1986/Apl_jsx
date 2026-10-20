@@ -3,7 +3,7 @@ import ProcurementPageHeader from '@/components/procurement-page-header';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Calculator, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, EyeOff, FileDown, FileSpreadsheet, FileText, Maximize2, Minimize2, Pencil, X } from 'lucide-react';
+import { Boxes, Calculator, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, EyeOff, FileDown, FileSpreadsheet, FileText, Maximize2, Minimize2, Pencil, X } from 'lucide-react';
 import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 type Company = { id: number; company_code: string; company_name: string };
@@ -827,18 +827,31 @@ export default function BalanceSheet({
                         </>
                     )}
                 </section>
-                <section className="w-full max-w-2xl overflow-hidden rounded-xl border bg-white shadow-sm">
-                    <div className="flex items-end justify-between border-b bg-cyan-50/60 px-4 py-3">
-                        <div>
-                            <p className="text-brand-berry text-[9px] font-bold tracking-[.15em] uppercase">Supplier commitments</p>
-                            <h2 className="font-bold">MOU Lifting Plan</h2>
+                <section className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex flex-col gap-3 border-b bg-gradient-to-r from-slate-50 via-cyan-50/70 to-white px-5 py-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-700 text-white shadow-sm">
+                                <Boxes className="size-4" />
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black tracking-[.16em] text-orange-600 uppercase">Supplier commitments</p>
+                                <h2 className="text-base font-black text-slate-900">MOU Lifting Plan</h2>
+                            </div>
                         </div>
-                        <p className="text-[10px] text-slate-500">Monthly committed quantities across the planning horizon</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-[10px] font-bold text-cyan-700">
+                                {mouPlans.length} suppliers
+                            </span>
+                            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-white">
+                                {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)} MT
+                            </span>
+                        </div>
                     </div>
-                    <table className="w-full text-xs">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[30rem] text-xs">
                         <thead>
                             <tr className="bg-slate-50 text-[10px] uppercase">
-                                <th className="px-4 py-3 text-left">Supplier</th>
+                                <th className="px-5 py-3 text-left">Supplier</th>
                                 <th className="px-4 py-3 text-right">{monthLabel}</th>
                                 <th className="px-4 py-3 text-right">Horizon total</th>
                             </tr>
@@ -846,14 +859,15 @@ export default function BalanceSheet({
                         <tbody>
                             {mouPlans.length === 0 ? (
                                 <tr>
-                                    <td className="px-4 py-3 text-slate-500" colSpan={3}>
-                                        No MOU vendor plan available
+                                    <td className="px-5 py-8 text-center text-slate-400" colSpan={3}>
+                                        <Boxes className="mx-auto mb-2 size-7 text-slate-300" />
+                                        No MOU vendor plan available for this planning horizon
                                     </td>
                                 </tr>
                             ) : (
                                 mouPlans.map((plan) => (
                                     <tr key={`${plan.vendor_code}-${plan.vendor_name}`} className="border-t">
-                                        <td className="px-4 py-3 font-medium">
+                                        <td className="px-5 py-3 font-semibold text-slate-800">
                                             {plan.vendor_name}
                                             <span className="ml-2 text-slate-400">{plan.vendor_code}</span>
                                         </td>
@@ -864,8 +878,8 @@ export default function BalanceSheet({
                             )}
                         </tbody>
                         <tfoot>
-                            <tr className="border-t bg-fuchsia-50 font-bold">
-                                <td className="px-4 py-3 text-right">TOTAL QTY.</td>
+                            <tr className="border-t-2 border-cyan-100 bg-gradient-to-r from-cyan-50 to-slate-50 font-black">
+                                <td className="px-5 py-3 text-right text-slate-600">TOTAL QUANTITY</td>
                                 <td className="px-4 py-3 text-right tabular-nums">
                                     {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
                                 </td>
@@ -875,6 +889,7 @@ export default function BalanceSheet({
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                 </section>
             </div>
             {editing && (

@@ -505,10 +505,10 @@ export default function BalanceOverview({
                         className={`flex shrink-0 flex-col bg-gradient-to-b from-slate-50 to-cyan-50/50 ${
                             expanded
                                 ? 'w-56 border-r sm:w-64'
-                                : 'max-h-[22rem] w-full border-b md:h-full md:max-h-none md:w-64 md:border-r md:border-b-0'
+                                : 'max-h-[22rem] w-full border-b md:h-full md:max-h-none md:w-72 md:border-r md:border-b-0'
                         }`}
                     >
-                        <div className="border-b px-3 py-3">
+                        <div className="border-b px-4 py-4">
                             <div>
                                 <p className="text-[10px] font-black tracking-[0.14em] text-cyan-800 uppercase">Material balance sheets</p>
                                 <p className="mt-0.5 text-[10px] text-slate-500">Select a material</p>
@@ -529,7 +529,7 @@ export default function BalanceOverview({
                         </div>
                         <nav
                             aria-label="Material balance sheets"
-                            className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2 [scrollbar-width:thin]"
+                            className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 [scrollbar-width:thin]"
                         >
                             {materialTabs.map((item) => {
                                 const active = item.matnr === filters.material;
@@ -580,8 +580,8 @@ export default function BalanceOverview({
                             )}
                         </nav>
                     </aside>
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <div className="relative z-30 flex items-center border-b bg-slate-50 px-4 py-2">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-50/40">
+                        <div className="relative z-30 flex items-center border-b bg-slate-50 px-5 py-3">
                             <details className="group relative">
                                 <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
                                     <Eye className="size-4" />
@@ -630,7 +630,7 @@ export default function BalanceOverview({
                                 </div>
                             </details>
                         </div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-5 py-3">
                             <div className="flex gap-2">
                                 <Button size="icon" variant="outline" title="Export Excel" onClick={exportExcel}>
                                     <FileSpreadsheet className="size-4" />
@@ -799,7 +799,7 @@ export default function BalanceOverview({
                             </div>
                             <div
                                 ref={desktopGrid}
-                                className="hidden min-h-0 w-full max-w-full flex-1 overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block"
+                                className="m-3 mt-0 hidden min-h-0 w-auto max-w-full flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block"
                             >
                                 <table className="w-max min-w-full border-collapse text-xs">
                                     <thead className="sticky top-0 z-30 shadow-sm">
@@ -975,7 +975,7 @@ export default function BalanceOverview({
                             </div>
                             </>
                         )}
-                <section className="mt-3 w-full shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <section className="mx-3 mb-3 mt-1 w-auto shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-2 border-b bg-gradient-to-r from-slate-50 via-cyan-50/70 to-white px-5 py-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-3">
                             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-700 text-white shadow-sm"><Boxes className="size-4" /></div>
