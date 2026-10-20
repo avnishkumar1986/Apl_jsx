@@ -66,6 +66,21 @@ const rows: { key: Metric; label: string; unit: string; highlight?: boolean; lab
     { key: 'closing_stock', label: 'Closing Stock', unit: 'mtn', labelHighlight: true },
     { key: 'remaining_shortage', label: 'Remaining Shortage (MT)', unit: 'mtn' },
 ];
+const metricFormulas: Record<Metric, { formula: string; note: string }> = {
+    opening_stock: { formula: 'Previous month Closing Stock', note: 'For the first month, opening stock comes from the current SAP material stock.' },
+    cover_days: { formula: 'Opening Stock ÷ Expected Average Consumption per Day', note: 'Shown only when daily consumption is greater than zero.' },
+    to_buy: { formula: 'Planned Buying + Active Local/Portal PO Quantity', note: 'Cancelled local POs are excluded.' },
+    supplier_receipts: { formula: 'Active SAP PO Quantity', note: 'Used internally for purchase receipt planning.' },
+    buying_imports: { formula: 'Sum of Active SAP PO Quantities', note: 'Local/portal POs are not included here.' },
+    total_buying: { formula: 'To Buy + Buying / Imports', note: 'Local and SAP POs are each counted exactly once.' },
+    total_availability: { formula: 'Opening Stock + Total Buying', note: 'Total stock expected to be available during the period.' },
+    average_consumption: { formula: 'Planned Daily Consumption', note: 'Taken from the active consumption plan for the plant and material.' },
+    days: { formula: 'Number of Planning Days in the Period', note: 'Uses the configured day count for the starting month and calendar days afterward.' },
+    consumption: { formula: 'Expected Average Consumption per Day × Days', note: 'Total expected material consumption for the period.' },
+    gross_shortage: { formula: 'MAX(0, Expected Consumption − Opening Stock − Planned Buying)', note: 'Shortage before applying local and SAP purchase orders.' },
+    closing_stock: { formula: 'Total Availability − Total Expected Consumption', note: 'This value becomes the next month’s opening stock.' },
+    remaining_shortage: { formula: 'MAX(0, Gross Shortage − Local PO Total − SAP PO Total)', note: 'Each active PO is deducted once; cancelled POs are excluded.' },
+};
 const purchaseTotalBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
     purchaseOrdersBySource(plant, source)
         .reduce((total, purchase) => total + Number(purchase.quantity_mt), 0);
@@ -104,6 +119,7 @@ export default function BalanceSheet({
     const expandedReceipts = useMemo(() => new Set<string>(), []);
     const [viewingOrders, setViewingOrders] = useState<{ plant: PlantColumn; source: 'sap' | 'local' } | null>(null);
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
+    const [formulaMetric, setFormulaMetric] = useState<Metric | null>(null);
     const [remark, setRemark] = useState('');
     const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
     const mobilePlantSlider = useRef<HTMLDivElement>(null);
@@ -556,10 +572,10 @@ export default function BalanceSheet({
                                                         }}
                                                         className={`group grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 transition-colors ${canManage ? 'cursor-pointer hover:bg-cyan-50/60 focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:outline-offset-[-2px]' : ''} ${row.highlight ? 'bg-fuchsia-50' : row.labelHighlight ? 'bg-orange-50' : ''}`}
                                                     >
-                                                        <p className={`flex min-w-0 items-center gap-1.5 text-[11px] font-semibold leading-4 ${row.labelHighlight ? 'text-orange-700' : 'text-slate-600'}`}>
+                                                        <button type="button" onClick={(event) => { event.stopPropagation(); setFormulaMetric(row.key); }} className={`flex min-w-0 items-center gap-1.5 text-left text-[11px] font-semibold leading-4 hover:text-cyan-700 ${row.labelHighlight ? 'text-orange-700' : 'text-slate-600'}`} title="View calculation formula">
                                                             <span>{row.label}</span>
                                                             {canManage && <Pencil className="size-2.5 shrink-0 text-slate-300 transition-colors group-hover:text-cyan-600" />}
-                                                        </p>
+                                                        </button>
                                                         <div className={`text-right text-xs font-black tabular-nums ${Number(plant[row.key]) < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                                                             {row.key === 'to_buy' && plant.consumption_id ? (
                                                                 <div className="flex flex-col items-end gap-1.5">
@@ -690,7 +706,7 @@ export default function BalanceSheet({
                                             <th
                                                 className={`sticky left-0 z-10 w-72 max-w-72 min-w-72 border px-3 py-3 text-left font-semibold break-words whitespace-normal ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
                                             >
-                                                {row.label}
+                                                <button type="button" onClick={() => setFormulaMetric(row.key)} className="w-full text-left hover:text-cyan-700" title="View calculation formula">{row.label}</button>
                                             </th>
                                             {columns.map((plant, plantIndex) => (
                                                 <Fragment key={`${plant.column_key}-${row.key}`}>
@@ -889,7 +905,24 @@ export default function BalanceSheet({
             {viewingOrders && (
                 <PurchaseOrdersModal plant={viewingOrders.plant} source={viewingOrders.source} onClose={() => setViewingOrders(null)} />
             )}
+            {formulaMetric && <FormulaModal metric={formulaMetric} onClose={() => setFormulaMetric(null)} />}
         </AppLayout>
+    );
+}
+
+function FormulaModal({ metric, onClose }: { metric: Metric; onClose: () => void }) {
+    const row = rows.find((item) => item.key === metric);
+    const details = metricFormulas[metric];
+    return (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/55 p-4" onMouseDown={onClose}>
+            <div className="w-full max-w-lg rounded-2xl border bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+                <p className="text-[10px] font-black tracking-[.16em] text-cyan-700 uppercase">Calculation formula</p>
+                <h2 className="mt-1 text-lg font-black text-slate-900">{row?.label}</h2>
+                <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold leading-6 text-slate-900">{details.formula}</div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">{details.note}</p>
+                <div className="mt-5 flex justify-end"><Button variant="outline" onClick={onClose}>Close</Button></div>
+            </div>
+        </div>
     );
 }
 
