@@ -498,7 +498,7 @@ export default function BalanceOverview({
                     className={`min-w-0 overflow-hidden border bg-white shadow-sm ${
                         expanded
                             ? 'fixed inset-0 z-50 flex h-dvh rounded-none'
-                            : 'relative z-10 flex min-h-0 flex-col rounded-xl md:h-[640px] md:flex-row lg:h-[560px]'
+                            : 'relative z-10 flex min-h-0 flex-col rounded-xl md:flex-row lg:h-[calc(100dvh-8rem)] lg:min-h-[720px]'
                     }`}
                 >
                     <aside
@@ -975,9 +975,7 @@ export default function BalanceOverview({
                             </div>
                             </>
                         )}
-                    </div>
-                </section>
-                <section className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <section className="mt-3 w-full shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-2 border-b bg-gradient-to-r from-slate-50 via-cyan-50/70 to-white px-5 py-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-3">
                             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-700 text-white shadow-sm"><Boxes className="size-4" /></div>
@@ -1026,6 +1024,8 @@ export default function BalanceOverview({
                                 </tr>
                             </tfoot>
                         </table>
+                    </div>
+                </section>
                     </div>
                 </section>
             </div>
