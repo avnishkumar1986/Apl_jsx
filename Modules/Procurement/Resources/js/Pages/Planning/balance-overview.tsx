@@ -975,7 +975,7 @@ export default function BalanceOverview({
                             </div>
                             </>
                         )}
-                <section className="mx-3 mb-3 mt-1 w-auto shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {!expanded && <section className="mx-3 mb-3 mt-1 w-auto shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-col gap-2 border-b bg-gradient-to-r from-slate-50 via-cyan-50/70 to-white px-5 py-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-3">
                             <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-700 text-white shadow-sm"><Boxes className="size-4" /></div>
@@ -1025,7 +1025,7 @@ export default function BalanceOverview({
                             </tfoot>
                         </table>
                     </div>
-                </section>
+                </section>}
                     </div>
                 </section>
             </div>
