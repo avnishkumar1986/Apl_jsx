@@ -139,6 +139,7 @@ export default function BalanceOverview({
     const [remark, setRemark] = useState('');
     const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
     const mobilePlantSlider = useRef<HTMLDivElement>(null);
+    const desktopGrid = useRef<HTMLDivElement>(null);
     const materialTabs = useMemo(() => {
         const selected = materials.find((item) => item.matnr === filters.material);
         const query = materialSearch.trim().toLowerCase();
@@ -167,6 +168,10 @@ export default function BalanceOverview({
     };
     useEffect(() => {
         setFoldedPlants(new Set());
+        if (desktopGrid.current) {
+            desktopGrid.current.scrollTop = 0;
+            desktopGrid.current.scrollLeft = 0;
+        }
     }, [filters.material]);
     useEffect(() => {
         setMobilePlantIndex((current) => Math.max(0, Math.min(current, visibleColumns.length - 1)));
@@ -793,10 +798,11 @@ export default function BalanceOverview({
                                 )}
                             </div>
                             <div
+                                ref={desktopGrid}
                                 className="hidden min-h-0 w-full max-w-full flex-1 overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block"
                             >
                                 <table className="w-max min-w-full border-collapse text-xs">
-                                    <thead>
+                                    <thead className="sticky top-0 z-30 shadow-sm">
                                         <tr className="bg-amber-50/60">
                                             <th className="sticky left-0 z-20 w-44 max-w-44 min-w-44 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal sm:w-56 sm:max-w-56 sm:min-w-56 lg:w-72 lg:max-w-72 lg:min-w-72">
                                                 PROCUREMENT BALANCE SHEET · {selectedMaterial?.maktx || filters.material}
@@ -971,19 +977,19 @@ export default function BalanceOverview({
                         )}
                     </div>
                 </section>
-                <section className="w-full max-w-2xl overflow-hidden rounded-xl border bg-white shadow-sm">
-                    <div className="flex flex-col gap-1 border-b bg-cyan-50/60 px-4 py-3 md:flex-row md:items-end md:justify-between">
-                        <div>
-                            <p className="text-brand-berry text-[9px] font-bold tracking-[.15em] uppercase">Supplier commitments</p>
-                            <h2 className="font-bold">MOU Lifting Plan</h2>
+                <section className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex flex-col gap-2 border-b bg-gradient-to-r from-slate-50 via-cyan-50/70 to-white px-5 py-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-700 text-white shadow-sm"><Boxes className="size-4" /></div>
+                            <div><p className="text-[9px] font-black tracking-[.16em] text-orange-600 uppercase">Supplier commitments</p><h2 className="text-base font-black text-slate-900">MOU Lifting Plan</h2></div>
                         </div>
-                        <p className="text-[10px] text-slate-500">Monthly committed quantities across the planning horizon</p>
+                        <div className="flex items-center gap-2"><span className="rounded-full border border-cyan-200 bg-white px-3 py-1.5 text-[10px] font-bold text-cyan-700">{mouPlans.length} suppliers</span><span className="rounded-full bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-white">{mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)} MT</span></div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[26rem] text-xs">
                             <thead>
                                 <tr className="bg-slate-50 text-[10px] uppercase">
-                                    <th className="px-4 py-3 text-left">Supplier</th>
+                                    <th className="px-5 py-3 text-left">Supplier</th>
                                     <th className="px-4 py-3 text-right">{monthLabel}</th>
                                     <th className="px-4 py-3 text-right">Horizon total</th>
                                 </tr>
@@ -991,14 +997,14 @@ export default function BalanceOverview({
                             <tbody>
                                 {mouPlans.length === 0 ? (
                                     <tr>
-                                        <td className="px-4 py-3 text-slate-500" colSpan={3}>
-                                            No MOU vendor plan available
+                                        <td className="px-5 py-8 text-center text-slate-400" colSpan={3}>
+                                            <Boxes className="mx-auto mb-2 size-7 text-slate-300" />No MOU vendor plan available for this planning horizon
                                         </td>
                                     </tr>
                                 ) : (
                                     mouPlans.map((plan) => (
                                         <tr key={`${plan.vendor_code}-${plan.vendor_name}`} className="border-t">
-                                            <td className="px-4 py-3 font-medium">
+                                            <td className="px-5 py-3 font-semibold text-slate-800">
                                                 {plan.vendor_name}
                                                 <span className="ml-2 text-slate-400">{plan.vendor_code}</span>
                                             </td>
@@ -1009,8 +1015,8 @@ export default function BalanceOverview({
                                 )}
                             </tbody>
                             <tfoot>
-                                <tr className="border-t bg-fuchsia-50 font-bold">
-                                    <td className="px-4 py-3 text-right">TOTAL QTY.</td>
+                                <tr className="border-t-2 border-cyan-100 bg-gradient-to-r from-cyan-50 to-slate-50 font-black">
+                                    <td className="px-5 py-3 text-right text-slate-600">TOTAL QUANTITY</td>
                                     <td className="px-4 py-3 text-right tabular-nums">
                                         {mouPlans.reduce((sum, plan) => sum + Number(plan.quantity_mt), 0).toFixed(3)}
                                     </td>
