@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Boxes,
+    Calculator,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -17,6 +18,7 @@ import {
     Minimize2,
     Pencil,
     Search,
+    X,
 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -703,6 +705,7 @@ export default function BalanceOverview({
                                                                     <div className="min-w-0">
                                                                         <button type="button" onClick={(event) => { event.stopPropagation(); setFormulaMetric(row.key); }} className={`flex items-center gap-1.5 text-left text-[11px] font-semibold leading-4 hover:text-cyan-700 ${row.labelHighlight ? 'text-orange-700' : 'text-slate-600'}`} title="View calculation formula">
                                                                             <span>{row.label}</span>
+                                                                            <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[8px] font-black text-cyan-700">ƒx</span>
                                                                             {canManage && <Pencil className="size-2.5 shrink-0 text-slate-300 transition-colors group-hover:text-cyan-600" />}
                                                                         </button>
                                                                     </div>
@@ -847,7 +850,7 @@ export default function BalanceOverview({
                                                 <th
                                                     className={`sticky left-0 z-10 w-44 max-w-44 min-w-44 border px-3 py-3 text-left font-semibold break-words whitespace-normal sm:w-56 sm:max-w-56 sm:min-w-56 lg:w-72 lg:max-w-72 lg:min-w-72 ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
                                                 >
-                                                    <button type="button" onClick={() => setFormulaMetric(row.key)} className="w-full text-left hover:text-cyan-700" title="View calculation formula">{row.label}</button>
+                                                    <button type="button" onClick={() => setFormulaMetric(row.key)} className="flex w-full items-center justify-between gap-2 text-left hover:text-cyan-700" title="View calculation formula"><span>{row.label}</span><span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[8px] font-black text-cyan-700">ƒx</span></button>
                                                 </th>
                                                 {visibleColumns.map((plant, plantIndex) => (
                                                     <Fragment key={`${plant.column_key}-${row.key}`}>
@@ -1057,14 +1060,16 @@ export default function BalanceOverview({
 function FormulaModal({ metric, onClose }: { metric: Metric; onClose: () => void }) {
     const row = rows.find((item) => item.key === metric);
     const details = metricFormulas[metric];
+    useEffect(() => {
+        const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+        document.addEventListener('keydown', closeOnEscape);
+        return () => document.removeEventListener('keydown', closeOnEscape);
+    }, [onClose]);
     return (
-        <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/55 p-4" onMouseDown={onClose}>
-            <div className="w-full max-w-lg rounded-2xl border bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-                <p className="text-[10px] font-black tracking-[.16em] text-cyan-700 uppercase">Calculation formula</p>
-                <h2 className="mt-1 text-lg font-black text-slate-900">{row?.label}</h2>
-                <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm font-bold leading-6 text-slate-900">{details.formula}</div>
-                <p className="mt-3 text-xs leading-5 text-slate-600">{details.note}</p>
-                <div className="mt-5 flex justify-end"><Button variant="outline" onClick={onClose}>Close</Button></div>
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onMouseDown={onClose} role="dialog" aria-modal="true" aria-labelledby="formula-title">
+            <div className="w-full max-w-xl overflow-hidden rounded-t-3xl border bg-white shadow-2xl sm:rounded-3xl" onMouseDown={(event) => event.stopPropagation()}>
+                <header className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 px-5 py-5 text-white sm:px-6"><div className="absolute -top-10 -right-8 size-32 rounded-full bg-cyan-400/10" /><div className="relative flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/15"><Calculator className="size-5 text-cyan-300" /></div><div className="min-w-0 flex-1"><p className="text-[10px] font-black tracking-[.18em] text-cyan-300 uppercase">Calculation details</p><h2 id="formula-title" className="mt-1 text-xl font-black leading-tight">{row?.label}</h2></div><button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 hover:bg-white/20" aria-label="Close formula"><X className="size-4" /></button></div></header>
+                <div className="space-y-4 p-5 sm:p-6"><section><p className="mb-2 text-[10px] font-black tracking-[.14em] text-slate-500 uppercase">Formula</p><div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-white p-4 text-center text-sm font-black leading-7 text-slate-900 shadow-sm sm:text-base">{details.formula}</div></section><section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-black tracking-[.14em] text-slate-500 uppercase">How it works</p><p className="mt-2 text-sm leading-6 text-slate-700">{details.note}</p></section><div className="flex flex-wrap gap-2 text-[10px] font-bold"><span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">Active records only</span><span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Cancelled POs excluded</span><span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">No duplicate counting</span></div><Button className="w-full bg-slate-900 hover:bg-slate-800 sm:ml-auto sm:block sm:w-auto" onClick={onClose}>Done</Button></div>
             </div>
         </div>
     );
