@@ -109,7 +109,8 @@ export default function BalanceOverview({
     const [materialSearch, setMaterialSearch] = useState('');
     const [showRemarks, setShowRemarks] = useState(true);
     const [expanded, setExpanded] = useState(false);
-    const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(() => new Set());
+    const expandedReceipts = useMemo(() => new Set<string>(), []);
+    const [viewingOrders, setViewingOrders] = useState<PlantColumn | null>(null);
     const [foldedPlants, setFoldedPlants] = useState<Set<number>>(() => new Set());
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
     const [remark, setRemark] = useState('');
@@ -189,12 +190,7 @@ export default function BalanceOverview({
         );
     };
     const toggleReceipts = (columnKey: string) => {
-        setExpandedReceipts((current) => {
-            const next = new Set(current);
-            if (next.has(columnKey)) next.delete(columnKey);
-            else next.add(columnKey);
-            return next;
-        });
+        setViewingOrders(columns.find((plant) => plant.column_key === columnKey) || null);
     };
     const formatExportValue = (plant: PlantColumn, row: (typeof rows)[number]) => {
         const total = formatValue(plant[row.key], row.unit);
@@ -1032,7 +1028,56 @@ export default function BalanceOverview({
                     </div>
                 </div>
             )}
+            {viewingOrders && (
+                <PurchaseOrdersModal plant={viewingOrders} onClose={() => setViewingOrders(null)} />
+            )}
         </AppLayout>
+    );
+}
+
+function PurchaseOrdersModal({ plant, onClose }: { plant: PlantColumn; onClose: () => void }) {
+    const groups = [
+        { key: 'local', label: 'Local purchase orders', color: 'border-orange-200 bg-orange-50 text-orange-700', orders: plant.purchase_orders.filter((order) => order.source === 'local') },
+        { key: 'sap', label: 'SAP purchase orders', color: 'border-blue-200 bg-blue-50 text-blue-700', orders: plant.purchase_orders.filter((order) => order.source !== 'local') },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/55 p-3 sm:p-6" onMouseDown={onClose}>
+            <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+                <div className="flex items-start justify-between gap-4 border-b px-4 py-3 sm:px-5">
+                    <div className="min-w-0">
+                        <h2 className="font-black text-slate-900">Purchase orders</h2>
+                        <p className="truncate text-xs text-slate-500">{plant.name} · Total {Number(plant.buying_imports).toFixed(3)} MT</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+                </div>
+                <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-2 sm:p-5">
+                    {groups.map((group) => (
+                        <section key={group.key} className="min-w-0">
+                            <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${group.color}`}>
+                                <h3 className="text-xs font-black uppercase">{group.label}</h3>
+                                <span className="text-[10px] font-bold">{group.orders.reduce((sum, order) => sum + Number(order.quantity_mt), 0).toFixed(3)} MT · {group.orders.length}</span>
+                            </div>
+                            <div className="mt-2 space-y-2">
+                                {group.orders.length ? group.orders.map((order, index) => (
+                                    <div key={`${group.key}-${order.po_number}-${index}`} className="rounded-xl border border-slate-200 p-3 shadow-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <p className="min-w-0 font-bold break-words text-slate-900">{order.vendor_name}</p>
+                                            <span className="shrink-0 font-black tabular-nums">{Number(order.quantity_mt).toFixed(3)} MT</span>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
+                                            <span>{order.po_number}</span>
+                                            <span>ETA {formatDateForDisplay(order.eta)}</span>
+                                            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700 uppercase">{order.status.replaceAll('_', ' ')}</span>
+                                        </div>
+                                    </div>
+                                )) : <p className="rounded-lg border border-dashed p-5 text-center text-xs text-slate-400">No {group.label.toLowerCase()}</p>}
+                            </div>
+                        </section>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 }
 
