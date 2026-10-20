@@ -382,7 +382,15 @@ class ProcurementController extends Controller
                     ->sortByDesc('consumption_date')
                     ->first();
                 $plantPurchases = $purchases->get($groupKey, collect());
-                $calculationPurchases = $plantPurchases->filter(fn ($purchase) => (bool) $purchase->status && $purchase->delivery_status !== 'cancelled');
+                // Portal-generated POs remain actionable until their delivery is
+                // cancelled. Some imported live records carry a false generic
+                // status even though the portal PO is still planned, which made
+                // the To Buy value show zero while the same PO appeared in More.
+                // SAP rows continue to respect their integration status flag.
+                $calculationPurchases = $plantPurchases->filter(fn ($purchase) =>
+                    $purchase->delivery_status !== 'cancelled'
+                    && ($purchase->source === 'local' || (bool) $purchase->status)
+                );
                 $openingStock = $rollingOpeningStock[$plant->id] ?? 0;
                 $dailyConsumption = (float) ($activePlan?->quantity_mt ?? 0);
                 $isPlanStartMonth = $activePlan && CarbonImmutable::parse($activePlan->consumption_date)->format('Y-m') === $periodKey;
