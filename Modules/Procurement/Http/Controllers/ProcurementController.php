@@ -395,13 +395,13 @@ class ProcurementController extends Controller
                 $supplierPurchases = $calculationPurchases->where('source', '!=', 'local');
                 $localPurchaseQuantity = (float) $localPurchases->sum('quantity_mt');
                 $sapPurchaseQuantity = (float) $supplierPurchases->sum('quantity_mt');
-                $toBuy = $plannedBuying;
+                $toBuy = $plannedBuying + $localPurchaseQuantity;
                 $imports = $sapPurchaseQuantity;
                 $supplierReceipts = $imports;
                 $consumption = $dailyConsumption * $days;
                 // Total Buying and shortage calculations include both categorized
                 // PO sources even though Buying / Imports displays SAP only.
-                $totalBuying = $plannedBuying + $localPurchaseQuantity + $sapPurchaseQuantity;
+                $totalBuying = $toBuy + $sapPurchaseQuantity;
                 $totalAvailability = $openingStock + $totalBuying;
                 $closingStock = $totalAvailability - $consumption;
                 $grossShortage = max(0, $consumption - ($openingStock + $plannedBuying));

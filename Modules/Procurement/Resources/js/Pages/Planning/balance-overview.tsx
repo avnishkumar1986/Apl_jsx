@@ -692,15 +692,17 @@ export default function BalanceOverview({
                                                                     </div>
                                                                     <div className={`text-right text-xs font-black tabular-nums ${Number(plant[row.key]) < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                                                                             {row.key === 'to_buy' && plant.consumption_id ? (
-                                                                                <div className="flex flex-col items-end gap-1">
-                                                                                    <span>{formatValue(plant.to_buy, row.unit)}</span>
-                                                                                    <span className="rounded bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                        Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
-                                                                                    </span>
+                                                                                <div className="flex flex-col items-end gap-1.5">
+                                                                                    <div className="flex items-center justify-end gap-2">
+                                                                                        <span>{formatValue(plant.to_buy, row.unit)}</span>
+                                                                                        {purchaseOrdersBySource(plant, 'local').length > 0 && (
+                                                                                            <button type="button" onClick={(event) => { event.stopPropagation(); toggleReceipts(plant.column_key, 'local'); }} className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-white px-2 py-1 text-[9px] font-bold text-orange-700">
+                                                                                                More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
                                                                                     {purchaseOrdersBySource(plant, 'local').length > 0 && (
-                                                                                        <button type="button" onClick={(event) => { event.stopPropagation(); toggleReceipts(plant.column_key, 'local'); }} className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-white px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                                            More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
-                                                                                        </button>
+                                                                                        <span className="text-[8px] font-bold text-orange-700">LOCAL PORTAL POs</span>
                                                                                     )}
                                                                                     <Link
                                                                                         onClick={(event) => event.stopPropagation()}
@@ -709,7 +711,6 @@ export default function BalanceOverview({
                                                                                     >
                                                                                         + Add local PO
                                                                                     </Link>
-                                                                                    <PurchaseOrderCards orders={purchaseOrdersBySource(plant, 'local')} limit={1} tone="local" />
                                                                                 </div>
                                                                             ) : plant.consumption_id ? (
                                                                             <Link onClick={(event) => event.stopPropagation()} className="hover:text-brand-berry hover:underline" href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}>
@@ -909,9 +910,14 @@ export default function BalanceOverview({
                                                                     )}
                                                                 </div>
                                                             ) : row.key === 'to_buy' && plant.consumption_id ? (
-                                                                <div className="flex flex-col items-end gap-1.5">
+                                                                <div className="space-y-1.5">
                                                                     <div className="flex items-center justify-end gap-2">
                                                                         <span className="font-black text-slate-900">{formatValue(plant.to_buy, row.unit)}</span>
+                                                                        {purchaseOrdersBySource(plant, 'local').length > 0 && (
+                                                                            <button type="button" onClick={() => toggleReceipts(plant.column_key, 'local')} className="inline-flex h-7 items-center gap-1 rounded-md border border-orange-200 bg-white px-2 text-[9px] font-bold uppercase text-orange-700">
+                                                                                More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
+                                                                            </button>
+                                                                        )}
                                                                         <Link
                                                                             className="inline-flex h-7 shrink-0 items-center rounded-md border border-orange-200 bg-orange-50 px-2 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
                                                                             href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
@@ -919,15 +925,6 @@ export default function BalanceOverview({
                                                                             + Local PO
                                                                         </Link>
                                                                     </div>
-                                                                    <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                        Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
-                                                                    </span>
-                                                                    {purchaseOrdersBySource(plant, 'local').length > 0 && (
-                                                                        <button type="button" onClick={() => toggleReceipts(plant.column_key, 'local')} className="inline-flex h-7 items-center gap-1 rounded-md border border-orange-200 bg-white px-2 text-[9px] font-bold uppercase text-orange-700">
-                                                                            More ({purchaseOrdersBySource(plant, 'local').length}) <ChevronDown className="size-3" />
-                                                                        </button>
-                                                                    )}
-                                                                    <PurchaseOrderCards orders={purchaseOrdersBySource(plant, 'local')} limit={2} tone="local" />
                                                                 </div>
                                                             ) : plant.consumption_id ? (
                                                                 <Link
@@ -1096,27 +1093,6 @@ function PurchaseOrdersModal({ plant, source, onClose }: { plant: PlantColumn; s
                     ))}
                 </div>
             </div>
-        </div>
-    );
-}
-
-function PurchaseOrderCards({ orders, limit, tone }: { orders: PlantColumn['purchase_orders']; limit: number; tone: 'local' | 'sap' }) {
-    const visibleOrders = orders.slice(0, limit);
-    if (!visibleOrders.length) return null;
-
-    return (
-        <div className="w-full space-y-1.5 pt-1 text-left whitespace-normal">
-            {visibleOrders.map((purchase, index) => (
-                <div key={`${tone}-${purchase.po_number}-${index}`} className={`rounded-lg border bg-white px-2.5 py-2 text-[9px] leading-4 shadow-sm ${tone === 'local' ? 'border-orange-200' : 'border-blue-200'}`}>
-                    <div className="font-bold break-words text-slate-900">{purchase.vendor_name}</div>
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-slate-500">{purchase.po_number}</span>
-                        <span className="shrink-0 font-black text-slate-900">{Number(purchase.quantity_mt).toFixed(3)} MT</span>
-                    </div>
-                    <div className="text-[8px] text-slate-500">ETA {formatDateForDisplay(purchase.eta)}</div>
-                </div>
-            ))}
-            {orders.length > limit && <p className="text-right text-[9px] font-bold text-orange-700">+ {orders.length - limit} more portal POs</p>}
         </div>
     );
 }
