@@ -688,9 +688,6 @@ export default function BalanceOverview({
                                                                             {row.key === 'to_buy' && plant.consumption_id ? (
                                                                                 <div className="flex flex-col items-end gap-1">
                                                                                     <span>{formatValue(plant.to_buy, row.unit)}</span>
-                                                                                    <span className="rounded bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                                        Local PO {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
-                                                                                    </span>
                                                                                     <Link
                                                                                         onClick={(event) => event.stopPropagation()}
                                                                                         className="inline-flex items-center rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
@@ -905,19 +902,14 @@ export default function BalanceOverview({
                                                                     )}
                                                                 </div>
                                                             ) : row.key === 'to_buy' && plant.consumption_id ? (
-                                                                <div className="flex flex-col items-end gap-1.5">
-                                                                    <div className="flex items-center justify-end gap-2">
-                                                                        <span className="font-black text-slate-900">{formatValue(plant.to_buy, row.unit)}</span>
-                                                                        <Link
-                                                                            className="inline-flex h-7 shrink-0 items-center rounded-md border border-orange-200 bg-orange-50 px-2 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
-                                                                            href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
-                                                                        >
-                                                                            + Local PO
-                                                                        </Link>
-                                                                    </div>
-                                                                    <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                        Local PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
-                                                                    </span>
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <span className="font-black text-slate-900">{formatValue(plant.to_buy, row.unit)}</span>
+                                                                    <Link
+                                                                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-orange-200 bg-orange-50 px-2 text-[9px] font-bold text-orange-700 hover:bg-orange-100"
+                                                                        href={`/admin/procurement/consumptions/${plant.consumption_id}/supply-plan`}
+                                                                    >
+                                                                        + Local PO
+                                                                    </Link>
                                                                 </div>
                                                             ) : plant.consumption_id ? (
                                                                 <Link
