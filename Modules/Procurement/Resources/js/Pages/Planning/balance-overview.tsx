@@ -581,8 +581,8 @@ export default function BalanceOverview({
                         </nav>
                     </aside>
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-50/40">
-                        <div className="relative z-30 flex items-center border-b bg-slate-50 px-5 py-3">
-                            <details className="group relative">
+                        <div className="relative z-30 flex flex-col items-start border-b bg-slate-50 px-4 py-3 sm:px-5">
+                            <details className="group w-full">
                                 <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
                                     <Eye className="size-4" />
                                     Plant columns
@@ -591,7 +591,7 @@ export default function BalanceOverview({
                                     </span>
                                     <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
                                 </summary>
-                                <div className="absolute top-11 left-0 z-50 w-72 overflow-hidden rounded-xl border bg-white shadow-xl shadow-slate-900/15">
+                                <div className="mt-2 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-900/10">
                                     <div className="flex items-center justify-between border-b bg-slate-50 px-3 py-2">
                                         <div>
                                             <p className="text-[10px] font-black tracking-wide text-slate-700 uppercase">Visible plants</p>
@@ -605,7 +605,7 @@ export default function BalanceOverview({
                                             Show all
                                         </button>
                                     </div>
-                                    <div className="max-h-72 space-y-1 overflow-y-auto p-2 [scrollbar-width:thin]">
+                                    <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto p-2 sm:grid-cols-2 [scrollbar-width:thin]">
                                         {plantOptions.map((plant) => {
                                             const visible = !foldedPlants.has(plant.id);
 
