@@ -568,6 +568,18 @@ export default function BalanceSheet({
                                                                     >
                                                                         + Add local PO
                                                                     </Link>
+                                                                    {plant.purchase_orders.some((order) => order.source === 'local') && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                toggleReceipts(plant.column_key);
+                                                                            }}
+                                                                            className="text-[9px] font-bold text-orange-700 underline decoration-orange-300 underline-offset-2"
+                                                                        >
+                                                                            View local POs ({plant.purchase_orders.filter((order) => order.source === 'local').length})
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             ) : plant.consumption_id ? (
                                                                 <Link
@@ -777,6 +789,15 @@ export default function BalanceSheet({
                                                                 <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
                                                                     Local PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                 </span>
+                                                                {plant.purchase_orders.some((order) => order.source === 'local') && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleReceipts(plant.column_key)}
+                                                                        className="text-[9px] font-bold text-orange-700 underline decoration-orange-300 underline-offset-2"
+                                                                    >
+                                                                        View local POs ({plant.purchase_orders.filter((order) => order.source === 'local').length})
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         ) : plant.consumption_id ? (
                                                             <Link
