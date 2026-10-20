@@ -493,14 +493,14 @@ export default function BalanceOverview({
                     className={`min-w-0 overflow-hidden border bg-white shadow-sm ${
                         expanded
                             ? 'fixed inset-0 z-50 flex h-dvh rounded-none'
-                            : 'relative z-10 flex min-h-[560px] flex-col rounded-xl md:flex-row'
+                            : 'relative z-10 flex min-h-0 flex-col rounded-xl md:h-[640px] md:flex-row lg:h-[560px]'
                     }`}
                 >
                     <aside
                         className={`flex shrink-0 flex-col bg-gradient-to-b from-slate-50 to-cyan-50/50 ${
                             expanded
                                 ? 'w-56 border-r sm:w-64'
-                                : 'max-h-[22rem] w-full border-b md:max-h-none md:w-64 md:border-r md:border-b-0'
+                                : 'max-h-[22rem] w-full border-b md:h-full md:max-h-none md:w-64 md:border-r md:border-b-0'
                         }`}
                     >
                         <div className="border-b px-3 py-3">
@@ -575,7 +575,7 @@ export default function BalanceOverview({
                             )}
                         </nav>
                     </aside>
-                    <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                         <div className="relative z-30 flex items-center border-b bg-slate-50 px-4 py-2">
                             <details className="group relative">
                                 <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
@@ -660,7 +660,7 @@ export default function BalanceOverview({
                             <div className="p-12 text-center text-sm text-slate-500">No active plants were found for the selected company.</div>
                         ) : (
                             <>
-                            <div className="min-w-0 bg-slate-50/70 lg:hidden">
+                            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-50/70 lg:hidden">
                                 {visibleColumns.length ? (
                                     <>
                                         <div
@@ -793,7 +793,7 @@ export default function BalanceOverview({
                                 )}
                             </div>
                             <div
-                                className={`hidden w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block ${expanded ? 'min-h-0 flex-1' : ''}`}
+                                className="hidden min-h-0 w-full max-w-full flex-1 overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block"
                             >
                                 <table className="w-max min-w-full border-collapse text-xs">
                                     <thead>
