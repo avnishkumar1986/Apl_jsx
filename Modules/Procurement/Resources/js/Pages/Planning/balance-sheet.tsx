@@ -68,7 +68,11 @@ const rows: { key: Metric; label: string; unit: string; highlight?: boolean; lab
 ];
 const purchaseTotalBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
     plant.purchase_orders
-        .filter((purchase) => (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'))
+        .filter(
+            (purchase) =>
+                purchase.status !== 'cancelled' &&
+                (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'),
+        )
         .reduce((total, purchase) => total + Number(purchase.quantity_mt), 0);
 
 export default function BalanceSheet({
@@ -559,7 +563,7 @@ export default function BalanceSheet({
                                                                 <div className="flex flex-col items-end gap-1">
                                                                     <span>{formatValue(plant.to_buy, row.unit)}</span>
                                                                     <span className="rounded bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                        Local PO {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
+                                                                        Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                     </span>
                                                                     <Link
                                                                         onClick={(event) => event.stopPropagation()}
@@ -775,7 +779,7 @@ export default function BalanceSheet({
                                                                     </Link>
                                                                 </div>
                                                                 <span className="rounded bg-orange-100/70 px-2 py-1 text-[9px] font-bold text-orange-700">
-                                                                    Local PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
+                                                                    Portal PO total {purchaseTotalBySource(plant, 'local').toFixed(3)} MT
                                                                 </span>
                                                             </div>
                                                         ) : plant.consumption_id ? (
