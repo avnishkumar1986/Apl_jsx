@@ -1,0 +1,1 @@
+import{j as t}from"./app-Bqf8rLXU.js";import o from"./error-page-sFZn0v24.js";import"./brand-lockup-CYLQsKYg.js";import"./arrow-left-BqRlUjk-.js";import"./user-round-CtYX7Ysf.js";function m(){return t.jsx(o,{status:404,title:"Page not found",description:"The page you requested does not exist, may have moved, or the address may be incorrect."})}export{m as default};

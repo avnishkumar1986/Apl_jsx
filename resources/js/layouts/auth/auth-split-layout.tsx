@@ -29,41 +29,41 @@ export default function AuthSplitLayout({ children, title, description }: AuthLa
                 </p>
             </section>
 
-            <section className="relative hidden min-h-0 overflow-hidden bg-[#061d3a] lg:block">
+            <section className="relative hidden min-h-0 overflow-hidden bg-gradient-to-b from-[#082d4c] via-[#061d3a] to-[#031522] lg:block">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[72%] bg-[#0a3455]" />
                 <img
                     src="/login-apl-apollo-pipe-v3.jpg"
                     alt="APL Apollo products and brand ambassadors"
                     width="1665"
                     height="945"
                     fetchPriority="high"
-                    className="absolute inset-0 size-full object-cover object-center"
+                    className="absolute inset-x-0 top-0 h-[72%] w-full object-cover object-[center_35%]"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#031522]/95 via-[#031522]/5 to-[#031522]/20" />
-                <div className="absolute top-[7%] left-[55%] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#041827]/65 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[72%] bg-gradient-to-t from-[#031522] via-transparent to-[#031522]/10" />
+                <div className="pointer-events-none absolute inset-x-0 top-[65%] h-[14%] bg-gradient-to-b from-transparent to-[#031522]" />
+                <div className="absolute top-6 left-6 w-[clamp(132px,13vw,168px)] overflow-hidden rounded-2xl border border-white/15 bg-[#172432]/92 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-md xl:top-8 xl:left-8">
                     <img
                         src="/apl-apollo-trust-stats-transparent-360.png"
-                        alt="35 plus years of trust, 3000 plus products, and top-grade materials"
+                        alt="APL Apollo experience, product range, and quality highlights"
                         width="360"
-                        height="372"
-                        loading="lazy"
-                        decoding="async"
-                        className="w-[clamp(135px,12vw,190px)] drop-shadow-[0_3px_8px_rgba(0,0,0,0.35)]"
+                        height="360"
+                        className="block h-auto w-full"
                     />
                 </div>
-                <div className="absolute bottom-[29%] left-8 rounded-2xl border border-white/15 bg-[#041827]/72 px-4 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-md xl:left-10">
+                <div className="absolute bottom-[25%] left-8 rounded-xl border border-white/15 bg-[#041827]/78 px-3.5 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-md xl:left-10">
                     <BrandLockup tone="dark" compact orientation="horizontal" className="justify-start" />
                 </div>
-                <div className="absolute inset-x-0 bottom-0 p-8 text-white xl:p-10 2xl:p-12">
+                <div className="absolute inset-x-0 bottom-0 px-8 pt-5 pb-7 text-white xl:px-10 xl:pb-9 2xl:px-12">
                     <div className="max-w-xl">
                         <span className="flex items-center gap-3 text-[10px] font-bold tracking-[0.2em] text-cyan-100 uppercase">
                             <span className="bg-brand-gold h-0.5 w-8" />
-                            Never cracks under pressure
+                            APL Apollo Enterprise Platform
                         </span>
-                        <h2 className="mt-3 text-[clamp(1.8rem,2.5vw,3rem)] leading-[1.05] font-black tracking-tight drop-shadow-lg">
-                            One workspace. <span className="text-brand-gold">Complete control.</span>
+                        <h2 className="mt-2.5 text-[clamp(1.65rem,2.2vw,2.65rem)] leading-[1.08] font-black tracking-tight drop-shadow-lg">
+                            Connected operations. <span className="text-brand-gold">Informed decisions.</span>
                         </h2>
-                        <p className="mt-4 max-w-lg text-sm leading-6 text-white/85 drop-shadow-md">
-                            Connect people, operations, procurement, sales, and business insights through one protected APL Apollo platform.
+                        <p className="mt-3 max-w-lg text-[13px] leading-5 text-white/80 drop-shadow-md">
+                            Access people, procurement, sales, and business insights securely through one unified enterprise platform.
                         </p>
                     </div>
                 </div>
