@@ -4,6 +4,7 @@ export interface Auth {
     user: User;
     roles: string[];
     permissions: string[];
+    homeUrl: string;
 }
 
 export interface BreadcrumbItem {
@@ -30,6 +31,10 @@ export interface SharedData {
     flash: { success?: string };
     datatable: { perPage: number; pageSizeOptions: number[] };
     activeModules: string[];
+    notifications: {
+        unreadCount: number;
+        items: Array<{ id: string; title: string; message: string; ticketNumber?: string; read: boolean; createdAt: string }>;
+    };
     [key: string]: unknown;
 }
 

@@ -48,7 +48,21 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'roles' => fn (): array => $request->user()?->getRoleNames()->values()->all() ?? [],
                 'permissions' => fn (): array => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
+                'homeUrl' => fn (): string => $request->user() && ! $request->user()->hasRole('Super Admin') && $request->user()->can('procurement.overview.view')
+                    ? '/admin/procurement/dashboard'
+                    : '/dashboard',
             ],
+            'notifications' => fn (): array => $request->user() && Schema::hasTable('notifications') ? [
+                'unreadCount' => $request->user()->unreadNotifications()->count(),
+                'items' => $request->user()->notifications()->latest()->limit(8)->get()->map(fn ($notification): array => [
+                    'id' => $notification->id,
+                    'title' => data_get($notification->data, 'title', 'Notification'),
+                    'message' => data_get($notification->data, 'message', ''),
+                    'ticketNumber' => data_get($notification->data, 'ticket_number'),
+                    'read' => $notification->read_at !== null,
+                    'createdAt' => $notification->created_at?->diffForHumans(),
+                ])->values()->all(),
+            ] : ['unreadCount' => 0, 'items' => []],
             'flash' => [
                 'success' => fn (): ?string => $request->session()->get('success'),
             ],
@@ -64,6 +78,7 @@ class HandleInertiaRequests extends Middleware
                         'procurement' => is_file(base_path('Modules/Procurement/routes/web.php')),
                         'sales' => is_file(base_path('Modules/Sales/routes/web.php')),
                         'corporate-chat' => is_file(base_path('Modules/CorporateChat/routes/web.php')),
+                        'support' => is_file(base_path('Modules/Support/routes/web.php')),
                         default => true,
                     })
                     ->values()

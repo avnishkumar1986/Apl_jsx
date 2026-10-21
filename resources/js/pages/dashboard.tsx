@@ -19,7 +19,6 @@ import {
     RefreshCw,
     ShieldCheck,
     ShoppingCart,
-    Store,
     TrendingUp,
     Users,
 } from 'lucide-react';
@@ -128,6 +127,7 @@ export default function Dashboard({
     const [selectedUserType, setSelectedUserType] = useState('all');
     const [securityScanRunning, setSecurityScanRunning] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState(1);
+    const [salesPeriod, setSalesPeriod] = useState<'monthly' | 'yearly'>('monthly');
     const [activeOffers, setActiveOffers] = useState([
         {
             id: 1,
@@ -390,10 +390,21 @@ export default function Dashboard({
         },
     ];
     const selectedProduct = dummyProducts.find((product) => product.id === selectedProductId) ?? dummyProducts[0]!;
-    const monthlyProductSales = [58, 66, 63, 74, 69, 82, 77, 71, 79, 86, 91, 95].map((value, index) => ({
-        month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index],
-        value: Math.round(value * selectedProduct.factor),
-    }));
+    const productSales = (
+        salesPeriod === 'monthly'
+            ? [58, 66, 63, 74, 69, 82, 77, 71, 79, 86, 91, 95].map((value, index) => ({
+                  label: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index],
+                  value,
+              }))
+            : [
+                  { label: '2022', value: 680 },
+                  { label: '2023', value: 760 },
+                  { label: '2024', value: 845 },
+                  { label: '2025', value: 930 },
+                  { label: '2026', value: 1025 },
+              ]
+    ).map((sale) => ({ ...sale, value: Math.round(sale.value * selectedProduct.factor) }));
+    const maximumProductSale = Math.max(...productSales.map((sale) => sale.value), 1);
     const accessRows = isSuperAdmin
         ? [
               { resource: 'Users', capability: 'Full access', source: 'Super Admin' },
@@ -637,57 +648,6 @@ export default function Dashboard({
                                     </Card>
                                 </Link>
                             ))}
-                            {[
-                                {
-                                    label: 'Total vendors',
-                                    value: 24,
-                                    color: 'text-pink-700',
-                                    surface: 'bg-pink-100',
-                                    accent: 'from-pink-500 to-rose-500',
-                                },
-                                {
-                                    label: 'Distributors',
-                                    value: 16,
-                                    color: 'text-violet-700',
-                                    surface: 'bg-violet-100',
-                                    accent: 'from-violet-500 to-purple-600',
-                                },
-                                {
-                                    label: 'Plumbers',
-                                    value: 8,
-                                    color: 'text-amber-700',
-                                    surface: 'bg-amber-100',
-                                    accent: 'from-amber-400 to-orange-500',
-                                },
-                                {
-                                    label: 'Active users',
-                                    value: visibleUserLocations.length,
-                                    color: 'text-cyan-700',
-                                    surface: 'bg-cyan-100',
-                                    accent: 'from-cyan-500 to-blue-600',
-                                },
-                            ].map((metric) => (
-                                <Card key={metric.label} className="corporate-card relative min-h-[132px] min-w-0 overflow-hidden">
-                                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${metric.accent}`} />
-                                    <CardContent className="relative flex min-h-[132px] items-center gap-3 p-4 sm:gap-4 sm:p-5">
-                                        <div
-                                            className={`grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm ${metric.surface} ${metric.color}`}
-                                        >
-                                            {metric.label === 'Active users' ? (
-                                                <MapPin className="size-6" strokeWidth={1.8} />
-                                            ) : (
-                                                <Store className="size-6" strokeWidth={1.8} />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-3xl font-bold tracking-tight text-slate-950 tabular-nums">
-                                                {metric.value.toLocaleString()}
-                                            </p>
-                                            <p className="mt-1 text-xs leading-4 font-semibold break-words text-slate-500">{metric.label}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
                         </section>
                         <Card className="corporate-card flex min-h-[420px] flex-col">
                             <CardHeader className="flex-row items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -695,9 +655,18 @@ export default function Dashboard({
                                     <span className="bg-brand-gold h-4 w-1 rounded-full" />
                                     Product sales
                                 </CardTitle>
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
-                                    Monthly performance
-                                </span>
+                                <label className="relative">
+                                    <span className="sr-only">Sales period</span>
+                                    <select
+                                        value={salesPeriod}
+                                        onChange={(event) => setSalesPeriod(event.target.value as 'monthly' | 'yearly')}
+                                        className="h-8 appearance-none rounded-lg border border-slate-200 bg-slate-50 py-1 pr-8 pl-3 text-[10px] font-semibold text-slate-600 transition outline-none hover:border-cyan-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                    >
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3 -translate-y-1/2 text-slate-400" />
+                                </label>
                             </CardHeader>
                             <CardContent className="flex-1 p-6">
                                 <div className="flex h-full flex-col items-stretch gap-5 sm:flex-row">
@@ -708,7 +677,7 @@ export default function Dashboard({
                                                 {dummyProducts.length}
                                             </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2 pb-1 min-[430px]:grid-cols-3 sm:flex sm:max-h-80 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
+                                        <div className="grid grid-cols-2 gap-2 pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin] min-[430px]:grid-cols-3 sm:flex sm:max-h-80 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pr-1">
                                             {dummyProducts.map((product) => (
                                                 <button
                                                     key={product.id}
@@ -738,17 +707,17 @@ export default function Dashboard({
                                     </div>
                                     <div className="flex min-w-0 flex-1 flex-col overflow-x-auto pb-1 [scrollbar-color:#cbd5e1_transparent] [scrollbar-width:thin]">
                                         <div className="flex h-64 min-w-full flex-none items-end gap-1 border-b border-l border-slate-200 px-1 sm:h-auto sm:min-h-80 sm:min-w-[430px] sm:flex-1 sm:gap-2 sm:px-3">
-                                            {monthlyProductSales.map((sale) => (
-                                                <div key={sale.month} className="group flex h-full min-w-0 flex-1 flex-col justify-end text-center">
+                                            {productSales.map((sale) => (
+                                                <div key={sale.label} className="group flex h-full min-w-0 flex-1 flex-col justify-end text-center">
                                                     <span className="mb-1 text-[9px] font-semibold text-slate-500 opacity-0 transition group-hover:opacity-100">
                                                         {sale.value}K
                                                     </span>
                                                     <div
                                                         className="bg-brand-teal relative w-full rounded-t-sm opacity-80 group-hover:opacity-100"
-                                                        style={{ height: `${sale.value}%` }}
-                                                        title={`${sale.month}: ${sale.value}K units`}
+                                                        style={{ height: `${Math.max(8, (sale.value / maximumProductSale) * 95)}%` }}
+                                                        title={`${sale.label}: ${sale.value}K units`}
                                                     />
-                                                    <span className="mt-2 text-[8px] font-semibold text-slate-500 sm:text-[9px]">{sale.month}</span>
+                                                    <span className="mt-2 text-[8px] font-semibold text-slate-500 sm:text-[9px]">{sale.label}</span>
                                                 </div>
                                             ))}
                                         </div>

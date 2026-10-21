@@ -1,8 +1,8 @@
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
-import { type User } from '@/types';
-import { Link } from '@inertiajs/react';
+import { type SharedData, type User } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 import { ClipboardCheck, Headphones, Inbox, LogOut, Settings, UserRound, WalletCards } from 'lucide-react';
 
 interface UserMenuContentProps {
@@ -12,6 +12,9 @@ interface UserMenuContentProps {
 
 export function UserMenuContent({ user, showHeader = true }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
+    const { auth } = usePage<SharedData>().props;
+    const canManageSupport =
+        auth.roles.includes('Super Admin') || auth.permissions.includes('support.manage') || auth.permissions.includes('support.view-all');
 
     return (
         <>
@@ -64,9 +67,15 @@ export function UserMenuContent({ user, showHeader = true }: UserMenuContentProp
                 Balance
                 <span className="ml-auto text-xs text-slate-400">—</span>
             </DropdownMenuItem>
-            <DropdownMenuItem disabled className="mx-1 min-h-11 gap-3 rounded-lg px-3 font-medium">
-                <Headphones className="size-4.5 text-slate-400" />
-                Support
+            <DropdownMenuItem asChild>
+                <Link
+                    className="mx-1 flex min-h-11 w-[calc(100%-0.5rem)] items-center gap-3 rounded-lg px-3 font-medium text-slate-700"
+                    href="/support"
+                    onClick={cleanup}
+                >
+                    <Headphones className="size-4.5 text-slate-500" />
+                    {canManageSupport ? 'Support Desk' : 'Create Ticket'}
+                </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="my-1" />
             <DropdownMenuItem asChild>

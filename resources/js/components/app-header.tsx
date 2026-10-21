@@ -45,6 +45,7 @@ interface AppHeaderProps {
 export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
+    const homeUrl = auth.homeUrl ?? '/dashboard';
     const getInitials = useInitials();
     return (
         <>
@@ -94,7 +95,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                         </Sheet>
                     </div>
 
-                    <Link href="/dashboard" prefetch className="flex items-center space-x-2">
+                    <Link href={homeUrl} prefetch className="flex items-center space-x-2">
                         <AppLogo />
                     </Link>
 

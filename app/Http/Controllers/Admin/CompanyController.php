@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Material;
 use App\Models\MaterialStock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,12 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    /** @var array<string, string> */
+    private const COMPANY_MATERIAL_TYPES = [
+        '1000' => 'ZRAW',
+        '5000' => 'YRAW',
+    ];
+
     public function index(Request $request): Response
     {
         $options = config('datatable.page_size_options');
@@ -42,46 +49,68 @@ class CompanyController extends Controller
     public function hierarchy(Request $request): Response
     {
         $companies = Company::query()
+            ->where('company_code', '!=', '0')
             ->orderBy('record_type')
             ->orderBy('company_name')
             ->get(['id', 'company_code', 'company_name', 'record_type', 'parent_company_id', 'gstin', 'status']);
 
         $childrenByParent = $companies->whereNotNull('parent_company_id')->groupBy('parent_company_id');
         $roots = $companies->filter(fn (Company $company): bool => $company->record_type === 1 && $company->parent_company_id === null);
-        $headOffices = $companies->where('record_type', 3);
         $knownCodes = $companies->pluck('company_code');
         $orphans = $companies->filter(fn (Company $company): bool => $company->record_type !== 3 && $company->parent_company_id !== null && ! $knownCodes->contains($company->parent_company_id));
 
         $view = in_array($request->string('view')->value(), ['plants', 'materials'], true) ? $request->string('view')->value() : 'companies';
-        $materialsByPlant = collect();
+        $materialsByCompany = collect();
         if ($view === 'materials') {
-            $companies->where('record_type', 2)->each(function (Company $plant) use ($materialsByPlant): void {
-                $query = MaterialStock::query()->where('plant_code', $plant->company_code);
-                $total = (clone $query)->count();
-                $items = $query
-                    ->leftJoin('tbl_materials', 'tbl_materials.matnr', '=', 'tbl_material_stocks.matnr')
-                    ->orderBy('tbl_material_stocks.material_desc')
-                    ->limit(24)
-                    ->get(['tbl_material_stocks.matnr', 'tbl_material_stocks.material_desc', 'tbl_material_stocks.current_stock', 'tbl_material_stocks.status', 'tbl_materials.maktx'])
-                    ->map(fn ($material): array => [
-                        'code' => $material->matnr,
-                        'name' => $material->maktx ?: $material->material_desc ?: $material->matnr,
-                        'stock' => (float) $material->current_stock,
-                        'active' => (bool) $material->status,
+            $companies->where('record_type', 1)->each(function (Company $company) use ($childrenByParent, $materialsByCompany): void {
+                $materialType = self::COMPANY_MATERIAL_TYPES[$company->company_code] ?? null;
+                if ($materialType === null) {
+                    return;
+                }
+
+                $materials = Material::query()
+                    ->where('mtart', $materialType)
+                    ->orderBy('matkl')
+                    ->orderBy('maktx')
+                    ->orderBy('matnr')
+                    ->get(['matnr', 'matkl', 'maktx', 'status']);
+
+                $plantCodes = $childrenByParent->get($company->company_code, collect())
+                    ->where('record_type', 2)
+                    ->pluck('company_code');
+                $stockByMaterial = MaterialStock::query()
+                    ->whereIn('plant_code', $plantCodes)
+                    ->select('matnr')
+                    ->selectRaw('SUM(current_stock) as total_stock')
+                    ->groupBy('matnr')
+                    ->pluck('total_stock', 'matnr');
+
+                $groups = $materials
+                    ->groupBy(fn (Material $material): string => filled($material->matkl) ? $material->matkl : 'Unclassified')
+                    ->map(fn (Collection $group, $code): array => [
+                        'code' => (string) $code,
+                        'total' => $group->count(),
+                        'items' => $group->map(fn (Material $material): array => [
+                            'code' => $material->matnr,
+                            'name' => $material->maktx ?: $material->matnr,
+                            'stock' => (float) ($stockByMaterial->get($material->matnr) ?? 0),
+                            'active' => (bool) $material->status,
+                        ])->values()->all(),
                     ])->values();
 
-                $materialsByPlant->put($plant->company_code, [
-                    'total' => $total,
-                    'items' => $items,
+                $materialsByCompany->put($company->company_code, [
+                    'type' => $materialType,
+                    'total' => $materials->count(),
+                    'stock' => (float) $materials->sum(fn (Material $material): float => (float) ($stockByMaterial->get($material->matnr) ?? 0)),
+                    'groups' => $groups,
                 ]);
             });
         }
 
         return Inertia::render('admin/companies/hierarchy', [
             'view' => $view,
-            'materialsByPlant' => $materialsByPlant,
+            'materialsByCompany' => $materialsByCompany,
             'hierarchy' => $roots->map(fn (Company $company): array => $this->hierarchyNode($company, $childrenByParent))->values(),
-            'headOffices' => $headOffices->map(fn (Company $company): array => $this->hierarchyNode($company, collect()))->values(),
             'orphans' => $orphans->map(fn (Company $company): array => $this->hierarchyNode($company, $childrenByParent))->values(),
             'stats' => [
                 'companies' => $companies->where('record_type', 1)->count(),
@@ -158,7 +187,7 @@ class CompanyController extends Controller
             'gstin' => $company->gstin,
             'active' => $company->status,
             'children' => $childrenByParent->get($company->company_code, collect())
-                ->where('record_type', '!=', 3)
+                ->sortBy(fn (Company $child): int => $child->record_type === 3 ? 0 : $child->record_type)
                 ->map(fn (Company $child): array => $this->hierarchyNode($child, $childrenByParent))
                 ->values()
                 ->all(),

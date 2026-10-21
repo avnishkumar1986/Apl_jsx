@@ -49,7 +49,12 @@ class AuthenticatedSessionController extends Controller
             ])->save();
         }
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+        $defaultDestination = ! $user->hasRole('Super Admin') && $user->can('procurement.overview.view')
+            ? route('admin.procurement.dashboard', absolute: false)
+            : route('dashboard', absolute: false);
+
+        return redirect()->intended($defaultDestination);
     }
 
     /**

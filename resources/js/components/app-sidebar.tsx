@@ -118,8 +118,9 @@ export function AppSidebar() {
         ...(procurementActive
             ? [
                   {
-                      title: 'Procurement',
-                      icon: ShoppingCart,
+                      title: isSuperAdmin ? 'Procurement' : 'Dashboard',
+                      ...(isSuperAdmin ? {} : { href: '/admin/procurement/dashboard' }),
+                      icon: isSuperAdmin ? ShoppingCart : LayoutGrid,
                       active:
                           currentPath.startsWith('/admin/procurement') ||
                           currentPath.startsWith('/admin/api-integrations') ||
@@ -142,7 +143,7 @@ export function AppSidebar() {
                             asChild
                             className="focus-visible:ring-brand-gold/70 h-16 overflow-hidden bg-transparent group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-1 hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-1 active:bg-transparent data-[active=true]:bg-transparent data-[slot=sidebar-menu-button]:!p-1 data-[state=open]:bg-transparent"
                         >
-                            <Link href={canViewDashboard ? '/dashboard' : '/settings/profile'} prefetch>
+                            <Link href={auth.homeUrl ?? (canViewDashboard ? '/dashboard' : '/settings/profile')} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -226,7 +227,75 @@ export function AppSidebar() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         )}
-                        {procurementActive && (
+                        {procurementActive && !isSuperAdmin && (
+                            <>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={currentPath === '/admin/procurement/dashboard'}
+                                        tooltip="Dashboard"
+                                        className="data-[active=true]:border-brand-gold data-[active=true]:bg-brand-berry h-10 border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white data-[active=true]:text-white data-[active=true]:shadow-sm"
+                                    >
+                                        <Link href="/admin/procurement/dashboard" prefetch>
+                                            <LayoutGrid className="!size-[17px] shrink-0" />
+                                            <span className="truncate">Dashboard</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <Collapsible
+                                    asChild
+                                    defaultOpen={currentPath.startsWith('/admin/procurement') && currentPath !== '/admin/procurement/dashboard'}
+                                    className="group/planning-direct"
+                                >
+                                    <SidebarMenuItem>
+                                        <CollapsibleTrigger asChild>
+                                            <SidebarMenuButton
+                                                isActive={
+                                                    currentPath.startsWith('/admin/procurement') && currentPath !== '/admin/procurement/dashboard'
+                                                }
+                                                className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-10 w-full border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white"
+                                            >
+                                                <CalendarDays className="!size-[17px] shrink-0" />
+                                                <span>RM Planning</span>
+                                                <ChevronRight className="ml-auto !size-3.5 transition-transform group-data-[state=open]/planning-direct:rotate-90" />
+                                            </SidebarMenuButton>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                            <SidebarMenuSub className="ml-1 gap-1 border-white/15 py-1.5 pl-1">
+                                                {[
+                                                    { title: 'Consumption', href: '/admin/procurement/daily-consumption', icon: CalendarDays },
+                                                    { title: 'Balance Sheet View', href: '/admin/procurement/balance-overview', icon: TrendingUp },
+                                                    { title: 'Balance Sheet', href: '/admin/procurement/balance-sheet', icon: Scale },
+                                                    {
+                                                        title: 'Materials Balance',
+                                                        href: '/admin/procurement/all-balance-sheet',
+                                                        icon: FileSpreadsheet,
+                                                    },
+                                                ].map((item) => (
+                                                    <SidebarMenuSubItem key={item.href}>
+                                                        <SidebarMenuSubButton
+                                                            asChild
+                                                            isActive={
+                                                                currentPath === item.href ||
+                                                                (item.href === '/admin/procurement/daily-consumption' &&
+                                                                    currentPath === '/admin/procurement')
+                                                            }
+                                                            className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                                                        >
+                                                            <Link href={item.href} prefetch>
+                                                                <item.icon className="!size-3.5" />
+                                                                <span>{item.title}</span>
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                ))}
+                                            </SidebarMenuSub>
+                                        </CollapsibleContent>
+                                    </SidebarMenuItem>
+                                </Collapsible>
+                            </>
+                        )}
+                        {procurementActive && isSuperAdmin && (
                             <Collapsible
                                 asChild
                                 defaultOpen={
@@ -255,7 +324,7 @@ export function AppSidebar() {
                                         </SidebarMenuButton>
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
-                                        <SidebarMenuSub className="ml-4 gap-1 border-white/15 py-1.5 pl-3 group-data-[collapsible=icon]:hidden">
+                                        <SidebarMenuSub className="ml-1 gap-1 border-white/15 py-1.5 pl-1 group-data-[collapsible=icon]:hidden">
                                             <SidebarMenuSubItem>
                                                 <SidebarMenuSubButton
                                                     asChild
@@ -280,14 +349,23 @@ export function AppSidebar() {
                                             >
                                                 <SidebarMenuSubItem>
                                                     <CollapsibleTrigger asChild>
-                                                        <SidebarMenuSubButton className="h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white">
+                                                        <SidebarMenuSubButton
+                                                            isActive={
+                                                                currentPath === '/admin/procurement' ||
+                                                                currentPath.includes('/admin/procurement/daily-consumption') ||
+                                                                currentPath.includes('/admin/procurement/balance-overview') ||
+                                                                currentPath.includes('/admin/procurement/balance-sheet') ||
+                                                                currentPath.includes('/admin/procurement/all-balance-sheet')
+                                                            }
+                                                            className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 w-full rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                                                        >
                                                             <CalendarDays className="!size-3.5" />
-                                                            <span>Planning</span>
+                                                            <span>RM Planning</span>
                                                             <ChevronRight className="ml-auto !size-3 transition-transform group-data-[state=open]/planning:rotate-90" />
                                                         </SidebarMenuSubButton>
                                                     </CollapsibleTrigger>
                                                     <CollapsibleContent>
-                                                        <div className="ml-3 space-y-1 border-l border-white/10 py-1 pl-2">
+                                                        <div className="ml-1 space-y-1 border-l border-white/10 py-1 pl-1">
                                                             {[
                                                                 {
                                                                     title: 'Consumption',
@@ -310,7 +388,7 @@ export function AppSidebar() {
                                                                     active: currentPath.startsWith('/admin/procurement/balance-sheet'),
                                                                 },
                                                                 {
-                                                                    title: 'All Materials Balance',
+                                                                    title: 'Materials Balance',
                                                                     href: '/admin/procurement/all-balance-sheet',
                                                                     icon: FileSpreadsheet,
                                                                     active: currentPath.startsWith('/admin/procurement/all-balance-sheet'),

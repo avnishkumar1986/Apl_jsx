@@ -45,6 +45,12 @@ class DashboardLocationController extends Controller
             'user_id' => ['nullable', 'integer'],
         ]);
         $isSuperAdmin = $request->user()->hasRole('Super Admin');
+        $activeUserIds = DB::table(config('session.table', 'tbl_sessions'))
+            ->whereNotNull('user_id')
+            ->where('last_activity', '>=', now()->subMinutes((int) config('session.lifetime', 120))->timestamp)
+            ->pluck('user_id')
+            ->map(fn ($userId): int => (int) $userId)
+            ->all();
 
         $locations = UserLocation::query()
             ->with('user:id,first_name,last_name')
@@ -64,6 +70,7 @@ class DashboardLocationController extends Controller
                 'latitude' => $location->latitude,
                 'longitude' => $location->longitude,
                 'deviceName' => $location->device_name ?? DeviceLabel::fromUserAgent($location->user_agent),
+                'isOnline' => in_array((int) $location->user_id, $activeUserIds, true),
                 'capturedAt' => $location->captured_at?->toIso8601String() ?? $location->created_at->toIso8601String(),
             ]);
 

@@ -2,7 +2,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     BadgeCheck,
     BriefcaseBusiness,
@@ -14,6 +14,7 @@ import {
     Mail,
     MapPin,
     Phone,
+    Printer,
     ShieldCheck,
     UserRound,
 } from 'lucide-react';
@@ -59,6 +60,7 @@ const profileTabs: Array<{ id: ProfileTab; label: string; icon: typeof UserRound
 export default function Profile({ employeeProfile }: { employeeProfile: EmployeeProfile }) {
     const { auth } = usePage<SharedData>().props;
     const [activeTab, setActiveTab] = useState<ProfileTab>('personal');
+    const [photoUploading, setPhotoUploading] = useState(false);
     const primaryPhone =
         employeeProfile.contacts.find((contact) => contact.type !== 'Email' && contact.primary) ??
         employeeProfile.contacts.find((contact) => contact.type !== 'Email');
@@ -74,28 +76,68 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Employee profile" />
             <SettingsLayout>
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="relative h-28 overflow-hidden bg-gradient-to-br from-[#052f40] via-[#075a70] to-[#129cb2] sm:h-32">
-                        <div className="absolute inset-0 [background-image:linear-gradient(rgba(255,255,255,.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.16)_1px,transparent_1px)] [background-size:42px_42px] opacity-20" />
-                        <div className="absolute -top-24 -right-20 size-80 rounded-full border-[52px] border-white/10" />
-                        <div className="absolute -bottom-28 left-1/3 size-64 rounded-full border-[40px] border-amber-400/15" />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/45 to-transparent px-6 pt-10 pb-4 sm:px-8">
-                            <p className="text-xs font-bold tracking-[0.22em] text-cyan-200 uppercase">APL Connect</p>
-                            <p className="mt-1 max-w-xl text-sm text-white/75">Your complete employee profile and organisation record.</p>
+                <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_55px_-32px_rgba(15,23,42,.45)] print:rounded-none print:shadow-none">
+                    <div className="relative h-32 overflow-hidden bg-gradient-to-br from-[#062f3f] via-[#075c70] to-[#0f8fa5] sm:h-36 print:hidden">
+                        <img
+                            src="/images/profile-hero-apl-apollo.png"
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 size-full object-cover object-center"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#032b3c]/95 via-[#063d50]/75 to-transparent" />
+                        <div className="absolute top-4 right-5 rounded-xl border border-white/15 bg-slate-950/45 px-3 py-2 shadow-lg backdrop-blur-sm sm:top-5 sm:right-7">
+                            <img src="/apl-apollo-logo-transparent.png" alt="APL Apollo Steel Pipes" className="h-8 w-auto object-contain sm:h-10" />
+                        </div>
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/65 to-transparent px-6 pt-12 pb-5 sm:px-8">
+                            <p className="text-[11px] font-bold tracking-[0.24em] text-cyan-200 uppercase">APL Connect · Employee Directory</p>
+                            <p className="mt-1 max-w-xl text-sm text-white/80">Profile, employment and access information in one secure place.</p>
                         </div>
                     </div>
                     <div className="relative px-5 sm:px-8">
-                        <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-end sm:gap-5">
-                            <div className="-mt-9 grid size-20 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-cyan-50 text-xl font-bold text-cyan-700 shadow-lg sm:-mt-10 sm:size-24">
-                                {employeeProfile.photo_url ? (
-                                    <img src={employeeProfile.photo_url} alt={auth.user.name} className="size-full object-cover" />
-                                ) : (
-                                    initials
-                                )}
+                        <div className="flex flex-col gap-4 pt-5 pb-6 sm:flex-row sm:items-end sm:gap-5 sm:pt-6">
+                            <div className="relative -mt-10 size-20 shrink-0 sm:-mt-12 sm:size-24">
+                                <div className="grid size-full place-items-center overflow-hidden rounded-2xl border-4 border-white bg-gradient-to-br from-cyan-50 to-white text-xl font-black text-cyan-700 shadow-xl">
+                                    {employeeProfile.photo_url ? (
+                                        <img src={employeeProfile.photo_url} alt={auth.user.name} className="size-full object-cover" />
+                                    ) : (
+                                        initials
+                                    )}
+                                </div>
+                                <label
+                                    className={`absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border-2 border-white bg-cyan-700 text-lg leading-none font-bold text-white shadow-lg transition hover:bg-cyan-800 ${photoUploading ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
+                                    title="Upload profile photo"
+                                    aria-label="Upload profile photo"
+                                >
+                                    <span aria-hidden="true">+</span>
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        className="sr-only"
+                                        disabled={photoUploading}
+                                        onChange={(event) => {
+                                            const photo = event.target.files?.[0];
+                                            if (!photo) return;
+
+                                            setPhotoUploading(true);
+                                            router.post(
+                                                '/settings/profile/photo',
+                                                { photo },
+                                                {
+                                                    forceFormData: true,
+                                                    preserveScroll: true,
+                                                    onFinish: () => {
+                                                        setPhotoUploading(false);
+                                                        event.target.value = '';
+                                                    },
+                                                },
+                                            );
+                                        }}
+                                    />
+                                </label>
                             </div>
                             <div className="min-w-0 flex-1 pb-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <h1 className="truncate text-2xl font-bold text-slate-900 sm:text-3xl">{auth.user.name}</h1>
+                                    <h1 className="truncate text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{auth.user.name}</h1>
                                     <span
                                         className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${employeeProfile.status ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
                                     >
@@ -110,28 +152,31 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
                                         employeeProfile.roles.join(', ') ||
                                         'Employee'}
                                 </p>
+                                <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                                    <MapPin className="size-3.5 text-cyan-600" />
+                                    {employeeProfile.sitting_location || 'Location not assigned'}
+                                </p>
                             </div>
-                            <div className="grid grid-cols-2 gap-x-7 gap-y-2 pb-1 text-sm sm:flex sm:gap-8">
-                                <HeroFact label="Employee ID" value={employeeProfile.employee_id} />
-                                <HeroFact label="Location" value={employeeProfile.sitting_location} />
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800 print:hidden"
+                            >
+                                <Printer className="size-4" />
+                                Print profile
+                            </button>
                         </div>
-                        <div className="-mx-5 overflow-x-auto border-t border-slate-100 bg-white px-5 sm:-mx-8 sm:px-8">
-                            <nav className="relative flex min-w-[620px] justify-between py-4" aria-label="Employee profile sections">
-                                <span className="absolute top-[31px] right-[8%] left-[8%] h-0.5 bg-slate-200" aria-hidden="true" />
-                                {profileTabs.map(({ id, label }, index) => (
+                        <div className="-mx-5 overflow-x-auto border-t border-slate-100 bg-slate-50/70 px-5 sm:-mx-8 sm:px-8 print:hidden">
+                            <nav className="flex min-w-[680px] gap-2 py-3" aria-label="Employee profile sections">
+                                {profileTabs.map(({ id, label, icon: Icon }) => (
                                     <button
                                         key={id}
                                         type="button"
                                         onClick={() => setActiveTab(id)}
-                                        className={`relative z-10 flex w-32 flex-col items-center gap-2 bg-white text-center text-[11px] font-semibold transition-colors ${activeTab === id ? 'text-cyan-700' : 'text-slate-400 hover:text-slate-700'}`}
+                                        className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition-all ${activeTab === id ? 'border-cyan-200 bg-white text-cyan-800 shadow-sm' : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-800'}`}
                                     >
-                                        <span
-                                            className={`grid size-9 place-items-center rounded-full border-2 shadow-sm ${activeTab === id ? 'border-cyan-500 bg-white text-cyan-700' : 'border-slate-200 bg-slate-50 text-slate-400'}`}
-                                        >
-                                            {index + 1}
-                                        </span>
-                                        <span className="max-w-28 truncate">{label}</span>
+                                        <Icon className={`size-4 shrink-0 ${activeTab === id ? 'text-cyan-600' : 'text-slate-400'}`} />
+                                        <span className="truncate">{label}</span>
                                     </button>
                                 ))}
                             </nav>
@@ -146,7 +191,7 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
                             title="Personal information"
                             description="Manage your account details and review your User Master record"
                         >
-                            <div className="space-y-5">
+                            <form className="space-y-5" aria-label="Personal and employment profile">
                                 <FormSection title="Account details" description="Account and sign-in identity information" badge="View only">
                                     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                                         <ReadonlyProfileField label="Full name" icon={UserRound} value={auth.user.name} />
@@ -187,14 +232,14 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
                                         <ReadonlyProfileField label="Assigned roles" icon={ShieldCheck} value={employeeProfile.roles.join(', ')} />
                                     </div>
                                 </FormSection>
-                            </div>
+                            </form>
                         </ProfilePanel>
                     </div>
                 )}
 
                 {activeTab === 'contact' && (
                     <ProfilePanel icon={Phone} title="Contact details" description="Email addresses and phone numbers maintained in User Master">
-                        <div className="space-y-5">
+                        <form className="space-y-5" aria-label="Contact profile">
                             <FormSection
                                 title="Contact information"
                                 description="Primary contact details maintained against your employee record"
@@ -205,7 +250,7 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
                                     <ReadonlyProfileField label="Primary email" icon={Mail} value={auth.user.email} />
                                 </div>
                             </FormSection>
-                        </div>
+                        </form>
                     </ProfilePanel>
                 )}
 
@@ -250,7 +295,7 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
 
                 {activeTab === 'login' && (
                     <ProfilePanel icon={KeyRound} title="Login & access" description="Read-only account identity, status and access roles">
-                        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                        <form className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-label="Login and access profile">
                             <ReadonlyProfileField label="Login email" icon={Mail} value={auth.user.email} />
                             <ReadonlyProfileField
                                 label="Account status"
@@ -259,7 +304,7 @@ export default function Profile({ employeeProfile }: { employeeProfile: Employee
                                 success={employeeProfile.status}
                             />
                             <ReadonlyProfileField label="Assigned roles" icon={ShieldCheck} value={employeeProfile.roles.join(', ')} />
-                        </div>
+                        </form>
                     </ProfilePanel>
                 )}
             </SettingsLayout>
@@ -279,14 +324,14 @@ function ProfilePanel({
     children: React.ReactNode;
 }) {
     return (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <header className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-                <div className="bg-brand-aqua/15 text-brand-teal grid size-10 shrink-0 place-items-center rounded-xl">
+        <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_16px_45px_-34px_rgba(15,23,42,.45)] print:break-inside-avoid print:rounded-none print:shadow-none">
+            <header className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 to-white px-5 py-4 sm:px-6">
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-cyan-100 bg-cyan-50 text-cyan-700 shadow-sm">
                     <Icon className="size-5" />
                 </div>
-                <div>
-                    <h2 className="font-bold text-slate-900">{title}</h2>
-                    <p className="text-xs text-slate-500">{description}</p>
+                <div className="min-w-0">
+                    <h2 className="font-black tracking-tight text-slate-900">{title}</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">{description}</p>
                 </div>
             </header>
             <div className="p-5 sm:p-6">{children}</div>
@@ -295,9 +340,9 @@ function ProfilePanel({
 }
 function FormSection({ title, description, badge, children }: { title: string; description: string; badge?: string; children: React.ReactNode }) {
     return (
-        <fieldset className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <fieldset className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:break-inside-avoid print:rounded-none print:shadow-none">
             <legend className="sr-only">{title}</legend>
-            <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h3 className="text-sm font-bold text-slate-800">{title}</h3>
                     <p className="mt-0.5 text-xs text-slate-500">{description}</p>
@@ -310,14 +355,6 @@ function FormSection({ title, description, badge, children }: { title: string; d
             </div>
             <div className="p-4 sm:p-5">{children}</div>
         </fieldset>
-    );
-}
-function HeroFact({ label, value }: { label: string; value: string | null }) {
-    return (
-        <div>
-            <p className="text-[9px] font-bold tracking-[0.12em] text-slate-400 uppercase">{label}</p>
-            <p className="mt-0.5 max-w-40 truncate font-semibold text-slate-700">{value || '—'}</p>
-        </div>
     );
 }
 function ReadonlyProfileField({
@@ -335,16 +372,24 @@ function ReadonlyProfileField({
     capitalize?: boolean;
     success?: boolean;
 }) {
+    const fieldId = `profile-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
     return (
-        <div className="min-w-0 border-b border-slate-200 pb-3">
-            <Label className="text-[10px] font-bold tracking-[0.08em] text-slate-400 uppercase">{label}</Label>
-            <div className="mt-2 flex min-h-6 items-center gap-2.5">
-                <Icon className={`size-4 shrink-0 ${success ? 'text-emerald-500' : 'text-brand-teal'}`} />
-                <span
-                    className={`truncate text-sm font-semibold ${capitalize ? 'capitalize' : ''} ${success ? 'text-emerald-700' : value ? 'text-slate-800' : 'text-slate-400'}`}
-                >
-                    {value || empty}
-                </span>
+        <div className="min-w-0">
+            <Label htmlFor={fieldId} className="text-[10px] font-bold tracking-[0.08em] text-slate-500 uppercase">
+                {label}
+            </Label>
+            <div className="relative mt-2">
+                <Icon
+                    className={`pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 ${success ? 'text-emerald-500' : 'text-cyan-700'}`}
+                />
+                <input
+                    id={fieldId}
+                    type="text"
+                    readOnly
+                    value={value || empty}
+                    className={`h-11 w-full cursor-default rounded-xl border border-slate-200 bg-slate-50/70 pr-3 pl-10 text-sm font-semibold shadow-sm outline-none print:rounded-none print:bg-white print:shadow-none ${capitalize ? 'capitalize' : ''} ${success ? 'border-emerald-200 bg-emerald-50/60 text-emerald-700' : value ? 'text-slate-800' : 'text-slate-400'}`}
+                />
             </div>
         </div>
     );

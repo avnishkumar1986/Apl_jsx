@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\UserMasterController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\UserTypeController;
 use App\Http\Controllers\DashboardLocationController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PortalActivityController;
 use App\Http\Controllers\SecurityAuditController;
 use App\Models\Company;
@@ -33,6 +34,8 @@ use Inertia\Response;
 Route::redirect('/', '/login')->name('home');
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
     Route::get('dashboard', function (Request $request): Response {
         $requiresProductionSecurity = ! app()->environment(['local', 'testing']);
         $securityChecks = collect([
@@ -339,6 +342,7 @@ $moduleRouteFiles = [
     base_path('Modules/Procurement/routes/web.php'),
     base_path('Modules/Sales/routes/web.php'),
     base_path('Modules/CorporateChat/routes/web.php'),
+    base_path('Modules/Support/routes/web.php'),
 ];
 
 foreach ($moduleRouteFiles as $moduleRouteFile) {

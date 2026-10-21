@@ -14,6 +14,7 @@ type LocationRow = {
     latitude: number;
     longitude: number;
     deviceName: string;
+    isOnline: boolean;
     capturedAt: string;
 };
 
@@ -144,6 +145,7 @@ export default function LocationReport({
                                         <th className="px-4 py-3">Location</th>
                                         <th className="px-4 py-3">Coordinates</th>
                                         <th className="px-4 py-3">Device</th>
+                                        <th className="px-4 py-3">Status</th>
                                         <th className="px-4 py-3">Captured date and time</th>
                                     </tr>
                                 </thead>
@@ -157,6 +159,20 @@ export default function LocationReport({
                                                 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-slate-600">{location.deviceName}</td>
+                                            <td className="px-4 py-3">
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                                        location.isOnline
+                                                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                                            : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`size-1.5 rounded-full ${location.isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                                                    />
+                                                    {location.isOnline ? 'Online' : 'Offline'}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 text-slate-600">
                                                 {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(
                                                     new Date(location.capturedAt),
@@ -166,7 +182,7 @@ export default function LocationReport({
                                     ))}
                                     {!locations.data.length && (
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-500">
+                                            <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
                                                 No location records found for the selected dates.
                                             </td>
                                         </tr>

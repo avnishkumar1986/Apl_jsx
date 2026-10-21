@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Models\UserPhoto;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -111,6 +112,44 @@ class ProfileController extends Controller
         });
 
         return to_route('profile.edit');
+    }
+
+    /**
+     * Store a new primary profile photo for the signed-in employee.
+     */
+    public function updatePhoto(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $user = $request->user();
+        $photo = $validated['photo'];
+        $path = $photo->store("profile-photos/{$user->unique_id}", 'public');
+
+        DB::transaction(function () use ($user, $photo, $path): void {
+            UserPhoto::query()
+                ->where('user_id', $user->unique_id)
+                ->where('photo_type', 'profile')
+                ->where('is_primary', true)
+                ->update(['is_primary' => false, 'updated_by' => $user->id]);
+
+            UserPhoto::query()->create([
+                'user_id' => $user->unique_id,
+                'photo_type' => 'profile',
+                'file_name' => $photo->getClientOriginalName(),
+                'file_path' => $path,
+                'mime_type' => $photo->getMimeType(),
+                'file_size' => $photo->getSize(),
+                'alt_text' => "Profile photo for {$user->name}",
+                'is_primary' => true,
+                'status' => true,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        });
+
+        return back()->with('status', 'Profile photo updated successfully.');
     }
 
     /**

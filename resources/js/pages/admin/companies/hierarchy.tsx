@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Building2, ChevronDown, Factory, Landmark, Package, Search, Unlink } from 'lucide-react';
+import { useState } from 'react';
 
 type CompanyNode = {
     id: number;
@@ -14,28 +15,54 @@ type CompanyNode = {
     active: boolean;
     children: CompanyNode[];
 };
-type PlantMaterial = { code: string; name: string; stock: number; active: boolean };
-type PlantMaterials = { total: number; items: PlantMaterial[] };
+type CompanyMaterial = {
+    code: string;
+    name: string;
+    stock: number;
+    active: boolean;
+};
+type MaterialGroup = { code: string; total: number; items: CompanyMaterial[] };
+type CompanyMaterials = {
+    type: string;
+    total: number;
+    stock: number;
+    groups: MaterialGroup[];
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Company hierarchy', href: '/admin/companies/hierarchy' },
 ];
 const typeDetails = {
-    1: { label: 'Company', icon: Building2, color: 'border-cyan-200 bg-cyan-50 text-cyan-800', iconColor: 'bg-cyan-600 text-white' },
-    2: { label: 'Plant', icon: Factory, color: 'border-amber-200 bg-amber-50 text-amber-800', iconColor: 'bg-amber-500 text-white' },
-    3: { label: 'Head Office', icon: Landmark, color: 'border-violet-200 bg-violet-50 text-violet-800', iconColor: 'bg-violet-600 text-white' },
+    1: {
+        label: 'Company',
+        icon: Building2,
+        color: 'border-cyan-200 bg-cyan-50 text-cyan-800',
+        iconColor: 'bg-cyan-600 text-white',
+    },
+    2: {
+        label: 'Plant',
+        icon: Factory,
+        color: 'border-amber-200 bg-amber-50 text-amber-800',
+        iconColor: 'bg-amber-500 text-white',
+    },
+    3: {
+        label: 'Head Office',
+        icon: Landmark,
+        color: 'border-violet-200 bg-violet-50 text-violet-800',
+        iconColor: 'bg-violet-600 text-white',
+    },
 } as const;
 
 function HierarchyNode({
     node,
-    materialsByPlant,
+    materialsByCompany,
     depth = 0,
     showChildren = true,
     showMaterials = false,
 }: {
     node: CompanyNode;
-    materialsByPlant: Record<string, PlantMaterials>;
+    materialsByCompany: Record<string, CompanyMaterials>;
     depth?: number;
     showChildren?: boolean;
     showMaterials?: boolean;
@@ -71,9 +98,6 @@ function HierarchyNode({
                             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                                 <span className="font-mono font-semibold text-slate-700">{node.code}</span>
                                 {node.gstin && <span>GSTIN: {node.gstin}</span>}
-                                <span>
-                                    {node.children.length} direct unit{node.children.length === 1 ? '' : 's'}
-                                </span>
                             </div>
                         </div>
                     </div>
@@ -83,55 +107,104 @@ function HierarchyNode({
                         {node.active ? 'Active' : 'Inactive'}
                     </span>
                 </div>
-                {showMaterials && node.type === 2 && (materialsByPlant[node.code]?.items.length ?? 0) > 0 && (
+                {showMaterials && node.type === 1 && materialsByCompany[node.code] && (
                     <Collapsible className="group/materials mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50">
                         <CollapsibleTrigger className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-emerald-100/70">
                             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-600 text-white">
                                 <Package className="size-4" />
                             </span>
                             <span className="flex-1 font-bold text-emerald-900">Materials</span>
+                            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold whitespace-nowrap text-white shadow-sm">
+                                Total:{' '}
+                                {materialsByCompany[node.code].stock.toLocaleString('en-IN', {
+                                    maximumFractionDigits: 3,
+                                })}{' '}
+                                MTN
+                            </span>
                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
-                                {materialsByPlant[node.code].total.toLocaleString('en-IN')}
+                                {materialsByCompany[node.code].total.toLocaleString('en-IN')}
                             </span>
                             <ChevronDown className="size-4 text-emerald-700 transition-transform group-data-[state=open]/materials:rotate-180" />
                         </CollapsibleTrigger>
                         <CollapsibleContent className="border-t border-emerald-200 p-3">
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {materialsByPlant[node.code].items.map((material) => (
-                                    <div key={material.code} className="rounded-lg border border-emerald-100 bg-white p-3 shadow-sm">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="truncate font-semibold text-slate-800" title={material.name}>
-                                                    {material.name}
-                                                </p>
-                                                <p className="mt-0.5 font-mono text-xs text-slate-500">{material.code}</p>
-                                            </div>
-                                            <span
-                                                className={`mt-1 size-2 shrink-0 rounded-full ${material.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                            />
-                                        </div>
-                                        <p className="mt-2 text-xs text-slate-500">
-                                            Stock: <b className="text-slate-700">{material.stock.toLocaleString('en-IN')}</b>
-                                        </p>
+                            <Collapsible className="group/material-type overflow-hidden rounded-lg border border-teal-200 bg-white shadow-sm">
+                                <CollapsibleTrigger className="flex w-full items-center gap-3 bg-teal-50 p-3 text-left transition hover:bg-teal-100">
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block font-mono text-lg font-extrabold text-teal-950">
+                                            {materialsByCompany[node.code].type}
+                                        </span>
+                                    </span>
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm">
+                                        {materialsByCompany[node.code].total.toLocaleString('en-IN')}
+                                    </span>
+                                    <ChevronDown className="size-4 text-teal-700 transition-transform group-data-[state=open]/material-type:rotate-180" />
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="border-t border-teal-200 p-2">
+                                    <div className="space-y-2">
+                                        {materialsByCompany[node.code].groups.map((group) => (
+                                            <Collapsible
+                                                key={group.code}
+                                                className="group/material-group overflow-hidden rounded-lg border border-emerald-100 bg-white shadow-sm"
+                                            >
+                                                <CollapsibleTrigger className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-emerald-50">
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block text-xs font-semibold tracking-wide text-emerald-700 uppercase">
+                                                            Material Group
+                                                        </span>
+                                                        <span className="mt-0.5 block font-mono text-base font-extrabold text-slate-900">
+                                                            {group.code}
+                                                        </span>
+                                                    </span>
+                                                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                        {group.total.toLocaleString('en-IN')}
+                                                    </span>
+                                                    <ChevronDown className="size-4 text-emerald-700 transition-transform group-data-[state=open]/material-group:rotate-180" />
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent className="border-t border-emerald-100 p-2">
+                                                    <div className="grid gap-2 sm:grid-cols-2">
+                                                        {group.items.map((material) => (
+                                                            <div key={material.code} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="font-mono text-xs font-semibold text-slate-500">
+                                                                            {material.code}
+                                                                        </p>
+                                                                        <p
+                                                                            className="mt-1 text-sm font-semibold text-slate-800"
+                                                                            title={material.name}
+                                                                        >
+                                                                            {material.name}
+                                                                        </p>
+                                                                    </div>
+                                                                    <span
+                                                                        className={`mt-1 size-2 shrink-0 rounded-full ${material.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CollapsibleContent>
+                                            </Collapsible>
+                                        ))}
+                                        {materialsByCompany[node.code].groups.length === 0 && (
+                                            <p className="py-3 text-center text-sm text-emerald-700">
+                                                No {materialsByCompany[node.code].type} materials found.
+                                            </p>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                            {materialsByPlant[node.code].total > materialsByPlant[node.code].items.length && (
-                                <p className="mt-3 text-center text-xs font-medium text-emerald-700">
-                                    Showing first {materialsByPlant[node.code].items.length} of{' '}
-                                    {materialsByPlant[node.code].total.toLocaleString('en-IN')} materials
-                                </p>
-                            )}
+                                </CollapsibleContent>
+                            </Collapsible>
                         </CollapsibleContent>
                     </Collapsible>
                 )}
             </div>
-            {showChildren &&
-                node.children.map((child) => (
+            {node.children
+                .filter((child) => showChildren || child.type === 3)
+                .map((child) => (
                     <HierarchyNode
                         key={child.id}
                         node={child}
-                        materialsByPlant={materialsByPlant}
+                        materialsByCompany={materialsByCompany}
                         depth={depth + 1}
                         showChildren
                         showMaterials={showMaterials}
@@ -143,18 +216,17 @@ function HierarchyNode({
 
 export default function CompanyHierarchy({
     view,
-    materialsByPlant,
+    materialsByCompany,
     hierarchy,
-    headOffices,
     orphans,
 }: {
     view: 'companies' | 'plants' | 'materials';
-    materialsByPlant: Record<string, PlantMaterials>;
+    materialsByCompany: Record<string, CompanyMaterials>;
     hierarchy: CompanyNode[];
-    headOffices: CompanyNode[];
     orphans: CompanyNode[];
 }) {
-    const filtered = hierarchy;
+    const [selectedCompany, setSelectedCompany] = useState('all');
+    const filtered = selectedCompany === 'all' ? hierarchy : hierarchy.filter((company) => company.code === selectedCompany);
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Company hierarchy" />
@@ -173,7 +245,11 @@ export default function CompanyHierarchy({
                                     router.get(
                                         '/admin/companies/hierarchy',
                                         { view: item.key },
-                                        { preserveScroll: false, preserveState: false, replace: true },
+                                        {
+                                            preserveScroll: false,
+                                            preserveState: false,
+                                            replace: true,
+                                        },
                                     )
                                 }
                                 aria-pressed={view === item.key}
@@ -190,55 +266,36 @@ export default function CompanyHierarchy({
                     </nav>
 
                     <section className="rounded-3xl border border-slate-200/80 bg-white/80 p-4 shadow-lg shadow-slate-900/5 backdrop-blur md:p-6">
-                        <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">Organization tree</h2>
                                 <p className="text-sm text-slate-500">Companies and their linked operational units</p>
                             </div>
-                            <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-sm font-semibold text-cyan-800">
-                                {filtered.length} root companies
-                            </span>
-                        </div>
-                        {headOffices.length > 0 && (
-                            <div className="mb-1">
-                                <div className="mx-auto max-w-xl rounded-3xl border border-violet-400/40 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 p-5 text-white shadow-xl shadow-violet-300/30">
-                                    <div className="flex items-center gap-4">
-                                        <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/25">
-                                            <Landmark className="size-6" />
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <h3 className="text-lg font-bold">Common Head Office</h3>
-                                                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold ring-1 ring-white/20">
-                                                    Shared by all companies
-                                                </span>
-                                            </div>
-                                            <p className="mt-1 text-sm text-violet-100">
-                                                {headOffices.map((office) => `${office.name} (${office.code})`).join(' · ')}
-                                            </p>
-                                        </div>
-                                        <span
-                                            className={`rounded-full px-2.5 py-1 text-xs font-bold ${headOffices.every((office) => office.active) ? 'bg-emerald-400/20 text-emerald-50' : 'bg-white/15 text-white'}`}
-                                        >
-                                            {headOffices.every((office) => office.active) ? 'Active' : 'Partly inactive'}
-                                        </span>
-                                    </div>
-                                </div>
-                                {filtered.length > 0 && (
-                                    <>
-                                        <div className="mx-auto hidden h-8 w-0.5 bg-violet-300 lg:block" />
-                                        <div className="relative mx-auto hidden h-8 w-1/2 border-t-2 border-violet-300 before:absolute before:top-0 before:left-0 before:h-8 before:border-l-2 before:border-violet-300 after:absolute after:top-0 after:right-0 after:h-8 after:border-r-2 after:border-violet-300 lg:block" />
-                                        <div className="mx-auto h-6 w-0.5 bg-violet-300 lg:hidden" />
-                                    </>
-                                )}
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <label htmlFor="company-filter" className="text-xs font-bold tracking-wide text-slate-500 uppercase">
+                                    Company
+                                </label>
+                                <select
+                                    id="company-filter"
+                                    value={selectedCompany}
+                                    onChange={(event) => setSelectedCompany(event.target.value)}
+                                    className="min-w-56 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                >
+                                    <option value="all">All companies</option>
+                                    {hierarchy.map((company) => (
+                                        <option key={company.id} value={company.code}>
+                                            {company.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                        )}
-                        <div className="grid items-start gap-4 lg:grid-cols-2">
+                        </div>
+                        <div className={`grid items-start gap-4 ${filtered.length > 1 ? 'lg:grid-cols-2' : 'mx-auto max-w-3xl'}`}>
                             {filtered.map((node) => (
                                 <HierarchyNode
                                     key={node.id}
                                     node={node}
-                                    materialsByPlant={materialsByPlant}
+                                    materialsByCompany={materialsByCompany}
                                     showChildren={view !== 'companies'}
                                     showMaterials={view === 'materials'}
                                 />
@@ -263,7 +320,12 @@ export default function CompanyHierarchy({
                                 </div>
                             </div>
                             {orphans.map((node) => (
-                                <HierarchyNode key={node.id} node={node} materialsByPlant={materialsByPlant} showMaterials={view === 'materials'} />
+                                <HierarchyNode
+                                    key={node.id}
+                                    node={node}
+                                    materialsByCompany={materialsByCompany}
+                                    showMaterials={view === 'materials'}
+                                />
                             ))}
                         </section>
                     )}
