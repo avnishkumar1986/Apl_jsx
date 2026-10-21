@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { BadgeCheck, Building2, ChevronDown, MapPin, Network, Search, Users } from 'lucide-react';
+import { BadgeCheck, Building2, ChevronDown, MapPin, Network, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import ProjectPageHeader from '@/components/project-page-header';
@@ -27,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Employee hierarchy', href: '/admin/employee-hierarchy' },
 ];
 
-export default function EmployeeHierarchy({ assignments, summary }: { assignments: Assignment[]; summary: Record<string, number> }) {
+export default function EmployeeHierarchy({ assignments }: { assignments: Assignment[] }) {
     const [search, setSearch] = useState('');
     const hierarchy = useMemo(
         () =>
@@ -56,13 +56,6 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
         [assignments, search],
     );
 
-    const statCards = [
-        ['Companies', summary.companies ?? 0, Building2],
-        ['Locations', summary.locations ?? 0, MapPin],
-        ['Departments', summary.departments ?? 0, Network],
-        ['Employees', summary.employees ?? 0, Users],
-    ] as const;
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Employee hierarchy" />
@@ -73,20 +66,6 @@ export default function EmployeeHierarchy({ assignments, summary }: { assignment
                         title="Employee hierarchy"
                         subtitle="Company → Location → Department → Designation → Employee"
                     />
-
-                    <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        {statCards.map(([label, value, Icon]) => (
-                            <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <span className="grid size-10 place-items-center rounded-xl bg-orange-50 text-orange-600">
-                                    <Icon className="size-5" />
-                                </span>
-                                <div>
-                                    <p className="text-xl font-bold text-slate-900">{value}</p>
-                                    <p className="text-[10px] font-semibold text-slate-500 uppercase">{label}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </section>
 
                     <div className="relative">
                         <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />

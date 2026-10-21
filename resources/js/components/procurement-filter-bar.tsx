@@ -3,6 +3,10 @@ import { Check, ChevronDown, Filter, RotateCcw, Search } from 'lucide-react';
 import { type FormEvent, type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 type Option = { value: string; label: string };
+const MATERIAL_TYPE_BY_COMPANY: Record<string, string> = {
+    '1000': 'ZRAW',
+    '5000': 'YRAW',
+};
 
 function SearchSelect({
     value,
@@ -51,7 +55,7 @@ function SearchSelect({
                 type="button"
                 disabled={disabled}
                 onClick={() => setOpen((current) => !current)}
-                className="border-input focus:border-ring focus:ring-ring/50 flex h-9 w-full items-center justify-between rounded-md border bg-white px-3 text-left text-sm shadow-xs outline-none focus:ring-[3px] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                className="border-input flex h-10 w-full items-center justify-between rounded-lg border bg-white px-3.5 text-left text-sm font-medium text-slate-800 shadow-sm transition outline-none focus:border-cyan-500 focus:ring-[3px] focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 disabled:shadow-none"
             >
                 <span className="truncate">{disabled ? disabledLabel : selected ? `${selected.value} - ${selected.label}` : allLabel}</span>
                 <ChevronDown className="size-4 shrink-0 text-slate-500" />
@@ -127,7 +131,7 @@ export default function ProcurementFilterBar({
     materialCode: string;
     companies: Array<{ company_code: string; company_name: string }>;
     plants: Array<{ company_code: string; company_name: string; parent_company_id?: string | null }>;
-    materials: Array<{ matnr: string; maktx: string | null }>;
+    materials: Array<{ matnr: string; maktx: string | null; mtart?: string | null }>;
     onCompanyChange: (value: string) => void;
     onPlantChange: (value: string) => void;
     onMaterialChange: (value: string) => void;
@@ -138,17 +142,29 @@ export default function ProcurementFilterBar({
 }) {
     const availablePlants =
         companyCode === 'all' ? [] : plants.filter((plant) => !plant.parent_company_id || plant.parent_company_id === companyCode);
+    const selectedMaterialType = MATERIAL_TYPE_BY_COMPANY[companyCode];
+    const availableMaterials = useMemo(
+        () => (selectedMaterialType ? materials.filter((material) => material.mtart?.trim().toUpperCase() === selectedMaterialType) : []),
+        [materials, selectedMaterialType],
+    );
+
+    useEffect(() => {
+        if (materialCode !== 'all' && !availableMaterials.some((material) => material.matnr === materialCode)) {
+            onMaterialChange('all');
+        }
+    }, [availableMaterials, materialCode, onMaterialChange]);
+
     return (
         <section
             className={
                 embedded
-                    ? 'rounded-lg border border-white/15 bg-white/8 p-2.5 shadow-inner shadow-black/5 backdrop-blur-sm'
+                    ? 'rounded-xl border border-white/15 bg-white/10 p-3 shadow-inner shadow-black/5 backdrop-blur-sm'
                     : 'rounded-xl border border-slate-200 bg-white p-3 shadow-sm'
             }
         >
             <form
                 onSubmit={onApply}
-                className={`grid gap-3 md:grid-cols-2 ${showReset ? 'xl:grid-cols-[1fr_1fr_1.5fr_auto_auto]' : 'xl:grid-cols-[1fr_1fr_1.5fr_auto]'} xl:items-end`}
+                className={`grid gap-3 md:grid-cols-2 ${showReset ? 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto_auto]' : 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto]'} xl:items-end`}
             >
                 <Field label="Company" dark={embedded}>
                     <SearchSelect
@@ -156,7 +172,11 @@ export default function ProcurementFilterBar({
                         options={companies.map((item) => ({ value: item.company_code, label: item.company_name }))}
                         allLabel="All companies"
                         searchLabel="Search company code or name..."
-                        onChange={onCompanyChange}
+                        onChange={(value) => {
+                            onCompanyChange(value);
+                            onPlantChange('all');
+                            onMaterialChange('all');
+                        }}
                     />
                 </Field>
                 <Field label="Plant" dark={embedded}>
@@ -173,13 +193,18 @@ export default function ProcurementFilterBar({
                 <Field label="Material" dark={embedded}>
                     <SearchSelect
                         value={materialCode}
-                        options={materials.map((item) => ({ value: item.matnr, label: item.maktx || 'No description' }))}
-                        allLabel="All materials"
+                        options={availableMaterials.map((item) => ({
+                            value: item.matnr,
+                            label: `${item.maktx || 'No description'} · ${item.mtart?.trim().toUpperCase()}`,
+                        }))}
+                        allLabel={selectedMaterialType ? `All ${selectedMaterialType} materials` : 'All materials'}
+                        disabled={companyCode === 'all' || !selectedMaterialType}
+                        disabledLabel={companyCode === 'all' ? 'Select company first' : 'No material rule for this company'}
                         searchLabel="Search material code or description..."
                         onChange={onMaterialChange}
                     />
                 </Field>
-                <Button type="submit" className="bg-brand-teal hover:bg-brand-teal/90 gap-2">
+                <Button type="submit" className="h-10 gap-2 rounded-lg bg-cyan-500 px-5 font-semibold text-white shadow-sm hover:bg-cyan-400">
                     <Filter className="size-4" /> Apply
                 </Button>
                 {showReset && (

@@ -19,12 +19,21 @@ use Inertia\Response;
 
 class ProcurementController extends Controller
 {
+    private const COMPANY_MATERIAL_TYPES = [
+        '1000' => 'ZRAW',
+        '5000' => 'YRAW',
+    ];
+
     public function dashboard(Request $request): Response
     {
         $companyCode = trim((string) $request->query('company_code', ''));
         $plantCode = trim((string) $request->query('plant_code', ''));
         $materialCode = trim((string) $request->query('material', ''));
         $company = $companyCode !== '' ? DB::table('tbl_company')->where('company_code', $companyCode)->where('record_type', 1)->first() : null;
+        $materialType = self::COMPANY_MATERIAL_TYPES[$company?->company_code] ?? null;
+        if ($materialCode !== '' && (! $materialType || ! DB::table('tbl_materials')->where('matnr', $materialCode)->where('mtart', $materialType)->exists())) {
+            $materialCode = '';
+        }
         $plant = $company && $plantCode !== ''
             ? DB::table('tbl_company')
                 ->where('company_code', $plantCode)
@@ -152,7 +161,7 @@ class ProcurementController extends Controller
             'filters' => ['company_code' => $company?->company_code ?? '', 'plant_code' => $plant?->company_code ?? '', 'material' => $materialCode],
             'companies' => DB::table('tbl_company')->where('record_type', 1)->where('status', 1)->orderBy('company_name')->get(['company_code', 'company_name']),
             'plants' => DB::table('tbl_company')->where('record_type', 2)->where('status', 1)->orderBy('company_name')->get(['company_code', 'company_name', 'parent_company_id']),
-            'materials' => DB::table('tbl_materials')->where('status', 1)->orderBy('matnr')->get(['matnr', 'maktx']),
+            'materials' => DB::table('tbl_materials')->where('status', 1)->orderBy('matnr')->get(['matnr', 'maktx', 'mtart']),
             'updatedAt' => now()->format('d M Y, h:i A'),
             'kpis' => [
                 'active_consumptions' => (clone $activeConsumptions)->count(),
@@ -275,10 +284,11 @@ class ProcurementController extends Controller
 
     public function balanceSheet(Request $request): Response
     {
-        $companies = Cache::remember('procurement:balance-companies', now()->addMinutes(5), fn () => DB::table('tbl_company')
+        $companies = Cache::remember('procurement:balance-companies:v2', now()->addMinutes(5), fn () => DB::table('tbl_company')
             ->where('status', 1)
             ->where('record_type', 1)
-            ->orderBy('company_name')
+            ->whereIn('company_code', array_keys(self::COMPANY_MATERIAL_TYPES))
+            ->orderByRaw("FIELD(company_code, '1000', '5000')")
             ->get(['id', 'company_code', 'company_name']));
         $companyCode = trim((string) $request->string('company_code'));
         $selectedCompany = $companyCode !== '' ? $companies->firstWhere('company_code', $companyCode) : null;
@@ -288,13 +298,18 @@ class ProcurementController extends Controller
         $selectedCompany ??= $companies->first();
         $companyId = (int) ($selectedCompany->id ?? 0);
         $companyCode = (string) ($selectedCompany->company_code ?? '');
-        $materials = Cache::remember('procurement:balance-materials', now()->addMinutes(2), fn () => DB::table('tbl_materials')
+        $materialType = self::COMPANY_MATERIAL_TYPES[$companyCode] ?? null;
+        $materials = Cache::remember('procurement:balance-materials:'.($materialType ?? 'none'), now()->addMinutes(2), fn () => DB::table('tbl_materials')
             ->where('status', 1)
+            ->when($materialType, fn ($query) => $query->whereRaw('UPPER(TRIM(mtart)) = ?', [$materialType]))
+            ->when(! $materialType, fn ($query) => $query->whereRaw('1 = 0'))
             ->orderBy('maktx')
             ->limit(5000)
             ->get(['matnr', 'maktx', 'mtart', 'matkl', 'meins']));
-        $materialCode = trim((string) $request->string('material')) ?: (string) ($materials->first()->matnr ?? '');
-        $selectedMaterial = $materials->firstWhere('matnr', $materialCode);
+        $requestedMaterialCode = trim((string) $request->string('material'));
+        $selectedMaterial = $requestedMaterialCode !== '' ? $materials->firstWhere('matnr', $requestedMaterialCode) : null;
+        $selectedMaterial ??= $materials->first();
+        $materialCode = (string) ($selectedMaterial->matnr ?? '');
         $requestedMonth = trim((string) $request->string('month'));
         $monthStart = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $requestedMonth)
             ? CarbonImmutable::parse($requestedMonth.'-01')->startOfMonth()
@@ -540,7 +555,7 @@ class ProcurementController extends Controller
     public function referenceData(): JsonResponse
     {
         return response()->json([
-            'materials' => DB::table('tbl_materials')->where('status', 1)->orderBy('maktx')->limit(5000)->get(['matnr', 'maktx']),
+            'materials' => DB::table('tbl_materials')->where('status', 1)->orderBy('maktx')->limit(5000)->get(['matnr', 'maktx', 'mtart']),
             'materialStocks' => DB::table('tbl_material_stocks')->where('status', 1)->get(['matnr', 'plant_code', 'current_stock']),
         ]);
     }

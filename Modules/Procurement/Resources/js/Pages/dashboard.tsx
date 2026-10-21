@@ -21,7 +21,7 @@ type Props = {
     filters: { company_code: string; plant_code: string; material: string };
     companies: { company_code: string; company_name: string }[];
     plants: { company_code: string; company_name: string; parent_company_id: string | null }[];
-    materials: { matnr: string; maktx: string | null }[];
+    materials: { matnr: string; maktx: string | null; mtart: string | null }[];
     updatedAt: string;
     kpis: {
         active_consumptions: number;
@@ -120,14 +120,8 @@ export default function ProcurementDashboard({
         >
             <Head title="Procurement Dashboard" />
             <div className="procurement-compact mx-auto w-full max-w-[1680px] space-y-3 p-3 md:p-4">
-                <div className="relative z-30 grid items-stretch overflow-visible rounded-xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-2.5 shadow-md shadow-slate-900/10 xl:grid-cols-[minmax(380px,0.8fr)_minmax(0,2fr)] xl:gap-3">
-                    <ProcurementPageHeader
-                        title="Procurement Dashboard"
-                        subtitle="Live demand, purchasing, inventory and delivery overview"
-                        icon={PackageCheck}
-                        meta={`Updated ${updatedAt}`}
-                        embedded
-                    />
+                <div className="relative z-30 grid items-stretch overflow-visible rounded-2xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10 xl:grid-cols-[minmax(390px,0.75fr)_minmax(0,2fr)] xl:gap-4">
+                    <ProcurementPageHeader title="Procurement Dashboard" icon={PackageCheck} meta={`Updated ${updatedAt}`} embedded />
 
                     <ProcurementFilterBar
                         companyCode={companyCode}
@@ -139,6 +133,7 @@ export default function ProcurementDashboard({
                         onCompanyChange={(value) => {
                             setCompanyCode(value);
                             setPlantCode('all');
+                            setMaterialCode('all');
                         }}
                         onPlantChange={setPlantCode}
                         onMaterialChange={setMaterialCode}

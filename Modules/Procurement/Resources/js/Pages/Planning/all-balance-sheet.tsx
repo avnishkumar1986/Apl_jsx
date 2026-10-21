@@ -2,13 +2,14 @@ import { DataTableSortHeader } from '@/components/master/data-table-sort-header'
 import ProcurementPageHeader from '@/components/procurement-page-header';
 import { RowExpandButton } from '@/components/row-expand-button';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Boxes,
     CalendarDays,
+    Check,
+    ChevronDown,
     Factory,
     FileSpreadsheet,
     Filter,
@@ -52,6 +53,7 @@ type Page<T> = {
 };
 type Filters = {
     month: string;
+    company_code: string;
     plant_code: string;
     material: string;
     search: string;
@@ -65,16 +67,104 @@ const number = (value: number) =>
         maximumFractionDigits: 3,
     });
 
+function SearchableFilterSelect({
+    value,
+    options,
+    placeholder,
+    onValueChange,
+}: {
+    value: string;
+    options: { value: string; label: string }[];
+    placeholder: string;
+    onValueChange: (value: string) => void;
+}) {
+    const selectedLabel = options.find((option) => option.value === value)?.label ?? '';
+    const [query, setQuery] = useState(selectedLabel);
+    const [open, setOpen] = useState(false);
+
+    useEffect(() => setQuery(selectedLabel), [selectedLabel]);
+
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredOptions = options.filter(
+        (option) => !normalizedQuery || option.label.toLowerCase().includes(normalizedQuery) || option.value.toLowerCase().includes(normalizedQuery),
+    );
+
+    return (
+        <div className="relative font-normal text-slate-900">
+            <Search className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+                role="combobox"
+                aria-expanded={open}
+                aria-autocomplete="list"
+                autoComplete="off"
+                value={query}
+                placeholder={placeholder}
+                className="border-input h-10 w-full rounded-lg border bg-white pr-9 pl-9 text-sm font-medium shadow-sm transition outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                onFocus={(event) => {
+                    setOpen(true);
+                    setQuery('');
+                }}
+                onChange={(event) => {
+                    setQuery(event.target.value);
+                    setOpen(true);
+                }}
+                onBlur={() =>
+                    window.setTimeout(() => {
+                        setOpen(false);
+                        setQuery(options.find((option) => option.value === value)?.label ?? '');
+                    }, 150)
+                }
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && open && filteredOptions.length > 0) {
+                        event.preventDefault();
+                        onValueChange(filteredOptions[0].value);
+                        setQuery(filteredOptions[0].label);
+                        setOpen(false);
+                    }
+                    if (event.key === 'Escape') setOpen(false);
+                }}
+            />
+            <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-slate-500" />
+            {open && (
+                <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-xl">
+                    {filteredOptions.length ? (
+                        filteredOptions.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                className="flex min-h-9 w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm hover:bg-cyan-50"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                    onValueChange(option.value);
+                                    setQuery(option.label);
+                                    setOpen(false);
+                                }}
+                            >
+                                <span className="truncate">{option.label}</span>
+                                {option.value === value && <Check className="size-4 shrink-0 text-cyan-600" />}
+                            </button>
+                        ))
+                    ) : (
+                        <p className="px-3 py-2 text-sm text-slate-500">No matching options</p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function AllBalanceSheet({
     rows,
+    companies,
     plants,
     materials,
     filters,
     summary,
 }: {
     rows: Page<Row>;
-    plants: { id: number; company_code: string; company_name: string }[];
-    materials: { matnr: string; maktx: string; meins: string | null }[];
+    companies: { id: number; company_code: string; company_name: string }[];
+    plants: { id: number; company_code: string; company_name: string; parent_company_id: string }[];
+    materials: { matnr: string; maktx: string; meins: string | null; mtart: string }[];
     filters: Filters;
     summary: {
         plants: number;
@@ -86,9 +176,9 @@ export default function AllBalanceSheet({
     };
 }) {
     const month = filters.month;
+    const [companyCode, setCompanyCode] = useState(filters.company_code);
     const [plantCode, setPlantCode] = useState(filters.plant_code || 'all');
     const [material, setMaterial] = useState(filters.material || 'all');
-    const [search, setSearch] = useState(filters.search);
     const [expanded, setExpanded] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const tableRef = useRef<HTMLElement>(null);
@@ -98,9 +188,9 @@ export default function AllBalanceSheet({
             '/admin/procurement/all-balance-sheet',
             {
                 month,
+                company_code: companyCode,
                 plant_code: plantCode === 'all' ? undefined : plantCode,
                 material: material === 'all' ? undefined : material,
-                search: search || undefined,
                 per_page: filters.per_page,
                 sort: filters.sort,
                 direction: filters.direction,
@@ -113,9 +203,9 @@ export default function AllBalanceSheet({
             '/admin/procurement/all-balance-sheet',
             {
                 month: filters.month,
+                company_code: filters.company_code,
                 plant_code: filters.plant_code || undefined,
                 material: filters.material || undefined,
-                search: filters.search || undefined,
                 per_page: perPage,
                 sort,
                 direction,
@@ -162,17 +252,16 @@ export default function AllBalanceSheet({
             breadcrumbs={[
                 { title: 'Procurement', href: '/admin/procurement' },
                 {
-                    title: 'All Materials Balance Sheet',
+                    title: 'All Material Stock',
                     href: '/admin/procurement/all-balance-sheet',
                 },
             ]}
         >
-            <Head title="All Materials Balance Sheet" />
+            <Head title="All Material Stock" />
             <main className="procurement-compact w-full min-w-0 space-y-3 p-3 sm:p-4">
-                <div className="relative z-30 grid items-stretch overflow-visible rounded-xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-2.5 shadow-md shadow-slate-900/10 xl:grid-cols-[minmax(390px,0.8fr)_minmax(0,2fr)] xl:gap-3 print:hidden">
+                <div className="relative z-30 grid items-center overflow-visible rounded-2xl border border-t-[3px] border-white/10 border-t-orange-500 bg-gradient-to-br from-[#062f42] via-[#075b70] to-[#0b91a7] p-3 shadow-lg shadow-slate-900/15 xl:grid-cols-[minmax(420px,0.75fr)_minmax(0,2fr)] xl:gap-4 print:hidden">
                     <ProcurementPageHeader
-                        title="All Materials Balance Sheet"
-                        subtitle="Consolidated monthly balance across every plant and material"
+                        title="All Material Stock"
                         icon={FileSpreadsheet}
                         embedded
                         actions={
@@ -200,51 +289,66 @@ export default function AllBalanceSheet({
                             </div>
                         }
                     />
-                    <section className="rounded-lg border border-white/15 bg-white/8 p-2.5 shadow-inner shadow-black/5 backdrop-blur-sm">
-                        <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1.2fr_auto] xl:items-end">
-                            <label className="space-y-1 text-xs font-semibold text-white/90">
+                    <section className="rounded-xl border border-white/15 bg-white/10 p-3 shadow-inner shadow-black/5 backdrop-blur-md">
+                        <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.5fr_auto] xl:items-end">
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
+                                Company
+                                <SearchableFilterSelect
+                                    value={companyCode}
+                                    options={companies.map((company) => ({
+                                        value: company.company_code,
+                                        label: `${company.company_code} · ${company.company_name}`,
+                                    }))}
+                                    placeholder="Search company..."
+                                    onValueChange={(nextCompanyCode) => {
+                                        setCompanyCode(nextCompanyCode);
+                                        setPlantCode('all');
+                                        setMaterial('all');
+                                        router.get(
+                                            '/admin/procurement/all-balance-sheet',
+                                            {
+                                                company_code: nextCompanyCode,
+                                                month,
+                                                per_page: filters.per_page,
+                                                sort: filters.sort,
+                                                direction: filters.direction,
+                                            },
+                                            { preserveState: true, replace: true },
+                                        );
+                                    }}
+                                />
+                            </label>
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
                                 Plant
-                                <select
-                                    className="border-input flex h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900"
+                                <SearchableFilterSelect
                                     value={plantCode}
-                                    onChange={(e) => setPlantCode(e.target.value)}
-                                >
-                                    <option value="all">All Plants</option>
-                                    {plants.map((plant) => (
-                                        <option key={plant.id} value={plant.company_code}>
-                                            {plant.company_code} · {plant.company_name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onValueChange={setPlantCode}
+                                    options={[
+                                        { value: 'all', label: 'All Plants' },
+                                        ...plants.map((plant) => ({
+                                            value: plant.company_code,
+                                            label: `${plant.company_code} · ${plant.company_name}`,
+                                        })),
+                                    ]}
+                                    placeholder="Search plant..."
+                                />
                             </label>
-                            <label className="space-y-1 text-xs font-semibold text-white/90">
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
                                 Material
-                                <select
-                                    className="border-input flex h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900"
+                                <SearchableFilterSelect
                                     value={material}
-                                    onChange={(e) => setMaterial(e.target.value)}
-                                >
-                                    <option value="all">All Materials</option>
-                                    {materials.map((item) => (
-                                        <option key={item.matnr} value={item.matnr}>
-                                            {item.matnr} · {item.maktx}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onValueChange={setMaterial}
+                                    options={[
+                                        { value: 'all', label: `All ${materials[0]?.mtart || ''} Materials` },
+                                        ...materials.map((item) => ({
+                                            value: item.matnr,
+                                            label: `${item.matnr} · ${item.maktx} · ${item.mtart}`,
+                                        })),
+                                    ]}
+                                    placeholder="Search material code or description..."
+                                />
                             </label>
-                            <label className="space-y-1 text-xs font-semibold text-white/90">
-                                Search
-                                <div className="relative">
-                                    <Search className="absolute top-2.5 left-3 size-4 text-slate-400" />
-                                    <Input
-                                        className="h-9 bg-white pl-9 text-slate-900"
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        placeholder="Material or plant..."
-                                    />
-                                </div>
-                            </label>
-                            <Button className="bg-brand-teal h-9 text-white hover:bg-cyan-600">
+                            <Button className="h-10 rounded-lg bg-cyan-500 px-6 font-semibold text-white shadow-md shadow-cyan-950/15 hover:bg-cyan-400">
                                 <Filter className="size-4" />
                                 Apply
                             </Button>
@@ -282,7 +386,8 @@ export default function AllBalanceSheet({
                         <div>
                             <h2 className="font-semibold text-slate-900">Balance details</h2>
                             <p className="text-xs text-slate-500">
-                                {filters.plant_code || 'All Plants'} · {filters.material || 'All Materials'} · {filters.month}
+                                {filters.company_code} · {filters.plant_code || 'All Plants'} ·{' '}
+                                {filters.material || `All ${materials[0]?.mtart || ''} Materials`} · {filters.month}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">

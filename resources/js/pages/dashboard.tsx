@@ -100,6 +100,7 @@ export default function Dashboard({
         latitude: number;
         longitude: number;
         locationName: string;
+        locationType: 'plant' | 'ho' | 'unassigned';
         lastSeen: string;
         devices: string[];
     }>;
@@ -128,6 +129,7 @@ export default function Dashboard({
     const [securityScanRunning, setSecurityScanRunning] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState(1);
     const [salesPeriod, setSalesPeriod] = useState<'monthly' | 'yearly'>('monthly');
+    const [locationFilter, setLocationFilter] = useState<'plant' | 'ho'>('ho');
     const [activeOffers, setActiveOffers] = useState([
         {
             id: 1,
@@ -188,8 +190,12 @@ export default function Dashboard({
     const completedProfileFields = profileFields.filter((value) => value !== null && value !== undefined && value !== '').length;
     const profileScore = Math.round((completedProfileFields / profileFields.length) * 100);
     const remainingProfileFields = profileFields.length - completedProfileFields;
-    const visibleUserLocations = userLocations;
-    const currentUserLocation = userLocations.find((location) => location.userId === auth.user.id);
+    const visibleUserLocations = userLocations.filter((location) => location.locationType === locationFilter);
+    const locationTypeCounts = {
+        plant: userLocations.filter((location) => location.locationType === 'plant').length,
+        ho: userLocations.filter((location) => location.locationType === 'ho').length,
+    };
+    const currentUserLocation = visibleUserLocations.find((location) => location.userId === auth.user.id);
     const mapLocationGroups = Object.values(
         visibleUserLocations.reduce<
             Record<
@@ -518,87 +524,117 @@ export default function Dashboard({
                         </Card>
                         <Card className="corporate-card overflow-hidden">
                             <CardHeader className="border-b border-slate-100 px-5 py-4">
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
                                     <CardTitle className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap">
                                         <span className="bg-brand-teal h-5 w-1 shrink-0 rounded-full" />
                                         User locations
                                     </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href="/dashboard/location-report"
-                                            aria-label="View location report"
-                                            className="text-brand-teal hover:bg-brand-aqua/10 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition"
-                                        >
-                                            <span className="hidden sm:inline">Report</span> <ArrowRight className="size-3" />
-                                        </Link>
-                                        <div className="min-w-16 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-center">
-                                            <div className="flex items-center justify-center gap-1.5">
-                                                <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
-                                                <span className="text-lg leading-none font-bold text-emerald-700">{visibleUserLocations.length}</span>
-                                            </div>
-                                            <p className="mt-1 text-[8px] font-bold tracking-wide text-emerald-700 uppercase">
-                                                {visibleUserLocations.length === 1 ? 'Active user' : 'Active users'}
-                                            </p>
+                                    <div className="flex min-w-0 justify-center" role="group" aria-label="Filter user locations">
+                                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+                                            {(
+                                                [
+                                                    { value: 'plant', label: 'Plant', icon: Factory },
+                                                    { value: 'ho', label: 'Head Office', icon: Building2 },
+                                                ] as const
+                                            ).map(({ value, label, icon: Icon }) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onClick={() => setLocationFilter(value)}
+                                                    aria-pressed={locationFilter === value}
+                                                    className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[10px] font-bold whitespace-nowrap transition-all ${
+                                                        locationFilter === value
+                                                            ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200'
+                                                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    <Icon className="size-3.5" />
+                                                    {label}
+                                                    <span
+                                                        className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${
+                                                            locationFilter === value ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-200 text-slate-500'
+                                                        }`}
+                                                    >
+                                                        {locationTypeCounts[value]}
+                                                    </span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
+                                    <Link
+                                        href="/dashboard/location-report"
+                                        aria-label="View location report"
+                                        className="text-brand-teal hover:bg-brand-aqua/10 inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-2 text-[10px] font-bold transition"
+                                    >
+                                        View report <ArrowRight className="size-3" />
+                                    </Link>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-5">
-                                <div className="relative mx-auto h-[330px] w-full overflow-hidden rounded-2xl border border-cyan-100 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.95),transparent_36%),linear-gradient(145deg,#effaff,#dffafb)]">
+                            <CardContent className="p-0">
+                                <div className="relative h-[410px] w-full overflow-hidden border-b border-cyan-100 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.95),transparent_36%),linear-gradient(145deg,#effaff,#dffafb)]">
                                     <div className="absolute inset-0 bg-[linear-gradient(rgba(8,145,178,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(8,145,178,0.035)_1px,transparent_1px)] bg-[size:24px_24px]" />
-                                    <IndiaMapSilhouette className="absolute inset-0 size-full p-5 text-[#0e8ca6] drop-shadow-[0_12px_24px_rgba(14,140,166,0.12)]" />
                                     <span className="absolute top-3 left-3 rounded-md bg-white/90 px-2 py-1 text-[9px] font-bold tracking-widest text-slate-500 shadow-sm">
                                         INDIA
                                     </span>
-                                    {mapLocationGroups.map((location, index) => (
-                                        <div
-                                            key={location.locationName}
-                                            className="group/location absolute z-10 -translate-x-1/2 -translate-y-1/2 hover:z-50"
-                                            style={mapPositionFor(location.latitude, location.longitude)}
-                                        >
-                                            <span className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-red-400/35" />
-                                            <MapPin className="relative size-8 fill-red-500 text-white drop-shadow-lg" />
-                                            <span className="peer absolute top-7 left-1/2 z-20 w-max max-w-40 -translate-x-1/2 cursor-help rounded-md bg-white/95 px-2 py-1 text-center text-[9px] leading-3 font-semibold text-slate-900 shadow-md">
-                                                {location.locationName} · {location.users.length}
-                                            </span>
+                                    <div className="absolute inset-y-2 left-1/2 aspect-[667/777] -translate-x-1/2">
+                                        <IndiaMapSilhouette className="absolute inset-0 size-full drop-shadow-[0_12px_24px_rgba(14,140,166,0.16)]" />
+                                        {mapLocationGroups.map((location, index) => (
                                             <div
-                                                className={`absolute top-1/2 z-50 hidden w-48 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-2 shadow-xl peer-hover:block ${
-                                                    location.longitude > 82 || index % 2 === 1 ? 'right-8' : 'left-8'
-                                                }`}
+                                                key={location.locationName}
+                                                className="group/location absolute z-10 -translate-x-1/2 -translate-y-1/2 hover:z-50"
+                                                style={mapPositionFor(location.latitude, location.longitude)}
                                             >
-                                                <div className="max-h-32 divide-y divide-slate-100 overflow-y-auto text-left [scrollbar-width:thin]">
-                                                    {location.users.map((user) => (
-                                                        <div key={user.userId} className="py-1.5 first:pt-0 last:pb-0">
-                                                            <p className="truncate text-[10px] font-bold text-slate-900">
-                                                                {user.name} {user.employeeId ? `(${user.employeeId})` : ''}
-                                                            </p>
-                                                            <p className="truncate text-[9px] text-slate-500">
-                                                                {[user.companyName, user.departmentName, user.designationName]
-                                                                    .filter(Boolean)
-                                                                    .join(' · ') || 'Organization details not assigned'}
-                                                            </p>
-                                                            {user.devices.map((device) => (
-                                                                <p key={device} className="mt-0.5 truncate text-[9px] text-slate-400">
-                                                                    Device: {device}
+                                                <span className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-red-400/35" />
+                                                <MapPin className="relative size-8 fill-red-500 text-white drop-shadow-lg" />
+                                                <span className="peer absolute top-7 left-1/2 z-20 w-max max-w-40 -translate-x-1/2 cursor-help rounded-md bg-white/95 px-2 py-1 text-center text-[9px] leading-3 font-semibold text-slate-900 shadow-md">
+                                                    {location.locationName} · {location.users.length}
+                                                </span>
+                                                <div
+                                                    className={`absolute top-1/2 z-50 hidden w-48 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-2 shadow-xl peer-hover:block ${
+                                                        location.longitude > 82 || index % 2 === 1 ? 'right-8' : 'left-8'
+                                                    }`}
+                                                >
+                                                    <div className="max-h-32 divide-y divide-slate-100 overflow-y-auto text-left [scrollbar-width:thin]">
+                                                        {location.users.map((user) => (
+                                                            <div key={user.userId} className="py-1.5 first:pt-0 last:pb-0">
+                                                                <p className="truncate text-[10px] font-bold text-slate-900">
+                                                                    {user.name} {user.employeeId ? `(${user.employeeId})` : ''}
                                                                 </p>
-                                                            ))}
-                                                        </div>
-                                                    ))}
+                                                                <p className="truncate text-[9px] text-slate-500">
+                                                                    {[user.companyName, user.departmentName, user.designationName]
+                                                                        .filter(Boolean)
+                                                                        .join(' · ') || 'Organization details not assigned'}
+                                                                </p>
+                                                                {user.devices.map((device) => (
+                                                                    <p key={device} className="mt-0.5 truncate text-[9px] text-slate-400">
+                                                                        Device: {device}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                     {!visibleUserLocations.length && (
-                                        <div className="absolute inset-x-4 bottom-4 rounded-lg border border-white/80 bg-white/90 p-3 text-center shadow-sm backdrop-blur">
-                                            <MapPin className="text-brand-teal mx-auto size-5" />
-                                            <p className="mt-1 text-xs font-semibold text-slate-700">Location not displayed yet</p>
+                                        <div className="absolute inset-0 z-20 grid place-items-center p-6">
+                                            <div className="max-w-56 rounded-2xl border border-white bg-white/95 px-5 py-4 text-center shadow-[0_12px_30px_-16px_rgba(15,23,42,0.4)] backdrop-blur-sm">
+                                                <span className="mx-auto grid size-9 place-items-center rounded-full bg-cyan-50 ring-1 ring-cyan-100">
+                                                    <MapPin className="size-4 text-cyan-600" />
+                                                </span>
+                                                <p className="mt-2 text-xs font-bold text-slate-800">No active locations</p>
+                                                <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                                                    No active {locationFilter === 'plant' ? 'plant' : 'head office'} users are currently available.
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="mt-4 text-center">
+                                <div className="px-5 py-4 text-center">
                                     <p className="text-sm font-semibold text-slate-800">
                                         {isSuperAdmin
-                                            ? `${visibleUserLocations.length} active ${visibleUserLocations.length === 1 ? 'employee' : 'employees'} across ${mapLocationGroups.length} ${mapLocationGroups.length === 1 ? 'location' : 'locations'}`
+                                            ? `${visibleUserLocations.length} active ${visibleUserLocations.length === 1 ? 'employee' : 'employees'} across ${mapLocationGroups.length} ${locationFilter === 'plant' ? 'plant' : 'head office'} ${mapLocationGroups.length === 1 ? 'location' : 'locations'}`
                                             : auth.user.name}
                                     </p>
                                     {currentUserLocation ? (

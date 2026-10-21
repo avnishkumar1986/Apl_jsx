@@ -138,6 +138,10 @@ Route::middleware(['auth'])->group(function () {
             return "{$device} · {$browser}";
         };
 
+        $sittingLocations = Company::query()
+            ->whereIn('record_type', [2, 3])
+            ->get(['company_code', 'company_name', 'record_type']);
+
         $userLocations = UserLocation::query()
             ->with([
                 'user:id,unique_id,first_name,last_name',
@@ -152,7 +156,13 @@ Route::middleware(['auth'])->group(function () {
                 fn ($query) => $query->where('user_id', $request->user()->getKey()),
             )
             ->get()
-            ->map(fn (UserLocation $location): array => [
+            ->map(function (UserLocation $location) use ($activeSessions, $deviceNameForUserAgent, $sittingLocations): array {
+                $assignedSittingLocation = $location->user->departmentAssignment?->sitting_location;
+                $sittingLocation = $sittingLocations->first(
+                    fn (Company $company): bool => in_array($assignedSittingLocation, [$company->company_code, $company->company_name], true),
+                );
+
+                return [
                 'userId' => $location->user_id,
                 'name' => $location->user->name,
                 'employeeId' => $location->user->unique_id,
@@ -162,13 +172,19 @@ Route::middleware(['auth'])->group(function () {
                 'latitude' => $location->latitude,
                 'longitude' => $location->longitude,
                 'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
+                'locationType' => match ($sittingLocation?->record_type) {
+                    2 => 'plant',
+                    3 => 'ho',
+                    default => 'unassigned',
+                },
                 'lastSeen' => ($location->captured_at ?? $location->updated_at)->toIso8601String(),
                 'devices' => $activeSessions
                     ->where('user_id', $location->user_id)
                     ->map(fn (object $session): string => $deviceNameForUserAgent($session->user_agent))
                     ->unique()
                     ->values(),
-            ]);
+                ];
+            });
 
         return Inertia::render('dashboard', [
             'organizationStats' => [

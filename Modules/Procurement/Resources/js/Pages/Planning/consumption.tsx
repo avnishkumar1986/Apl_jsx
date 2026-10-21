@@ -20,7 +20,7 @@ type Company = {
     record_type: number;
     parent_company_id: string | null;
 };
-type Material = { matnr: string; maktx: string };
+type Material = { matnr: string; maktx: string; mtart: string | null };
 type MaterialStock = {
     matnr: string;
     plant_code: string;
@@ -88,6 +88,10 @@ const consumptionBlank = {
     material: '',
     common_remarks: '',
     entries: [] as { plant_id: string; quantity_mt: string; remarks: string }[],
+};
+const MATERIAL_TYPE_BY_COMPANY: Record<string, string> = {
+    '1000': 'ZRAW',
+    '5000': 'YRAW',
 };
 const todayInIndia = () => {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -267,6 +271,9 @@ export default function Procurement({
         );
     };
     const selectedPurchaseCompany = companies.find((company) => String(company.id) === purchase.data.company_id);
+    const purchaseMaterials = materials.filter(
+        (material) => material.mtart?.trim().toUpperCase() === MATERIAL_TYPE_BY_COMPANY[selectedPurchaseCompany?.company_code ?? ''],
+    );
     const selectedPurchasePlant = companies.find((company) => String(company.id) === purchase.data.plant_id);
     const purchasePlants = companies.filter(
         (company) => company.record_type === 2 && company.parent_company_id === selectedPurchaseCompany?.company_code,
@@ -303,6 +310,9 @@ export default function Procurement({
         return () => controller.abort();
     }, [purchase.data.material, selectedPurchasePlant?.company_code]);
     const selectedCompany = companies.find((company) => String(company.id) === consumption.data.company_id);
+    const consumptionMaterials = materials.filter(
+        (material) => material.mtart?.trim().toUpperCase() === MATERIAL_TYPE_BY_COMPANY[selectedCompany?.company_code ?? ''],
+    );
     const consumptionError = Object.values(consumption.errors)[0];
     const consumptionPlants = companies.filter(
         (company) =>
@@ -824,6 +834,7 @@ export default function Procurement({
                                 onChange={(v) => {
                                     purchase.setData('company_id', v);
                                     purchase.setData('plant_id', '');
+                                    purchase.setData('material', '');
                                     purchase.setData('vendor_name', '');
                                     purchase.setData('vendor_source', 'sap');
                                     setManualVendor(false);
@@ -842,7 +853,7 @@ export default function Procurement({
                             />
                             <MaterialSelect
                                 value={purchase.data.material}
-                                materials={materials}
+                                materials={purchaseMaterials}
                                 onChange={(v) => {
                                     purchase.setData('material', v);
                                     purchase.setData('vendor_name', '');
@@ -972,12 +983,13 @@ export default function Procurement({
                                     options={companies.filter((company) => company.record_type === 1)}
                                     onChange={(v) => {
                                         consumption.setData('company_id', v);
+                                        consumption.setData('material', '');
                                         consumption.setData('entries', []);
                                     }}
                                 />
                                 <MaterialSelect
                                     value={consumption.data.material}
-                                    materials={materials}
+                                    materials={consumptionMaterials}
                                     onChange={(v) => consumption.setData('material', v)}
                                     loading={referenceLoading}
                                 />
@@ -1201,7 +1213,11 @@ function MaterialSelect({
                     className="border-input focus-visible:ring-ring flex h-9 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 text-left text-sm shadow-xs outline-none focus-visible:ring-1"
                 >
                     <span className={`truncate ${selected ? '' : 'text-muted-foreground'}`}>
-                        {selected ? `${selected.matnr} · ${selected.maktx}` : loading ? 'Loading materials...' : 'Select material'}
+                        {selected
+                            ? `${selected.matnr} · ${selected.maktx} · ${selected.mtart}`
+                            : loading
+                              ? 'Loading materials...'
+                              : 'Select material'}
                     </span>
                     <ChevronDown className="size-4 shrink-0 opacity-50" />
                 </button>
@@ -1239,6 +1255,9 @@ function MaterialSelect({
                                         <span>
                                             <b>{material.matnr}</b>
                                             <span className="ml-2 text-slate-500">{material.maktx}</span>
+                                            <span className="ml-2 rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-700">
+                                                {material.mtart}
+                                            </span>
                                         </span>
                                     </button>
                                 ))

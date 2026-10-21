@@ -5,6 +5,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Boxes,
     Calculator,
+    Check,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -130,6 +131,8 @@ export default function BalanceOverview({
     canManage: boolean;
 }) {
     const companyCode = filters.company_code || '';
+    const selectedCompany = companies.find((company) => company.company_code === companyCode);
+    const selectedMaterialType = materials[0]?.mtart?.trim().toUpperCase() || '';
     const [material, setMaterial] = useState(filters.material);
     const [materialSearch, setMaterialSearch] = useState('');
     const [showRemarks, setShowRemarks] = useState(true);
@@ -487,18 +490,140 @@ export default function BalanceOverview({
             ]}
         >
             <Head title="Procurement Balance Sheet View" />
-            <div className="procurement-compact mx-auto flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-col gap-3 p-[clamp(10px,1.5vw,20px)]">
-                <div className="relative z-30 shrink-0 overflow-hidden rounded-2xl border-t-4 border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10">
+            <div className="procurement-compact mx-auto flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-col gap-3 overflow-hidden p-[clamp(10px,1.5vw,20px)] lg:h-[calc(100dvh-9rem)] lg:min-h-[30rem] lg:flex-none">
+                <div className="relative z-40 shrink-0 overflow-visible rounded-2xl border-t-4 border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10">
                     <ProcurementPageHeader
                         title="Procurement Balance Sheet"
-                        subtitle="Plant-wise demand, availability, purchasing, and closing stock planning"
+                        subtitle={monthLabel}
                         icon={FileText}
+                        actions={
+                            <div className="flex max-w-4xl flex-wrap items-center justify-end gap-2">
+                                <label className="relative flex h-9 min-w-64 items-center rounded-lg border border-white/20 bg-white/10 pl-3 text-white shadow-sm transition focus-within:bg-white/15">
+                                    <span className="pointer-events-none absolute top-1 left-3 text-[8px] font-bold tracking-wide text-cyan-100 uppercase">
+                                        Company
+                                    </span>
+                                    <select
+                                        aria-label="Company"
+                                        value={companyCode}
+                                        onChange={(event) => {
+                                            const nextCompany = event.target.value;
+                                            setMaterial('');
+                                            setFoldedPlants(new Set());
+                                            router.get(
+                                                '/admin/procurement/balance-overview',
+                                                {
+                                                    company_code: nextCompany,
+                                                    month: filters.month,
+                                                    months: filters.months,
+                                                },
+                                                { preserveState: false, replace: true },
+                                            );
+                                        }}
+                                        className="h-full w-full appearance-none bg-transparent pt-2 pr-8 text-xs font-semibold text-white outline-none [&_option]:text-slate-900"
+                                    >
+                                        {companies.map((company) => (
+                                            <option key={company.id} value={company.company_code}>
+                                                {company.company_code} · {company.company_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-3 size-3.5 text-cyan-100" />
+                                </label>
+                                <details className="group relative">
+                                    <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-white/20">
+                                        <Eye className="size-4" />
+                                        Plant columns
+                                        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold text-cyan-50">
+                                            {plantOptions.filter((plant) => !foldedPlants.has(plant.id)).length}/{plantOptions.length}
+                                        </span>
+                                        <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+                                    </summary>
+                                    <div className="absolute top-full right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xl shadow-slate-950/20">
+                                        <div className="flex items-center justify-between border-b bg-slate-50 px-3 py-2">
+                                            <div>
+                                                <p className="text-[10px] font-black tracking-wide uppercase">Visible plants</p>
+                                                <p className="text-[9px] text-slate-400">Select columns to display</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFoldedPlants(new Set())}
+                                                className="text-[9px] font-bold text-cyan-700 hover:underline"
+                                            >
+                                                Show all
+                                            </button>
+                                        </div>
+                                        <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto p-2 [scrollbar-width:thin] sm:grid-cols-2">
+                                            {plantOptions.map((plant) => {
+                                                const visible = !foldedPlants.has(plant.id);
+                                                return (
+                                                    <button
+                                                        key={plant.id}
+                                                        type="button"
+                                                        onClick={() => togglePlantFold(plant.id)}
+                                                        className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold transition ${
+                                                            visible ? 'bg-cyan-50 text-cyan-800' : 'text-slate-500 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`grid size-4 shrink-0 place-items-center rounded border ${
+                                                                visible ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-300 bg-white'
+                                                            }`}
+                                                        >
+                                                            {visible && <Check className="size-3" strokeWidth={3} />}
+                                                        </span>
+                                                        <span className="min-w-0 flex-1 truncate" title={plant.name}>
+                                                            {plant.name}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </details>
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="size-9 border-white/20 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                    title="Export Excel"
+                                    onClick={exportExcel}
+                                >
+                                    <FileSpreadsheet className="size-4" />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="size-9 border-white/20 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                    title="Export PDF"
+                                    onClick={() => exportPdf(showRemarks)}
+                                >
+                                    <FileDown className="size-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    title={showRemarks ? 'Hide remarks' : 'Show remarks'}
+                                    onClick={() => setShowRemarks((visible) => !visible)}
+                                    className="h-9 gap-2 border-white/20 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                >
+                                    {showRemarks ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                    <span className="hidden 2xl:inline">{showRemarks ? 'Hide remarks' : 'Show remarks'}</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    title={expanded ? 'Collapse balance sheet' : 'Expand balance sheet'}
+                                    onClick={toggleExpanded}
+                                    className="h-9 gap-2 border-white/20 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                >
+                                    {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                                    <span className="hidden 2xl:inline">{expanded ? 'Collapse' : 'Expand'}</span>
+                                </Button>
+                            </div>
+                        }
                         embedded
                     />
                 </div>
 
                 <section
-                    className={`min-w-0 overflow-hidden border bg-white shadow-sm ${
+                    className={`min-w-0 overflow-hidden border bg-white shadow-sm lg:h-0 ${
                         expanded ? 'fixed inset-0 z-50 flex h-dvh rounded-none' : 'relative z-10 flex min-h-0 flex-1 flex-col rounded-xl md:flex-row'
                     }`}
                 >
@@ -506,13 +631,17 @@ export default function BalanceOverview({
                         className={`flex shrink-0 flex-col bg-gradient-to-b from-slate-50 to-cyan-50/50 ${
                             expanded
                                 ? 'w-56 border-r sm:w-64'
-                                : 'max-h-[22rem] w-full border-b md:w-72 md:border-r md:border-b-0 lg:h-[calc(100dvh-14rem)] lg:max-h-[calc(100dvh-14rem)]'
+                                : 'max-h-[22rem] w-full border-b md:w-72 md:border-r md:border-b-0 lg:h-full lg:max-h-none'
                         }`}
                     >
                         <div className="border-b px-4 py-4">
                             <div>
-                                <p className="text-[10px] font-black tracking-[0.14em] text-cyan-800 uppercase">Material balance sheets</p>
-                                <p className="mt-0.5 text-[10px] text-slate-500">Select a material</p>
+                                <p className="text-[10px] font-black tracking-[0.14em] text-cyan-800 uppercase">
+                                    {selectedMaterialType || 'Company'} materials
+                                </p>
+                                <p className="mt-0.5 truncate text-[10px] text-slate-500" title={selectedCompany?.company_name}>
+                                    {selectedCompany?.company_name || 'Select a company'}
+                                </p>
                             </div>
                             <div className="relative mt-2.5">
                                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400" />
@@ -527,7 +656,7 @@ export default function BalanceOverview({
                         </div>
                         <nav
                             aria-label="Material balance sheets"
-                            className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 [scrollbar-width:thin]"
+                            className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-gutter:stable] [scrollbar-width:thin]"
                         >
                             {materialTabs.map((item) => {
                                 const active = item.matnr === filters.material;
@@ -579,7 +708,7 @@ export default function BalanceOverview({
                         </nav>
                     </aside>
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-50/40">
-                        <div className="relative z-30 flex flex-col items-start border-b bg-slate-50 px-4 py-3 sm:px-5">
+                        <div className="hidden">
                             <details className="group w-full">
                                 <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700">
                                     <Eye className="size-4" />
@@ -616,11 +745,16 @@ export default function BalanceOverview({
                                                         visible ? 'bg-cyan-50 text-cyan-800' : 'text-slate-500 hover:bg-slate-50'
                                                     }`}
                                                 >
-                                                    {visible ? <Eye className="size-3.5 shrink-0" /> : <EyeOff className="size-3.5 shrink-0" />}
+                                                    <span
+                                                        className={`grid size-4 shrink-0 place-items-center rounded border ${
+                                                            visible ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-300 bg-white'
+                                                        }`}
+                                                    >
+                                                        {visible && <Check className="size-3" strokeWidth={3} />}
+                                                    </span>
                                                     <span className="min-w-0 flex-1 truncate" title={plant.name}>
                                                         {plant.name}
                                                     </span>
-                                                    <span className={`size-2 rounded-full ${visible ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                                                 </button>
                                             );
                                         })}
@@ -628,7 +762,7 @@ export default function BalanceOverview({
                                 </div>
                             </details>
                         </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-5 py-3">
+                        <div className="hidden">
                             <div className="flex gap-2">
                                 <Button size="icon" variant="outline" title="Export Excel" onClick={exportExcel}>
                                     <FileSpreadsheet className="size-4" />
@@ -889,7 +1023,7 @@ export default function BalanceOverview({
                                 </div>
                                 <div
                                     ref={desktopGrid}
-                                    className="m-3 mt-0 hidden min-h-0 w-auto max-w-full flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block"
+                                    className="m-3 mt-0 hidden min-h-0 w-auto max-w-full flex-1 overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-sm [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-gutter:stable_both-edges] [scrollbar-width:auto] lg:block"
                                 >
                                     <table className="w-max min-w-full border-collapse text-xs">
                                         <thead className="sticky top-0 z-30 shadow-sm">

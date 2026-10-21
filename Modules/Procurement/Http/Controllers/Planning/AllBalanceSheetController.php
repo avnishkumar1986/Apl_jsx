@@ -13,6 +13,11 @@ use Inertia\Response;
 
 class AllBalanceSheetController extends Controller
 {
+    private const COMPANY_MATERIAL_TYPES = [
+        '1000' => 'ZRAW',
+        '5000' => 'YRAW',
+    ];
+
     public function index(Request $request): Response
     {
         $requestedMonth = trim((string) $request->string('month'));
@@ -21,6 +26,17 @@ class AllBalanceSheetController extends Controller
             : CarbonImmutable::now('Asia/Kolkata')->startOfMonth();
         $monthStart = $month->startOfMonth();
         $monthEnd = $month->endOfMonth();
+        $companies = Cache::remember('procurement:all-balance-companies:v2', now()->addMinutes(5), fn () => DB::table('tbl_company')
+            ->where('status', 1)
+            ->where('record_type', 1)
+            ->whereIn('company_code', array_keys(self::COMPANY_MATERIAL_TYPES))
+            ->orderByRaw("FIELD(company_code, '1000', '5000')")
+            ->get(['id', 'company_code', 'company_name']));
+        $companyCode = trim((string) $request->string('company_code'));
+        $selectedCompany = $companyCode !== '' ? $companies->firstWhere('company_code', $companyCode) : null;
+        $selectedCompany ??= $companies->first();
+        $companyCode = (string) ($selectedCompany->company_code ?? '');
+        $materialType = self::COMPANY_MATERIAL_TYPES[$companyCode] ?? null;
         $plantCode = trim((string) $request->string('plant_code'));
         $materialCode = trim((string) $request->string('material'));
         $search = trim((string) $request->string('search'));
@@ -30,12 +46,22 @@ class AllBalanceSheetController extends Controller
         $sort = in_array($sort, $sortable, true) ? $sort : 'material_name';
         $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
-        $plants = Cache::remember('procurement:active-plants', now()->addMinute(), fn () => DB::table('tbl_company')
+        $plants = Cache::remember('procurement:active-plants:'.$companyCode, now()->addMinute(), fn () => DB::table('tbl_company')
             ->where('status', 1)->whereIn('record_type', [2, 3])
+            ->where('parent_company_id', $companyCode)
             ->whereRaw("LOWER(TRIM(company_name)) NOT IN ('head office', 'other plant')")
-            ->orderBy('company_name')->get(['id', 'company_code', 'company_name']));
-        $materials = Cache::remember('procurement:active-materials', now()->addMinute(), fn () => DB::table('tbl_materials')
-            ->where('status', 1)->orderBy('maktx')->get(['matnr', 'maktx', 'meins']));
+            ->orderBy('company_name')->get(['id', 'company_code', 'company_name', 'parent_company_id']));
+        $materials = Cache::remember('procurement:active-materials:'.($materialType ?? 'none'), now()->addMinute(), fn () => DB::table('tbl_materials')
+            ->where('status', 1)
+            ->when($materialType, fn ($query) => $query->where('mtart', $materialType))
+            ->when(! $materialType, fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderBy('maktx')->get(['matnr', 'maktx', 'meins', 'mtart']));
+        if ($plantCode !== '' && ! $plants->contains('company_code', $plantCode)) {
+            $plantCode = '';
+        }
+        if ($materialCode !== '' && ! $materials->contains('matnr', $materialCode)) {
+            $materialCode = '';
+        }
         $selectedPlants = $plantCode !== '' ? $plants->where('company_code', $plantCode) : $plants;
         $selectedMaterials = $materialCode !== '' ? $materials->where('matnr', $materialCode) : $materials;
         $plantIds = $selectedPlants->pluck('id');
@@ -99,9 +125,10 @@ class AllBalanceSheetController extends Controller
 
         return Inertia::render('modules/procurement/planning/all-balance-sheet', [
             'rows' => $paginated,
+            'companies' => $companies,
             'plants' => $plants,
             'materials' => $materials,
-            'filters' => ['month' => $month->format('Y-m'), 'plant_code' => $plantCode, 'material' => $materialCode, 'search' => $search, 'per_page' => $perPage, 'sort' => $sort, 'direction' => $direction],
+            'filters' => ['month' => $month->format('Y-m'), 'company_code' => $companyCode, 'plant_code' => $plantCode, 'material' => $materialCode, 'search' => $search, 'per_page' => $perPage, 'sort' => $sort, 'direction' => $direction],
             'summary' => [
                 'plants' => $selectedPlants->count(), 'materials' => $selectedMaterials->count(),
                 'opening_stock' => $rows->sum('opening_stock'), 'consumption' => $rows->sum('consumption'),
