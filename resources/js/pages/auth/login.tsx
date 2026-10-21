@@ -32,6 +32,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
         location_name: '',
     });
     const [locating, setLocating] = useState(false);
+    const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
     const completeLogin = (location?: { latitude: number; longitude: number; locationName: string }) => {
         transform((currentData) => ({
@@ -48,13 +49,36 @@ export default function Login({ status, canResetPassword }: LoginProps) {
         });
     };
 
-    const submit: FormEventHandler = (e) => {
+    const continueWithoutLocation = (message: string) => {
+        setLocationMessage(message);
+        completeLogin();
+    };
+
+    const submit: FormEventHandler = async (e) => {
         e.preventDefault();
         setLocating(true);
+        setLocationMessage(null);
+
+        if (!window.isSecureContext) {
+            continueWithoutLocation('Location is unavailable on an insecure connection. Use HTTPS in production.');
+            return;
+        }
 
         if (!navigator.geolocation) {
-            completeLogin();
+            continueWithoutLocation('Location is not supported by this browser. Login will continue without it.');
             return;
+        }
+
+        if (navigator.permissions) {
+            try {
+                const permission = await navigator.permissions.query({ name: 'geolocation' });
+                if (permission.state === 'denied') {
+                    continueWithoutLocation('Location permission is blocked. Login will continue without it.');
+                    return;
+                }
+            } catch {
+                // Some browsers expose Permissions API without supporting geolocation queries.
+            }
         }
 
         navigator.geolocation.getCurrentPosition(
@@ -78,7 +102,16 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
                 completeLogin({ latitude: coords.latitude, longitude: coords.longitude, locationName });
             },
-            () => completeLogin(),
+            (error) => {
+                const message =
+                    error.code === error.PERMISSION_DENIED
+                        ? 'Location permission was denied. Login will continue without it.'
+                        : error.code === error.TIMEOUT
+                          ? 'Location request timed out. Login will continue without it.'
+                          : 'Your location could not be determined. Login will continue without it.';
+
+                continueWithoutLocation(message);
+            },
             { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
         );
     };
@@ -165,6 +198,11 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 </div>
 
                 <p className="text-muted-foreground text-center text-xs">Access is monitored and restricted by your assigned role.</p>
+                {locationMessage && (
+                    <p role="status" aria-live="polite" className="text-center text-xs text-amber-700 dark:text-amber-400">
+                        {locationMessage}
+                    </p>
+                )}
             </form>
 
             {status && <div className="mb-4 text-center text-sm font-medium text-green-600">{status}</div>}
