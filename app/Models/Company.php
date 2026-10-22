@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\HasAuditFields;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Company extends Model
 {
@@ -14,6 +15,16 @@ class Company extends Model
     protected function casts(): array
     {
         return ['record_type' => 'integer', 'status' => 'boolean'];
+    }
+
+    public function address(): BelongsTo
+    {
+        return $this->belongsTo(Address::class, 'address_id');
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'contact_id');
     }
 
     protected static function booted(): void

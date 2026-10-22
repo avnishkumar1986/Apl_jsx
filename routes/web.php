@@ -177,6 +177,7 @@ Route::middleware(['auth'])->group(function () {
                     3 => 'ho',
                     default => 'unassigned',
                 },
+                'sittingLocationCode' => $sittingLocation?->company_code,
                 'lastSeen' => ($location->captured_at ?? $location->updated_at)->toIso8601String(),
                 'devices' => $activeSessions
                     ->where('user_id', $location->user_id)
@@ -185,6 +186,37 @@ Route::middleware(['auth'])->group(function () {
                     ->values(),
                 ];
             });
+
+        $companyLocations = Company::query()
+            ->with('address:id,address_line_1,address_line_2,city,state,district,postal_code,country,latitude,longitude,status')
+            ->whereIn('record_type', [2, 3])
+            ->where('status', true)
+            ->whereHas('address', fn ($query) => $query
+                ->where('status', true)
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->whereColumn('tbl_usraddress.user_id', 'tbl_company.company_code')
+                ->whereRaw("((tbl_company.record_type = 2 AND tbl_usraddress.user_type = 'USR9') OR (tbl_company.record_type = 3 AND tbl_usraddress.user_type = 'USR11'))"))
+            ->orderBy('company_name')
+            ->get(['id', 'company_code', 'company_name', 'record_type', 'parent_company_id', 'address_id'])
+            ->map(fn (Company $company): array => [
+                'id' => $company->id,
+                'code' => $company->company_code,
+                'name' => $company->company_name,
+                'parentCompanyCode' => $company->parent_company_id,
+                'locationType' => $company->record_type === 2 ? 'plant' : 'ho',
+                'latitude' => $company->address->latitude,
+                'longitude' => $company->address->longitude,
+                'address' => collect([
+                    $company->address->address_line_1,
+                    $company->address->address_line_2,
+                    $company->address->city,
+                    $company->address->district,
+                    $company->address->state,
+                    $company->address->postal_code,
+                    $company->address->country,
+                ])->filter()->implode(', '),
+            ]);
 
         return Inertia::render('dashboard', [
             'organizationStats' => [
@@ -218,6 +250,16 @@ Route::middleware(['auth'])->group(function () {
                 ] : null,
             ],
             'userLocations' => $userLocations,
+            'companyLocations' => $companyLocations,
+            'mapCompanies' => Company::query()
+                ->where('record_type', 1)
+                ->where('status', true)
+                ->orderBy('company_name')
+                ->get(['company_code', 'company_name'])
+                ->map(fn (Company $company): array => [
+                    'code' => $company->company_code,
+                    'name' => $company->company_name,
+                ]),
             'portalLogs' => PortalLog::query()
                 ->with('user:id,first_name,last_name')
                 ->when(

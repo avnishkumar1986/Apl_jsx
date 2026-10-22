@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\User;
 use App\Models\UserLocation;
 use App\Support\DeviceLabel;
@@ -43,8 +44,24 @@ class DashboardLocationController extends Controller
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'user_id' => ['nullable', 'integer'],
+            'organization_type' => ['nullable', 'in:company,plant,head_office'],
+            'organization_code' => ['nullable', 'string', 'max:100'],
         ]);
         $isSuperAdmin = $request->user()->hasRole('Super Admin');
+        $organizationType = $validated['organization_type'] ?? null;
+        $organizationCode = $validated['organization_code'] ?? null;
+        $recordType = match ($organizationType) {
+            'company' => 1,
+            'plant' => 2,
+            'head_office' => 3,
+            default => null,
+        };
+        $selectedOrganization = $recordType && $organizationCode
+            ? Company::query()
+                ->where('record_type', $recordType)
+                ->where('company_code', $organizationCode)
+                ->first(['id', 'company_code', 'company_name'])
+            : null;
         $activeUserIds = DB::table(config('session.table', 'tbl_sessions'))
             ->whereNotNull('user_id')
             ->where('last_activity', '>=', now()->subMinutes((int) config('session.lifetime', 120))->timestamp)
@@ -57,6 +74,27 @@ class DashboardLocationController extends Controller
             ->whereIn('id', UserLocation::query()->selectRaw('MAX(id)')->groupBy('user_id'))
             ->when(! $isSuperAdmin, fn ($query) => $query->where('user_id', $request->user()->getKey()))
             ->when($isSuperAdmin && isset($validated['user_id']), fn ($query) => $query->where('user_id', $validated['user_id']))
+            ->when($isSuperAdmin && $recordType === 1, fn ($query) => $query->whereHas(
+                'user.departmentAssignment.company',
+                fn ($companyQuery) => $companyQuery
+                    ->where('record_type', 1)
+                    ->when($selectedOrganization, fn ($selectedQuery) => $selectedQuery->whereKey($selectedOrganization->id)),
+            ))
+            ->when($isSuperAdmin && in_array($recordType, [2, 3], true), function ($query) use ($recordType, $selectedOrganization): void {
+                $locations = $selectedOrganization
+                    ? collect([$selectedOrganization])
+                    : Company::query()
+                        ->where('record_type', $recordType)
+                        ->get(['company_code', 'company_name']);
+                $sittingLocationValues = $locations
+                    ->flatMap(fn (Company $company): array => [$company->company_code, $company->company_name])
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                $query->whereHas('user.departmentAssignment', fn ($assignmentQuery) => $assignmentQuery
+                    ->whereIn('sitting_location', $sittingLocationValues));
+            })
             ->when(isset($validated['from']), fn ($query) => $query->whereDate('captured_at', '>=', $validated['from']))
             ->when(isset($validated['to']), fn ($query) => $query->whereDate('captured_at', '<=', $validated['to']))
             ->latest('captured_at')
@@ -80,8 +118,27 @@ class DashboardLocationController extends Controller
                 'from' => $validated['from'] ?? '',
                 'to' => $validated['to'] ?? '',
                 'userId' => $validated['user_id'] ?? '',
+                'organizationType' => $organizationType ?? '',
+                'organizationCode' => $organizationCode ?? '',
             ],
             'canFilterUsers' => $isSuperAdmin,
+            'organizations' => $isSuperAdmin
+                ? Company::query()
+                    ->where('status', true)
+                    ->whereIn('record_type', [1, 2, 3])
+                    ->orderBy('record_type')
+                    ->orderBy('company_name')
+                    ->get(['company_code', 'company_name', 'record_type'])
+                    ->map(fn (Company $company): array => [
+                        'code' => $company->company_code,
+                        'name' => $company->company_name,
+                        'type' => match ($company->record_type) {
+                            1 => 'company',
+                            2 => 'plant',
+                            3 => 'head_office',
+                        },
+                    ])
+                : [],
             'users' => $isSuperAdmin
                 ? User::query()->where('status', true)->orderBy('first_name')->get(['id', 'first_name', 'last_name'])->map(fn (User $user) => [
                     'id' => $user->id,

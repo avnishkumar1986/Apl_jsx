@@ -11,8 +11,8 @@ class Address extends Model
     protected $table = 'tbl_usraddress';
 
     protected $fillable = [
-        'user_id', 'address_type', 'address_line_1', 'address_line_2', 'city', 'state', 'district',
-        'postal_code', 'country', 'latitude', 'longitude', 'is_primary', 'status', 'created_by', 'updated_by',
+        'user_type', 'user_id', 'address_type', 'address_line_1', 'address_line_2', 'city', 'state', 'district',
+        'postal_code', 'country', 'latitude', 'longitude', 'google_maps_url', 'is_primary', 'status', 'created_by', 'updated_by',
     ];
 
     protected function casts(): array

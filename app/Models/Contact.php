@@ -11,7 +11,7 @@ class Contact extends Model
     protected $table = 'tbl_usrcontact';
 
     protected $fillable = [
-        'user_id', 'contact_type', 'email', 'country_code', 'contact_number', 'is_primary', 'is_verified', 'email_verified_at', 'phone_verified_at',
+        'usr_type', 'user_id', 'contact_type', 'email', 'contact_number', 'is_primary', 'is_verified', 'email_verified_at', 'phone_verified_at',
         'status', 'created_by', 'updated_by',
     ];
 

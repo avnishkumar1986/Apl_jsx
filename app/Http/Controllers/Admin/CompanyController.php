@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Address;
 use App\Models\Company;
+use App\Models\Contact;
 use App\Models\Material;
 use App\Models\MaterialStock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,8 +39,29 @@ class CompanyController extends Controller
             $sort = 'name';
         }
 
+        $companies = Company::query()
+            ->with([
+                'address' => fn ($query) => $query->whereIn('user_type', ['USR9', 'USR10', 'USR11']),
+                'contact' => fn ($query) => $query->whereIn('usr_type', ['USR9', 'USR10', 'USR11']),
+            ])
+            ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('company_code', 'like', "%{$search}%")->orWhere('company_name', 'like', "%{$search}%")->orWhere('gstin', 'like', "%{$search}%")->orWhere('pan', 'like', "%{$search}%")))
+            ->orderByRaw('CASE WHEN record_type = 1 THEN 0 ELSE 1 END')
+            ->orderBy($sortable[$sort], $direction)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $companies->getCollection()->each(function (Company $company): void {
+            $expectedType = $this->detailUserTypeForRecord($company->record_type);
+            if ($company->address && ($company->address->user_type !== $expectedType || (string) $company->address->user_id !== $company->company_code)) {
+                $company->setRelation('address', null);
+            }
+            if ($company->contact && ($company->contact->usr_type !== $expectedType || (string) $company->contact->user_id !== $company->company_code)) {
+                $company->setRelation('contact', null);
+            }
+        });
+
         return Inertia::render('admin/companies/index', [
-            'companies' => Company::query()->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('company_code', 'like', "%{$search}%")->orWhere('company_name', 'like', "%{$search}%")->orWhere('gstin', 'like', "%{$search}%")->orWhere('pan', 'like', "%{$search}%")))->orderBy($sortable[$sort], $direction)->paginate($perPage)->withQueryString(),
+            'companies' => $companies,
             'parentCompanies' => Company::query()->where('status', true)->where('record_type', 1)->orderBy('company_name')->get(['company_code', 'company_name']),
             'filters' => ['search' => $search, 'per_page' => $perPage, 'sort' => $sort, 'direction' => $direction],
             'pageSizeOptions' => $options,
@@ -80,6 +104,7 @@ class CompanyController extends Controller
                     ->pluck('company_code');
                 $stockByMaterial = MaterialStock::query()
                     ->whereIn('plant_code', $plantCodes)
+                    ->whereIn('matnr', $materials->pluck('matnr'))
                     ->select('matnr')
                     ->selectRaw('SUM(current_stock) as total_stock')
                     ->groupBy('matnr')
@@ -123,14 +148,34 @@ class CompanyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Company::create($this->validated($request));
+        $data = $this->validated($request);
+        DB::transaction(function () use ($data): void {
+            $company = Company::create($this->companyData($data));
+            $address = Address::create($this->addressData($data, $company));
+            $contact = Contact::create($this->contactData($data, $company));
+            $company->update(['address_id' => $address->id, 'contact_id' => $contact->id]);
+        });
 
         return back()->with('success', 'Company created successfully.');
     }
 
     public function update(Request $request, Company $company): RedirectResponse
     {
-        $company->update($this->validated($request, $company));
+        $data = $this->validated($request, $company);
+        DB::transaction(function () use ($company, $data): void {
+            $company->update($this->companyData($data));
+            $address = $company->address;
+            if (! $address || $address->user_type !== $data['usr_type'] || (string) $address->user_id !== $company->company_code) {
+                $address = new Address;
+            }
+            $address->fill($this->addressData($data, $company))->save();
+            $contact = $company->contact;
+            if (! $contact || $contact->usr_type !== $data['usr_type'] || (string) $contact->user_id !== $company->company_code) {
+                $contact = new Contact;
+            }
+            $contact->fill($this->contactData($data, $company))->save();
+            $company->update(['address_id' => $address->id, 'contact_id' => $contact->id]);
+        });
 
         return back()->with('success', 'Company updated successfully.');
     }
@@ -165,11 +210,53 @@ class CompanyController extends Controller
         return $request->validate([
             'company_code' => ['required', 'string', 'max:30', Rule::unique('tbl_company', 'company_code')->ignore($company?->id)],
             'company_name' => ['required', 'string', 'max:255', Rule::unique('tbl_company', 'company_name')->ignore($company?->id)],
-            'record_type' => ['required', 'integer', Rule::in([1, 2, 3])],
+            'usr_type' => ['required', 'string', Rule::in(['USR9', 'USR10', 'USR11'])],
             'parent_company_id' => ['nullable', 'string', 'max:30', Rule::exists('tbl_company', 'company_code'), Rule::notIn([$company?->company_code])],
-            'address_id' => ['nullable', 'integer', 'min:1'], 'contact_id' => ['nullable', 'integer', 'min:1'],
             'gstin' => ['nullable', 'string', 'size:15'], 'pan' => ['nullable', 'string', 'size:10'], 'status' => ['required', 'boolean'],
+            'address_line_1' => ['required', 'string', 'max:255'], 'address_line_2' => ['nullable', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:100'], 'state' => ['required', 'string', 'max:100'],
+            'district' => ['nullable', 'string', 'max:100'], 'postal_code' => ['required', 'string', 'max:20'],
+            'country' => ['required', 'string', 'max:100'], 'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'google_maps_url' => ['nullable', 'url', 'max:8000'],
+            'email' => ['nullable', 'email:rfc', 'max:255'], 'contact_number' => ['required', 'string', 'max:30'],
         ], ['parent_company_id.not_in' => 'A company cannot be its own parent.']);
+    }
+
+    private function companyData(array $data): array
+    {
+        return collect($data)->only(['company_code', 'company_name', 'parent_company_id', 'gstin', 'pan', 'status'])->merge([
+            'record_type' => match ($data['usr_type']) {
+                'USR9' => 2,
+                'USR11' => 3,
+                default => 1,
+            },
+        ])->all();
+    }
+
+    private function addressData(array $data, Company $company): array
+    {
+        return collect($data)->only(['address_line_1', 'address_line_2', 'city', 'state', 'district', 'postal_code', 'country', 'latitude', 'longitude', 'google_maps_url'])->merge([
+            'user_type' => $data['usr_type'], 'user_id' => $company->company_code, 'address_type' => 'primary',
+            'is_primary' => true, 'status' => true,
+        ])->all();
+    }
+
+    private function contactData(array $data, Company $company): array
+    {
+        return collect($data)->only(['email', 'contact_number'])->merge([
+            'usr_type' => $data['usr_type'], 'user_id' => $company->company_code, 'contact_type' => 'primary',
+            'is_primary' => true, 'is_verified' => false, 'status' => true,
+        ])->all();
+    }
+
+    private function detailUserTypeForRecord(int $recordType): string
+    {
+        return match ($recordType) {
+            2 => 'USR9',
+            3 => 'USR11',
+            default => 'USR10',
+        };
     }
 
     /**

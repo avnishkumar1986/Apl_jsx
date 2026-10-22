@@ -38,26 +38,49 @@ export default function LocationReport({
     locations,
     filters,
     canFilterUsers,
+    organizations,
     users,
 }: {
     locations: LocationPage;
-    filters: { from: string; to: string; userId: number | string };
+    filters: {
+        from: string;
+        to: string;
+        userId: number | string;
+        organizationType: string;
+        organizationCode: string;
+    };
     canFilterUsers: boolean;
+    organizations: Array<{ code: string; name: string; type: 'company' | 'plant' | 'head_office' }>;
     users: Array<{ id: number; name: string }>;
 }) {
     const [from, setFrom] = useState(filters.from);
     const [to, setTo] = useState(filters.to);
     const [userId, setUserId] = useState(String(filters.userId ?? ''));
+    const [organizationType, setOrganizationType] = useState(filters.organizationType ?? '');
+    const [organizationCode, setOrganizationCode] = useState(filters.organizationCode ?? '');
+    const matchingOrganizations = organizationType ? organizations.filter((organization) => organization.type === organizationType) : [];
 
     const applyFilters = (event: FormEvent) => {
         event.preventDefault();
-        router.get('/dashboard/location-report', { from, to, user_id: userId || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/dashboard/location-report',
+            {
+                from,
+                to,
+                user_id: userId || undefined,
+                organization_type: organizationType || undefined,
+                organization_code: organizationCode || undefined,
+            },
+            { preserveState: true, replace: true },
+        );
     };
 
     const resetFilters = () => {
         setFrom('');
         setTo('');
         setUserId('');
+        setOrganizationType('');
+        setOrganizationCode('');
         router.get('/dashboard/location-report', {}, { replace: true });
     };
 
@@ -80,7 +103,7 @@ export default function LocationReport({
 
                     <form
                         onSubmit={applyFilters}
-                        className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr_auto_auto] lg:items-end"
+                        className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.25fr_1.25fr_auto_auto] xl:items-end"
                     >
                         <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
                             From date
@@ -101,6 +124,42 @@ export default function LocationReport({
                                 className="h-10 rounded-lg border border-slate-200 px-3 font-normal"
                             />
                         </label>
+                        {canFilterUsers && (
+                            <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                                Location type
+                                <select
+                                    value={organizationType}
+                                    onChange={(event) => {
+                                        setOrganizationType(event.target.value);
+                                        setOrganizationCode('');
+                                    }}
+                                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 font-normal"
+                                >
+                                    <option value="">All types</option>
+                                    <option value="plant">Plant</option>
+                                    <option value="head_office">Head Office</option>
+                                    <option value="company">Company</option>
+                                </select>
+                            </label>
+                        )}
+                        {canFilterUsers && (
+                            <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                                Company / location
+                                <select
+                                    value={organizationCode}
+                                    onChange={(event) => setOrganizationCode(event.target.value)}
+                                    disabled={!organizationType}
+                                    className="h-10 min-w-0 rounded-lg border border-slate-200 bg-white px-3 font-normal disabled:bg-slate-50 disabled:text-slate-400"
+                                >
+                                    <option value="">{organizationType ? 'All matching locations' : 'Select type first'}</option>
+                                    {matchingOrganizations.map((organization) => (
+                                        <option key={`${organization.type}-${organization.code}`} value={organization.code}>
+                                            {organization.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
                         {canFilterUsers && (
                             <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
                                 User
@@ -183,7 +242,7 @@ export default function LocationReport({
                                     {!locations.data.length && (
                                         <tr>
                                             <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
-                                                No location records found for the selected dates.
+                                                No location records found for the selected filters.
                                             </td>
                                         </tr>
                                     )}

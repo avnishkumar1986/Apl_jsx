@@ -41,7 +41,8 @@ export default function Dashboard({
     organizationStats,
     userTypes,
     portalSecurity,
-    userLocations,
+    companyLocations,
+    mapCompanies,
     portalLogs,
 }: {
     organizationStats: {
@@ -90,20 +91,17 @@ export default function Dashboard({
             lowFindings: number;
         } | null;
     };
-    userLocations: Array<{
-        userId: number;
+    companyLocations: Array<{
+        id: number;
+        code: string;
         name: string;
-        employeeId: string | null;
-        companyName: string | null;
-        departmentName: string | null;
-        designationName: string | null;
+        parentCompanyCode: string | null;
         latitude: number;
         longitude: number;
-        locationName: string;
-        locationType: 'plant' | 'ho' | 'unassigned';
-        lastSeen: string;
-        devices: string[];
+        address: string;
+        locationType: 'plant' | 'ho';
     }>;
+    mapCompanies: Array<{ code: string; name: string }>;
     portalLogs: Array<{
         id: number;
         userName: string;
@@ -130,6 +128,7 @@ export default function Dashboard({
     const [selectedProductId, setSelectedProductId] = useState(1);
     const [salesPeriod, setSalesPeriod] = useState<'monthly' | 'yearly'>('monthly');
     const [locationFilter, setLocationFilter] = useState<'plant' | 'ho'>('ho');
+    const [mapCompanyFilter, setMapCompanyFilter] = useState(mapCompanies[0]?.code ?? '');
     const [activeOffers, setActiveOffers] = useState([
         {
             id: 1,
@@ -190,56 +189,39 @@ export default function Dashboard({
     const completedProfileFields = profileFields.filter((value) => value !== null && value !== undefined && value !== '').length;
     const profileScore = Math.round((completedProfileFields / profileFields.length) * 100);
     const remainingProfileFields = profileFields.length - completedProfileFields;
-    const visibleUserLocations = userLocations.filter((location) => location.locationType === locationFilter);
-    const locationTypeCounts = {
-        plant: userLocations.filter((location) => location.locationType === 'plant').length,
-        ho: userLocations.filter((location) => location.locationType === 'ho').length,
+    const companyFilteredLocations = companyLocations.filter((location) => location.parentCompanyCode === mapCompanyFilter);
+    const visibleCompanyLocations = companyFilteredLocations.filter((location) => location.locationType === locationFilter);
+    const markerCounts = {
+        plant: companyFilteredLocations.filter((location) => location.locationType === 'plant').length,
+        ho: companyFilteredLocations.filter((location) => location.locationType === 'ho').length,
     };
-    const currentUserLocation = visibleUserLocations.find((location) => location.userId === auth.user.id);
-    const mapLocationGroups = Object.values(
-        visibleUserLocations.reduce<
-            Record<
-                string,
-                {
-                    locationName: string;
-                    latitude: number;
-                    longitude: number;
-                    users: Array<{
-                        userId: number;
-                        name: string;
-                        employeeId: string | null;
-                        companyName: string | null;
-                        departmentName: string | null;
-                        designationName: string | null;
-                        devices: string[];
-                    }>;
-                }
-            >
-        >((groups, location) => {
-            const key = location.locationName;
-            const group = groups[key] ?? {
-                locationName: location.locationName,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                users: [],
-            };
-            group.users.push({
-                userId: location.userId,
-                name: location.name,
-                employeeId: location.employeeId,
-                companyName: location.companyName,
-                departmentName: location.departmentName,
-                designationName: location.designationName,
-                devices: location.devices,
-            });
-            groups[key] = group;
+    const mapPointFor = (latitude: number, longitude: number) => ({
+        left: Math.min(86, Math.max(14, ((longitude - 68) / 29.5) * 100)),
+        top: Math.min(88, Math.max(10, ((37.5 - latitude) / 31) * 100)),
+    });
+    const markerOffsets = [
+        { left: 0, top: 0 },
+        { left: -9, top: -5 },
+        { left: 9, top: 5 },
+        { left: -9, top: 5 },
+        { left: 9, top: -5 },
+    ];
+    const positionedCompanyLocations = visibleCompanyLocations.map((location, index, locations) => {
+        const point = mapPointFor(location.latitude, location.longitude);
+        const collisionIndex = locations.slice(0, index).filter((previousLocation) => {
+            const previousPoint = mapPointFor(previousLocation.latitude, previousLocation.longitude);
 
-            return groups;
-        }, {}),
-    );
-    const mapPositionFor = (latitude: number, longitude: number) => ({
-        left: `${Math.min(86, Math.max(14, ((longitude - 68) / 29.5) * 100))}%`,
-        top: `${Math.min(88, Math.max(10, ((37.5 - latitude) / 31) * 100))}%`,
+            return Math.abs(previousPoint.left - point.left) < 6 && Math.abs(previousPoint.top - point.top) < 6;
+        }).length;
+        const offset = markerOffsets[collisionIndex % markerOffsets.length];
+
+        return {
+            location,
+            position: {
+                left: `${Math.min(88, Math.max(12, point.left + offset.left))}%`,
+                top: `${Math.min(90, Math.max(8, point.top + offset.top))}%`,
+            },
+        };
     });
     const downloadSecurityReport = async () => {
         const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
@@ -527,40 +509,22 @@ export default function Dashboard({
                                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
                                     <CardTitle className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap">
                                         <span className="bg-brand-teal h-5 w-1 shrink-0 rounded-full" />
-                                        User locations
+                                        Company locations
                                     </CardTitle>
-                                    <div className="flex min-w-0 justify-center" role="group" aria-label="Filter user locations">
-                                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-                                            {(
-                                                [
-                                                    { value: 'plant', label: 'Plant', icon: Factory },
-                                                    { value: 'ho', label: 'Head Office', icon: Building2 },
-                                                ] as const
-                                            ).map(({ value, label, icon: Icon }) => (
-                                                <button
-                                                    key={value}
-                                                    type="button"
-                                                    onClick={() => setLocationFilter(value)}
-                                                    aria-pressed={locationFilter === value}
-                                                    className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[10px] font-bold whitespace-nowrap transition-all ${
-                                                        locationFilter === value
-                                                            ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200'
-                                                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'
-                                                    }`}
-                                                >
-                                                    <Icon className="size-3.5" />
-                                                    {label}
-                                                    <span
-                                                        className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${
-                                                            locationFilter === value ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-200 text-slate-500'
-                                                        }`}
-                                                    >
-                                                        {locationTypeCounts[value]}
-                                                    </span>
-                                                </button>
+                                    <label className="flex min-w-0 justify-center">
+                                        <span className="sr-only">Filter map by company</span>
+                                        <select
+                                            value={mapCompanyFilter}
+                                            onChange={(event) => setMapCompanyFilter(event.target.value)}
+                                            className="h-9 min-w-40 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-xs font-semibold text-slate-700 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200"
+                                        >
+                                            {mapCompanies.map((company) => (
+                                                <option key={company.code} value={company.code}>
+                                                    {company.name}
+                                                </option>
                                             ))}
-                                        </div>
-                                    </div>
+                                        </select>
+                                    </label>
                                     <Link
                                         href="/dashboard/location-report"
                                         aria-label="View location report"
@@ -576,48 +540,68 @@ export default function Dashboard({
                                     <span className="absolute top-3 left-3 rounded-md bg-white/90 px-2 py-1 text-[9px] font-bold tracking-widest text-slate-500 shadow-sm">
                                         INDIA
                                     </span>
+                                    <div className="absolute top-3 right-3 z-30 inline-flex rounded-lg border border-cyan-200 bg-white/95 p-0.5 shadow-md backdrop-blur-sm" role="group" aria-label="Filter company locations">
+                                        {(
+                                            [
+                                                { value: 'plant', label: 'Plant', icon: Factory },
+                                                { value: 'ho', label: 'Head Office', icon: Building2 },
+                                            ] as const
+                                        ).map(({ value, label, icon: Icon }) => (
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                onClick={() => setLocationFilter(value)}
+                                                aria-pressed={locationFilter === value}
+                                                className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[10px] font-bold whitespace-nowrap transition-all ${
+                                                    locationFilter === value
+                                                        ? 'bg-cyan-50 text-cyan-700 shadow-sm ring-1 ring-cyan-100'
+                                                        : 'text-slate-500 hover:bg-cyan-50/70 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                <Icon className="size-3.5" />
+                                                {label}
+                                                <span className="rounded-full bg-white px-1.5 py-0.5 text-[9px] leading-none text-cyan-700">
+                                                    {markerCounts[value]}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
                                     <div className="absolute inset-y-2 left-1/2 aspect-[667/777] -translate-x-1/2">
                                         <IndiaMapSilhouette className="absolute inset-0 size-full drop-shadow-[0_12px_24px_rgba(14,140,166,0.16)]" />
-                                        {mapLocationGroups.map((location, index) => (
+                                        {positionedCompanyLocations.map(({ location, position }) => (
                                             <div
-                                                key={location.locationName}
-                                                className="group/location absolute z-10 -translate-x-1/2 -translate-y-1/2 hover:z-50"
-                                                style={mapPositionFor(location.latitude, location.longitude)}
+                                                key={location.id}
+                                                role="button"
+                                                tabIndex={0}
+                                                aria-label={location.name}
+                                                className="group/location absolute z-10 cursor-pointer -translate-x-1/2 -translate-y-1/2 outline-none hover:z-50 focus:z-50"
+                                                style={position}
                                             >
                                                 <span className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-red-400/35" />
                                                 <MapPin className="relative size-8 fill-red-500 text-white drop-shadow-lg" />
-                                                <span className="peer absolute top-7 left-1/2 z-20 w-max max-w-40 -translate-x-1/2 cursor-help rounded-md bg-white/95 px-2 py-1 text-center text-[9px] leading-3 font-semibold text-slate-900 shadow-md">
-                                                    {location.locationName} · {location.users.length}
-                                                </span>
                                                 <div
-                                                    className={`absolute top-1/2 z-50 hidden w-48 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-2 shadow-xl peer-hover:block ${
-                                                        location.longitude > 82 || index % 2 === 1 ? 'right-8' : 'left-8'
+                                                    className={`absolute z-50 hidden max-h-52 w-48 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-xl group-hover/location:block group-focus/location:block ${
+                                                        location.latitude < 13 ? 'bottom-8' : 'top-8'
+                                                    } ${
+                                                        location.longitude < 74
+                                                            ? 'left-0'
+                                                            : location.longitude > 84
+                                                              ? 'right-0'
+                                                              : 'left-1/2 -translate-x-1/2'
                                                     }`}
                                                 >
-                                                    <div className="max-h-32 divide-y divide-slate-100 overflow-y-auto text-left [scrollbar-width:thin]">
-                                                        {location.users.map((user) => (
-                                                            <div key={user.userId} className="py-1.5 first:pt-0 last:pb-0">
-                                                                <p className="truncate text-[10px] font-bold text-slate-900">
-                                                                    {user.name} {user.employeeId ? `(${user.employeeId})` : ''}
-                                                                </p>
-                                                                <p className="truncate text-[9px] text-slate-500">
-                                                                    {[user.companyName, user.departmentName, user.designationName]
-                                                                        .filter(Boolean)
-                                                                        .join(' · ') || 'Organization details not assigned'}
-                                                                </p>
-                                                                {user.devices.map((device) => (
-                                                                    <p key={device} className="mt-0.5 truncate text-[9px] text-slate-400">
-                                                                        Device: {device}
-                                                                    </p>
-                                                                ))}
-                                                            </div>
-                                                        ))}
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-bold text-slate-900">{location.name}</p>
+                                                        <p className="mt-0.5 text-[9px] font-semibold text-cyan-700">{location.code}</p>
+                                                        <p className="mt-1 text-[9px] leading-3 text-slate-500">
+                                                            {location.address || 'Address details not available'}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
-                                    {!visibleUserLocations.length && (
+                                    {!visibleCompanyLocations.length && (
                                         <div className="absolute inset-0 z-20 grid place-items-center p-6">
                                             <div className="max-w-56 rounded-2xl border border-white bg-white/95 px-5 py-4 text-center shadow-[0_12px_30px_-16px_rgba(15,23,42,0.4)] backdrop-blur-sm">
                                                 <span className="mx-auto grid size-9 place-items-center rounded-full bg-cyan-50 ring-1 ring-cyan-100">
@@ -625,7 +609,7 @@ export default function Dashboard({
                                                 </span>
                                                 <p className="mt-2 text-xs font-bold text-slate-800">No active locations</p>
                                                 <p className="mt-1 text-[10px] leading-4 text-slate-500">
-                                                    No active {locationFilter === 'plant' ? 'plant' : 'head office'} users are currently available.
+                                                    No active {locationFilter === 'plant' ? 'plant' : 'head office'} with saved coordinates is available.
                                                 </p>
                                             </div>
                                         </div>
@@ -633,22 +617,11 @@ export default function Dashboard({
                                 </div>
                                 <div className="px-5 py-4 text-center">
                                     <p className="text-sm font-semibold text-slate-800">
-                                        {isSuperAdmin
-                                            ? `${visibleUserLocations.length} active ${visibleUserLocations.length === 1 ? 'employee' : 'employees'} across ${mapLocationGroups.length} ${locationFilter === 'plant' ? 'plant' : 'head office'} ${mapLocationGroups.length === 1 ? 'location' : 'locations'}`
-                                            : auth.user.name}
+                                        {`${visibleCompanyLocations.length} active ${locationFilter === 'plant' ? 'plant' : 'head office'} ${visibleCompanyLocations.length === 1 ? 'location' : 'locations'}`}
                                     </p>
-                                    {currentUserLocation ? (
-                                        <div className="mt-1 text-[11px] text-slate-500">
-                                            <p>{currentUserLocation.locationName}</p>
-                                            <p>
-                                                {currentUserLocation.latitude.toFixed(4)}° N, {currentUserLocation.longitude.toFixed(4)}° E
-                                            </p>
-                                        </div>
-                                    ) : (
+                                    {!visibleCompanyLocations.length && (
                                         <p className="mt-1 text-[11px] text-slate-500">
-                                            {isSuperAdmin
-                                                ? 'Users appear after their login location is captured.'
-                                                : 'Your location will appear after it is captured during login.'}
+                                            Add latitude and longitude in Company Master to display a marker here.
                                         </p>
                                     )}
                                 </div>

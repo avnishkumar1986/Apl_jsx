@@ -2,7 +2,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Building2, ChevronDown, Factory, Landmark, Package, Search, Unlink } from 'lucide-react';
+import { Building2, ChevronDown, ChevronLeft, ChevronRight, Factory, Landmark, Package, Search, Unlink } from 'lucide-react';
 import { useState } from 'react';
 
 type CompanyNode = {
@@ -53,6 +53,63 @@ const typeDetails = {
         iconColor: 'bg-violet-600 text-white',
     },
 } as const;
+
+function MaterialSlider({ items }: { items: CompanyMaterial[] }) {
+    const pageSize = 6;
+    const [page, setPage] = useState(0);
+    const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+    const visibleItems = items.slice(page * pageSize, page * pageSize + pageSize);
+
+    return (
+        <div>
+            <div className="grid gap-2 sm:grid-cols-2">
+                {visibleItems.map((material) => (
+                    <div key={material.code} className="min-h-24 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                                <p className="font-mono text-xs font-semibold text-slate-500">{material.code}</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800" title={material.name}>
+                                    {material.name}
+                                </p>
+                            </div>
+                            <span className={`mt-1 size-2 shrink-0 rounded-full ${material.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {pageCount > 1 && (
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                    <span className="text-xs font-medium text-slate-500">
+                        {page * pageSize + 1}–{Math.min((page + 1) * pageSize, items.length)} of {items.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            aria-label="Previous materials"
+                            disabled={page === 0}
+                            onClick={() => setPage((current) => Math.max(0, current - 1))}
+                            className="grid size-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <ChevronLeft className="size-4" />
+                        </button>
+                        <span className="min-w-16 text-center text-xs font-bold text-slate-600">
+                            {page + 1} / {pageCount}
+                        </span>
+                        <button
+                            type="button"
+                            aria-label="Next materials"
+                            disabled={page >= pageCount - 1}
+                            onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+                            className="grid size-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <ChevronRight className="size-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 function HierarchyNode({
     node,
@@ -161,28 +218,7 @@ function HierarchyNode({
                                                     <ChevronDown className="size-4 text-emerald-700 transition-transform group-data-[state=open]/material-group:rotate-180" />
                                                 </CollapsibleTrigger>
                                                 <CollapsibleContent className="border-t border-emerald-100 p-2">
-                                                    <div className="grid gap-2 sm:grid-cols-2">
-                                                        {group.items.map((material) => (
-                                                            <div key={material.code} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                                                                <div className="flex items-start justify-between gap-2">
-                                                                    <div className="min-w-0">
-                                                                        <p className="font-mono text-xs font-semibold text-slate-500">
-                                                                            {material.code}
-                                                                        </p>
-                                                                        <p
-                                                                            className="mt-1 text-sm font-semibold text-slate-800"
-                                                                            title={material.name}
-                                                                        >
-                                                                            {material.name}
-                                                                        </p>
-                                                                    </div>
-                                                                    <span
-                                                                        className={`mt-1 size-2 shrink-0 rounded-full ${material.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                    <MaterialSlider items={group.items} />
                                                 </CollapsibleContent>
                                             </Collapsible>
                                         ))}
