@@ -9,7 +9,7 @@ class Education extends Model
 {
     protected $table = 'tbl_usreducation';
 
-    protected $fillable = ['user_id', 'education_level', 'degree_name', 'institution_name', 'university_name', 'board_or_university', 'start_date', 'end_date', 'grade', 'currently_studying', 'document_path', 'status'];
+    protected $fillable = ['user_type', 'user_id', 'education_level', 'degree_name', 'institution_name', 'university_name', 'board_or_university', 'field_of_study', 'start_date', 'end_date', 'grade', 'currently_studying', 'document_path', 'passing_year', 'status', 'created_by', 'updated_by'];
 
     protected function casts(): array
     {
@@ -18,6 +18,6 @@ class Education extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id', 'unique_id');
     }
 }

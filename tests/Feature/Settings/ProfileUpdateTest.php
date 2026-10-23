@@ -33,7 +33,7 @@ test('profile information can be updated', function () {
     expect($user->email_verified_at)->toBeNull();
     expect($user->primaryEmail->email)->toBe('test@example.com');
     expect($user->primaryEmail->is_verified)->toBeFalse();
-    expect($user->login->login_name)->toBe('test@example.com');
+    expect($user->login->username)->toBe('test@example.com');
 });
 
 test('email verification status is unchanged when the email address is unchanged', function () {

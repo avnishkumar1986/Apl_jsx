@@ -147,17 +147,17 @@ export default function Login({ status, canResetPassword }: LoginProps) {
             <form className="flex flex-col gap-5 sm:gap-6" onSubmit={submit}>
                 <div className="grid gap-5 sm:gap-6">
                     <div className="grid gap-2">
-                        <Label htmlFor="email">Email address</Label>
+                        <Label htmlFor="email">Username or email</Label>
                         <Input
                             id="email"
-                            type="email"
+                            type="text"
                             required
                             autoFocus
                             tabIndex={1}
                             autoComplete="username"
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
-                            placeholder="email@example.com"
+                            placeholder="Username or email"
                             className="focus-visible:border-brand-teal focus-visible:ring-brand-aqua/30 h-11 rounded-lg border-slate-200 bg-white px-4 shadow-sm shadow-slate-900/[0.02]"
                         />
                         <InputError message={errors.email} />

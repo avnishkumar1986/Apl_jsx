@@ -10,14 +10,19 @@ class SeparatedUserProvider extends EloquentUserProvider
 {
     public function retrieveByCredentials(array $credentials): ?Authenticatable
     {
-        $email = $credentials['email'] ?? $credentials['login_name'] ?? null;
+        $identifier = $credentials['email'] ?? $credentials['username'] ?? null;
 
-        if (! is_string($email) || $email === '') {
+        if (! is_string($identifier) || trim($identifier) === '') {
             return null;
         }
+        $identifier = trim($identifier);
 
         return $this->newModelQuery()
-            ->whereHas('login', fn ($query) => $query->where('login_name', $email)->where('status', true))
+            ->whereHas('login', fn ($query) => $query->where('status', true))
+            ->where(function ($query) use ($identifier): void {
+                $query->whereHas('login', fn ($loginQuery) => $loginQuery->where('username', $identifier))
+                    ->orWhereHas('primaryEmail', fn ($emailQuery) => $emailQuery->where('email', $identifier));
+            })
             ->first();
     }
 

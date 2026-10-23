@@ -16,8 +16,12 @@ class JwtAuthController extends Controller
     public function login(JwtLoginRequest $request): JsonResponse
     {
         $credentials = $request->validated();
+        $identifier = trim($credentials['email']);
         $login = Login::query()->with('user')
-            ->where('login_name', $credentials['email'])
+            ->where(function ($query) use ($identifier): void {
+                $query->where('username', $identifier)
+                    ->orWhereHas('user.primaryEmail', fn ($emailQuery) => $emailQuery->where('email', $identifier));
+            })
             ->where('status', true)
             ->first();
         $token = $login && $login->user?->status && Hash::check($credentials['password'], $login->password)

@@ -90,7 +90,7 @@ class ProfileController extends Controller
                 $request->user()->login()->updateOrCreate(
                     ['user_id' => $request->user()->id],
                     [
-                        'login_name' => $request->validated('email'),
+                        'username' => $request->validated('email'),
                         'updated_by' => $request->user()->id,
                     ],
                 );

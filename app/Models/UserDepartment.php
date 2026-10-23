@@ -11,7 +11,7 @@ class UserDepartment extends Model
     protected $table = 'tbl_usrdept';
 
     protected $fillable = [
-        'user_id', 'company_id', 'sitting_location', 'department_id', 'designation_id', 'role_id',
+        'user_type', 'user_id', 'company_id', 'sitting_location', 'department_id', 'designation_id', 'role_id',
         'status', 'created_by', 'updated_by',
     ];
 

@@ -19,7 +19,7 @@ class UserType extends Model
 
     public function users(): HasMany
     {
-        return $this->hasMany(User::class, 'user_type_id', 'uid');
+        return $this->hasMany(User::class, 'user_type', 'uid');
     }
 
     protected static function booted(): void

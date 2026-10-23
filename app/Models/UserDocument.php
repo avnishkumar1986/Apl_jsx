@@ -11,6 +11,7 @@ class UserDocument extends Model
     protected $table = 'tbl_usrdocument';
 
     protected $fillable = [
+        'user_type',
         'user_id',
         'document_type',
         'document_number',

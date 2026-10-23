@@ -37,20 +37,21 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:tbl_usrcontact,email|unique:tbl_usrlogin,login_name',
+            'email' => 'required|string|lowercase|email|max:255|unique:tbl_usrcontact,email|unique:tbl_usrlogin,username',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = DB::transaction(function () use ($request): User {
             $user = User::create([
-                'user_type_id' => UserType::query()->where('status', true)->value('uid'),
+                'user_type' => UserType::query()->where('status', true)->value('uid'),
                 'name' => $request->name,
                 'status' => true,
             ]);
 
             Login::create([
-                'user_id' => $user->id,
-                'login_name' => $request->email,
+                'usr_type' => $user->user_type,
+                'user_id' => $user->unique_id,
+                'username' => $request->email,
                 'password' => $request->password,
                 'status' => true,
             ]);

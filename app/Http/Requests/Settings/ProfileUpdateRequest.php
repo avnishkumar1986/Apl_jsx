@@ -17,7 +17,7 @@ class ProfileUpdateRequest extends FormRequest
     {
         $emailRules = ['required', 'string', 'lowercase', 'email', 'max:255'];
         if ($this->input('email') !== $this->user()->email) {
-            $emailRules[] = Rule::unique('tbl_usrlogin', 'login_name')->ignore($this->user()->login?->id);
+            $emailRules[] = Rule::unique('tbl_usrlogin', 'username')->ignore($this->user()->login?->id);
             $emailRules[] = Rule::unique('tbl_usrcontact', 'email')->ignore($this->user()->primaryEmail?->id);
         }
 

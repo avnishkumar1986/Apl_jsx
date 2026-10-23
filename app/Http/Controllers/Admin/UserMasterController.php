@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\Address;
+use App\Models\Banking;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Designation;
@@ -33,6 +34,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class UserMasterController extends Controller
 {
+    private const EMPLOYEE_USER_TYPE = 'USR6';
+
     public function locationOptions(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -61,6 +64,48 @@ class UserMasterController extends Controller
         };
 
         return response()->json($options->map(fn ($value) => ['value' => (string) $value, 'label' => (string) $value])->values());
+    }
+
+    public function locationCoordinates(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'district' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $base = DB::table('tbl_usraddress')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where('status', true);
+
+        $address = null;
+        if (filled($data['postal_code'] ?? null)) {
+            $address = (clone $base)->where('postal_code', $data['postal_code'])->orderByDesc('is_primary')->latest('updated_at')->first();
+        }
+        if (! $address && filled($data['city'] ?? null)) {
+            $address = (clone $base)
+                ->where('city', $data['city'])
+                ->when(filled($data['state'] ?? null), fn ($query) => $query->where('state', $data['state']))
+                ->orderByDesc('is_primary')->latest('updated_at')->first();
+        }
+        if (! $address && filled($data['district'] ?? null)) {
+            $address = (clone $base)
+                ->where('district', $data['district'])
+                ->when(filled($data['state'] ?? null), fn ($query) => $query->where('state', $data['state']))
+                ->orderByDesc('is_primary')->latest('updated_at')->first();
+        }
+
+        if (! $address) {
+            return response()->json(['message' => 'No saved map coordinates were found for this location.'], 404);
+        }
+
+        return response()->json([
+            'latitude' => (string) $address->latitude,
+            'longitude' => (string) $address->longitude,
+            'google_maps_url' => $address->google_maps_url,
+        ]);
     }
 
     public function sendContactOtp(Request $request, User $user): RedirectResponse
@@ -154,14 +199,15 @@ class UserMasterController extends Controller
         }
 
         $users = User::query()
-            ->leftJoin('tbl_usertype', 'tbl_usertype.uid', '=', 'tbl_users.user_type_id')
+            ->leftJoin('tbl_usertype', 'tbl_usertype.uid', '=', 'tbl_users.user_type')
             ->select('tbl_users.*')
             ->with([
                 'userType:id,uid,name', 'primaryEmail:id,user_id,email,is_verified,email_verified_at',
-                'login:id,user_id,login_name,last_login_at,status',
+                'login:id,user_id,username,last_login_at,status',
                 'addresses' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('id'),
                 'contacts' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('id'),
                 'educations' => fn ($query) => $query->orderBy('id'),
+                'banking:id,user_id,bank_name,account_number,account_type,branch_name,ifsc_code,is_primary,status',
                 'documents' => fn ($query) => $query->whereIn('document_type', ['aadhaar', 'pan']),
                 'departmentAssignment:id,user_id,company_id,sitting_location,department_id,designation_id,role_id,status',
                 'departmentAssignment.company:id,company_name',
@@ -251,17 +297,12 @@ class UserMasterController extends Controller
         DB::transaction(function () use ($request): void {
             $data = $request->validated();
             $data['status'] = true;
-            $employeeTypeId = UserType::query()
-                ->whereRaw('LOWER(name) = ?', ['employee'])
-                ->where('status', true)
-                ->value('uid') ?? $data['user_type_id'];
             $user = User::create([
-                'user_type_id' => $employeeTypeId,
+                'user_type' => self::EMPLOYEE_USER_TYPE,
                 'unique_id' => ($data['unique_id'] ?? null) ?: $this->nextUniqueId(),
                 'first_name' => $data['first_name'],
                 'middle_name' => $data['middle_name'] ?? '',
                 'last_name' => $data['last_name'],
-                'name' => trim($data['first_name'].' '.$data['last_name']),
                 'gender' => $data['gender'] ?? null,
                 'marital_status' => $data['marital_status'] ?? null,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
@@ -270,10 +311,12 @@ class UserMasterController extends Controller
             ]);
             $this->saveIdentityDocuments($user, $data, $request);
             $this->saveDepartment($user, $data);
-            Login::create(['user_id' => $user->id, 'login_name' => $data['email'], 'password' => $data['password'], 'status' => $data['status']]);
+            Login::create(['usr_type' => self::EMPLOYEE_USER_TYPE, 'user_id' => $user->unique_id, 'username' => trim($data['username']), 'password' => $data['password'], 'status' => $data['status']]);
             $this->saveContact($user, $data);
             $this->saveAddress($user, $data);
             $this->saveEducation($user, $data);
+            $this->saveBanking($user, $data);
+            $this->syncReferenceIds($user);
             $user->syncRoles([$data['role']]);
         });
 
@@ -288,11 +331,10 @@ class UserMasterController extends Controller
             return back()->withErrors(['file' => 'The spreadsheet has no data rows.']);
         }
 
-        $employeeTypeId = UserType::query()->whereRaw('LOWER(name) = ?', ['employee'])->where('status', true)->value('uid');
         $defaultRole = Role::query()->where('status', true)->where('guard_name', 'web')->where('name', 'Viewer')->value('name')
             ?? Role::query()->where('status', true)->where('guard_name', 'web')->value('name');
-        if (! $employeeTypeId || ! $defaultRole) {
-            return back()->withErrors(['file' => 'Employee user type or an active role is not configured.']);
+        if (! $defaultRole) {
+            return back()->withErrors(['file' => 'An active role is not configured.']);
         }
 
         $created = 0;
@@ -309,7 +351,7 @@ class UserMasterController extends Controller
                 continue;
             }
             $duplicate = ($uniqueId !== '' && User::query()->where('unique_id', $uniqueId)->exists())
-                || Login::query()->where('login_name', $email)->exists();
+                || Login::query()->where('username', $email)->exists();
             if ($duplicate) {
                 $skipped++;
 
@@ -317,10 +359,10 @@ class UserMasterController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($row, $email, $firstName, $lastName, $uniqueId, $employeeTypeId, $defaultRole): void {
+                DB::transaction(function () use ($row, $email, $firstName, $lastName, $uniqueId, $defaultRole): void {
                     $user = User::create([
-                        'user_type_id' => $employeeTypeId, 'unique_id' => $uniqueId ?: $this->nextUniqueId(),
-                        'first_name' => $firstName, 'last_name' => $lastName, 'name' => trim($firstName.' '.$lastName),
+                        'user_type' => self::EMPLOYEE_USER_TYPE, 'unique_id' => $uniqueId ?: $this->nextUniqueId(),
+                        'first_name' => $firstName, 'last_name' => $lastName,
                         'gender' => in_array(strtolower((string) ($row['gender'] ?? '')), ['male', 'female', 'other'], true) ? strtolower((string) $row['gender']) : null,
                         'status' => true,
                     ]);
@@ -330,8 +372,9 @@ class UserMasterController extends Controller
                         'role' => $row['role'] ?? $defaultRole,
                     ]);
                     $password = (string) ($row['password'] ?? 'Password@123');
-                    Login::create(['user_id' => $user->id, 'login_name' => $email, 'password' => $password, 'status' => true]);
+                    Login::create(['usr_type' => self::EMPLOYEE_USER_TYPE, 'user_id' => $user->unique_id, 'username' => $email, 'password' => $password, 'status' => true]);
                     $this->saveContact($user, ['email' => $email, 'status' => true, 'contacts' => [['contact_type' => 'mobile', 'contact_value' => $row['mobile'] ?? null, 'is_primary' => true]]]);
+                    $this->syncReferenceIds($user);
                     $user->syncRoles([$row['role'] ?? $defaultRole]);
                 });
                 $created++;
@@ -388,12 +431,11 @@ class UserMasterController extends Controller
             $data['status'] = $user->status;
             $originalUniqueId = $user->unique_id;
             $user->update([
-                'user_type_id' => $data['user_type_id'],
+                'user_type' => self::EMPLOYEE_USER_TYPE,
                 'unique_id' => ($data['unique_id'] ?? null) ?: $user->unique_id,
                 'first_name' => $data['first_name'],
                 'middle_name' => $data['middle_name'] ?? '',
                 'last_name' => $data['last_name'],
-                'name' => trim($data['first_name'].' '.$data['last_name']),
                 'gender' => $data['gender'] ?? null,
                 'marital_status' => $data['marital_status'] ?? null,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
@@ -403,21 +445,25 @@ class UserMasterController extends Controller
                 DB::table('tbl_usrcontact')->where('user_id', $originalUniqueId)->update(['user_id' => $user->unique_id]);
                 DB::table('tbl_usrdept')->where('user_id', $originalUniqueId)->update(['user_id' => $user->unique_id]);
                 DB::table('tbl_usrdocument')->where('user_id', $originalUniqueId)->update(['user_id' => $user->unique_id]);
-                $user->unsetRelation('contacts')->unsetRelation('primaryEmail')->unsetRelation('departmentAssignment');
+                DB::table('tbl_usrlogin')->where('user_id', $originalUniqueId)->update(['user_id' => $user->unique_id]);
+                DB::table('tbl_usrbanking')->where('user_id', $originalUniqueId)->update(['user_id' => $user->unique_id]);
+                $user->unsetRelation('contacts')->unsetRelation('primaryEmail')->unsetRelation('departmentAssignment')->unsetRelation('login');
             }
             $this->saveDepartment($user, $data);
             $this->saveIdentityDocuments($user, $data, $request);
 
-            $loginData = ['login_name' => $data['email'], 'status' => $data['status']];
+            $loginData = ['usr_type' => self::EMPLOYEE_USER_TYPE, 'username' => trim($data['username']), 'status' => $data['status']];
             if (! empty($data['password'])) {
                 $loginData['password'] = $data['password'];
             } elseif (! $user->login) {
                 $loginData['password'] = Str::password(24);
             }
-            $user->login()->updateOrCreate(['user_id' => $user->id], $loginData);
+            $user->login()->updateOrCreate(['user_id' => $user->unique_id], $loginData);
             $this->saveContact($user, $data);
             $this->saveAddress($user, $data);
             $this->saveEducation($user, $data);
+            $this->saveBanking($user, $data);
+            $this->syncReferenceIds($user);
             $user->syncRoles([$data['role']]);
         });
 
@@ -445,6 +491,7 @@ class UserMasterController extends Controller
             }
 
             $values = [
+                'user_type' => self::EMPLOYEE_USER_TYPE,
                 'document_number' => $type === 'pan' && filled($number) ? Str::upper($number) : $number,
                 'document_name' => strtoupper($type),
                 'status' => 'active',
@@ -495,6 +542,7 @@ class UserMasterController extends Controller
             $isEmailContact = ($contactData['contact_type'] ?? '') === 'email' || ($contactValue && filter_var($contactValue, FILTER_VALIDATE_EMAIL));
 
             $values = [
+                'usr_type' => self::EMPLOYEE_USER_TYPE,
                 'contact_type' => $isEmailContact ? 'email' : ($contactData['contact_type'] ?? 'mobile'),
                 'email' => $isEmailContact ? $contactValue : ($index === $primaryIndex ? $data['email'] : null),
                 'contact_number' => $isEmailContact ? null : $contactValue,
@@ -538,9 +586,13 @@ class UserMasterController extends Controller
                 continue;
             }
 
+            $latitude = filled($data[$prefix.'latitude'] ?? null) ? (string) $data[$prefix.'latitude'] : null;
+            $longitude = filled($data[$prefix.'longitude'] ?? null) ? (string) $data[$prefix.'longitude'] : null;
+
             Address::query()->updateOrCreate(
-                ['user_id' => $user->id, 'address_type' => $type],
+                ['user_id' => (string) $user->unique_id, 'address_type' => $type],
                 [
+                    'user_type' => self::EMPLOYEE_USER_TYPE,
                     'address_line_1' => $addressLine,
                     'address_line_2' => $data[$prefix.'address_line_2'] ?? null,
                     'city' => $data[$prefix.'city'] ?? null,
@@ -548,8 +600,11 @@ class UserMasterController extends Controller
                     'district' => $data[$prefix.'district'] ?? null,
                     'postal_code' => $data[$prefix.'postal_code'] ?? null,
                     'country' => $data[$prefix.'country'] ?? null,
-                    'latitude' => $data[$prefix.'latitude'] ?? null,
-                    'longitude' => $data[$prefix.'longitude'] ?? null,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'google_maps_url' => $latitude && $longitude
+                        ? "https://www.google.com/maps?q={$latitude},{$longitude}"
+                        : null,
                     'is_primary' => $type === 'local',
                     'status' => $data['status'],
                 ],
@@ -587,6 +642,7 @@ class UserMasterController extends Controller
         UserDepartment::query()->updateOrCreate(
             ['user_id' => (string) $user->unique_id],
             [
+                'user_type' => self::EMPLOYEE_USER_TYPE,
                 'company_id' => $company?->id,
                 'sitting_location' => filled($data['sitting_location'] ?? null) ? $data['sitting_location'] : null,
                 'department_id' => filled($data['department_id'] ?? null) ? (int) $data['department_id'] : null,
@@ -611,8 +667,14 @@ class UserMasterController extends Controller
 
             $education = isset($educationData['id']) ? $user->educations()->whereKey($educationData['id'])->first() : null;
             $values = collect($educationData)->only(['education_level', 'degree_name', 'institution_name', 'university_name', 'start_date', 'end_date', 'grade', 'currently_studying'])->all();
+            $values['start_date'] = $this->databaseDate($educationData['start_date'] ?? null);
+            $values['end_date'] = $this->databaseDate($educationData['end_date'] ?? null);
+            $values['user_type'] = self::EMPLOYEE_USER_TYPE;
             $values['board_or_university'] = $educationData['university_name'] ?? null;
-            $values['status'] = 'active';
+            $values['passing_year'] = filled($values['end_date'])
+                ? (int) substr((string) $values['end_date'], 0, 4)
+                : null;
+            $values['status'] = true;
             if (($educationData['currently_studying'] ?? false) === true) {
                 $values['end_date'] = null;
             }
@@ -623,6 +685,62 @@ class UserMasterController extends Controller
             $keptIds[] = $education->id;
         }
         $user->educations()->when($keptIds !== [], fn ($query) => $query->whereNotIn('id', $keptIds))->when($keptIds === [], fn ($query) => $query)->delete();
+    }
+
+    private function databaseDate(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            return $value;
+        }
+
+        foreach (['d-m-Y', 'd/m/Y'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!'.$format, $value);
+            if ($date !== false && $date->format($format) === $value) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    private function syncReferenceIds(User $user): void
+    {
+        $user->forceFill([
+            'contact_id' => $user->contacts()->orderByDesc('is_primary')->orderBy('id')->value('id'),
+            'address_id' => $user->addresses()->orderByDesc('is_primary')->orderBy('id')->value('id'),
+            'document_id' => $user->documents()->orderByRaw("document_type = 'aadhaar' desc")->orderBy('id')->value('id'),
+            'education_id' => $user->educations()->orderBy('id')->value('id'),
+            'banking_id' => DB::table('tbl_usrbanking')->where('user_id', $user->unique_id)->orderBy('id')->value('id'),
+        ])->save();
+    }
+
+    /** @param array<string, mixed> $data */
+    private function saveBanking(User $user, array $data): void
+    {
+        $hasBanking = collect($data)->only([
+            'bank_name', 'account_number', 'account_type', 'branch_name', 'ifsc_code',
+        ])->filter(fn ($value) => filled($value))->isNotEmpty();
+
+        if (! $hasBanking) {
+            return;
+        }
+
+        Banking::query()->updateOrCreate(
+            ['user_id' => $user->unique_id, 'is_primary' => true],
+            [
+                'bank_name' => $data['bank_name'],
+                'account_number' => $data['account_number'],
+                'account_type' => $data['account_type'] ?? null,
+                'branch_name' => $data['branch_name'] ?? null,
+                'ifsc_code' => filled($data['ifsc_code'] ?? null) ? Str::upper($data['ifsc_code']) : null,
+                'status' => true,
+            ],
+        );
     }
 
     /** @return array<int, array<string, string>> */

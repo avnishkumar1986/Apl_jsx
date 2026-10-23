@@ -49,14 +49,21 @@ class UserTypeController extends Controller
             });
         }
 
+        $userTypes = $query->paginate($perPage)->withQueryString();
+        $companyCounts = $this->companyRecordCounts();
+        $userTypes->getCollection()->each(function (UserType $userType) use ($companyCounts): void {
+            $userType->users_count = $this->displayCount($userType, $companyCounts);
+        });
+
         return Inertia::render('admin/user-types/index', [
-            'userTypes' => $query->paginate($perPage)->withQueryString(),
+            'userTypes' => $userTypes,
             'filters' => ['search' => $search, 'per_page' => $perPage, 'sort' => $sort, 'direction' => $direction],
             'pageSizeOptions' => $pageSizeOptions,
             'stats' => [
                 'total' => UserType::query()->count(),
                 'active' => UserType::query()->where('status', true)->count(),
-                'assignedUsers' => UserType::query()->withCount('users')->get()->sum('users_count'),
+                'assignedUsers' => UserType::query()->withCount('users')->get()
+                    ->sum(fn (UserType $userType): int => $this->displayCount($userType, $companyCounts)),
             ],
             'canManage' => auth()->user()?->can('users.manage') ?? false,
         ]);
@@ -77,8 +84,8 @@ class UserTypeController extends Controller
 
             if ($previousUid !== $userType->uid) {
                 DB::table('tbl_users')
-                    ->where('user_type_id', $previousUid)
-                    ->update(['user_type_id' => $userType->uid]);
+                    ->where('user_type', $previousUid)
+                    ->update(['user_type' => $userType->uid]);
             }
         });
 
@@ -106,7 +113,11 @@ class UserTypeController extends Controller
             'action' => ['required', Rule::in(['activate', 'deactivate', 'delete'])],
         ]);
 
+        $companyCounts = $this->companyRecordCounts();
         $userTypes = UserType::query()->withCount('users')->whereIn('id', $validated['ids'])->get();
+        $userTypes->each(function (UserType $userType) use ($companyCounts): void {
+            $userType->users_count = $this->displayCount($userType, $companyCounts);
+        });
 
         if ($validated['action'] === 'delete' && $userTypes->contains(fn (UserType $userType): bool => $userType->users_count > 0)) {
             throw ValidationException::withMessages([
@@ -129,7 +140,7 @@ class UserTypeController extends Controller
 
     public function destroy(UserType $userType): RedirectResponse
     {
-        if ($userType->users()->exists()) {
+        if ($this->displayCount($userType, $this->companyRecordCounts()) > 0) {
             throw ValidationException::withMessages([
                 'user_type' => 'This user type is assigned to users and cannot be deleted.',
             ]);
@@ -138,5 +149,32 @@ class UserTypeController extends Controller
         $userType->delete();
 
         return back()->with('success', 'User type deleted successfully.');
+    }
+
+    /** @return array<int, int> */
+    private function companyRecordCounts(): array
+    {
+        return DB::table('tbl_company')
+            ->whereIn('record_type', [1, 2, 3])
+            ->selectRaw('record_type, COUNT(*) as aggregate')
+            ->groupBy('record_type')
+            ->pluck('aggregate', 'record_type')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /** @param array<int, int> $companyCounts */
+    private function displayCount(UserType $userType, array $companyCounts): int
+    {
+        $recordType = match ($userType->uid) {
+            'USR10' => 1,
+            'USR9' => 2,
+            'USR11' => 3,
+            default => null,
+        };
+
+        return $recordType === null
+            ? (int) ($userType->users_count ?? $userType->users()->count())
+            : ($companyCounts[$recordType] ?? 0);
     }
 }

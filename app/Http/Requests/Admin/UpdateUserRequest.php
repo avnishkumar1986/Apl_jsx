@@ -46,7 +46,7 @@ class UpdateUserRequest extends FormRequest
             'marital_status' => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed'])],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'anniversary_date' => ['nullable', 'date'],
-            'user_type_id' => ['required', Rule::exists('tbl_usertype', 'uid')->where('status', true)],
+            'user_type' => ['required', Rule::exists('tbl_usertype', 'uid')->where('status', true)],
             'company' => ['nullable', 'string', 'max:150'],
             'sitting_location' => ['nullable', 'string', 'max:150'],
             'department_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {
@@ -59,7 +59,12 @@ class UpdateUserRequest extends FormRequest
             'email' => [
                 'required', 'string', 'lowercase', 'email', 'max:255',
                 Rule::unique('tbl_usrcontact', 'email')->ignore($user->primaryEmail?->id),
-                Rule::unique('tbl_usrlogin', 'login_name')->ignore($user->login?->id),
+                Rule::unique('tbl_usrlogin', 'username')->ignore($user->login?->id),
+            ],
+            'username' => [
+                'required', 'string', 'max:255',
+                Rule::unique('tbl_usrlogin', 'username')->ignore($user->login?->id),
+                Rule::unique('tbl_usrcontact', 'email')->ignore($user->primaryEmail?->id),
             ],
             'password' => ['nullable', 'string', 'min:8'],
             'aadhaar_number' => ['nullable', 'regex:/^[0-9]{12}$/', Rule::unique('tbl_usrdocument', 'document_number')->where('document_type', 'aadhaar')->ignore($user->documents()->where('document_type', 'aadhaar')->value('id'))],
@@ -104,6 +109,11 @@ class UpdateUserRequest extends FormRequest
             'educations.*.grade' => ['nullable', 'string', 'max:50'],
             'educations.*.currently_studying' => ['required', 'boolean'],
             'educations.*.document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'bank_name' => ['nullable', 'string', 'max:150', 'required_with:account_number,account_type,branch_name,ifsc_code'],
+            'account_number' => ['nullable', 'string', 'max:50', 'required_with:bank_name,account_type,branch_name,ifsc_code'],
+            'account_type' => ['nullable', 'string', 'max:30'],
+            'branch_name' => ['nullable', 'string', 'max:150'],
+            'ifsc_code' => ['nullable', 'string', 'max:20'],
         ];
     }
 

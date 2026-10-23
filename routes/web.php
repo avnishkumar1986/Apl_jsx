@@ -225,7 +225,7 @@ Route::middleware(['auth'])->group(function () {
                 'materials' => Material::query()->count(),
                 'employees' => User::query()
                     ->where('status', true)
-                    ->whereIn('user_type_id', UserType::query()->whereRaw('LOWER(name) = ?', ['employee'])->select('uid'))
+                    ->whereIn('user_type', UserType::query()->whereRaw('LOWER(name) = ?', ['employee'])->select('uid'))
                     ->count(),
             ],
             'userTypes' => UserType::query()
@@ -371,6 +371,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('user-master', [UserMasterController::class, 'index'])->middleware('permission:users.view')->name('user-master.index');
         Route::get('user-master/location-options', [UserMasterController::class, 'locationOptions'])->middleware('permission:users.manage')->name('user-master.location-options');
+        Route::get('user-master/location-coordinates', [UserMasterController::class, 'locationCoordinates'])->middleware('permission:users.manage')->name('user-master.location-coordinates');
         Route::post('user-master', [UserMasterController::class, 'store'])->middleware('permission:users.manage')->name('user-master.store');
         Route::post('user-master/import', [UserMasterController::class, 'importExcel'])->middleware('permission:users.manage')->name('user-master.import');
         Route::get('user-master/import-template', [UserMasterController::class, 'downloadImportTemplate'])->middleware('permission:users.manage')->name('user-master.import-template');

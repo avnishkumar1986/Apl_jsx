@@ -40,7 +40,7 @@ class User extends Authenticatable implements JWTSubject
      */
     protected $fillable = [
         'name',
-        'user_type_id',
+        'user_type',
         'unique_id',
         'first_name',
         'middle_name',
@@ -53,6 +53,8 @@ class User extends Authenticatable implements JWTSubject
         'employment_id',
         'education_id',
         'address_id',
+        'banking_id',
+        'document_id',
         'status',
         'created_by',
         'updated_by',
@@ -86,7 +88,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function userType(): BelongsTo
     {
-        return $this->belongsTo(UserType::class, 'user_type_id', 'uid');
+        return $this->belongsTo(UserType::class, 'user_type', 'uid');
     }
 
     public function departmentAssignment(): HasOne
@@ -144,12 +146,17 @@ class User extends Authenticatable implements JWTSubject
 
     public function addresses(): HasMany
     {
-        return $this->hasMany(Address::class);
+        return $this->hasMany(Address::class, 'user_id', 'unique_id');
     }
 
     public function educations(): HasMany
     {
-        return $this->hasMany(Education::class);
+        return $this->hasMany(Education::class, 'user_id', 'unique_id');
+    }
+
+    public function banking(): HasOne
+    {
+        return $this->hasOne(Banking::class, 'user_id', 'unique_id')->where('is_primary', true);
     }
 
     public function contacts(): HasMany
@@ -211,7 +218,7 @@ class User extends Authenticatable implements JWTSubject
 
     public function login(): HasOne
     {
-        return $this->hasOne(Login::class);
+        return $this->hasOne(Login::class, 'user_id', 'unique_id');
     }
 
     public function getAuthPassword(): string
@@ -233,7 +240,7 @@ class User extends Authenticatable implements JWTSubject
     public function getEmailAttribute(): ?string
     {
         return $this->primaryEmail?->email
-            ?? $this->login?->login_name
+            ?? $this->login?->username
             ?? $this->pendingEmail;
     }
 
@@ -245,8 +252,17 @@ class User extends Authenticatable implements JWTSubject
 
     public function setNameAttribute(?string $value): void
     {
-        $this->pendingName = $value;
-        $this->attributes['name'] = $value;
+        $name = trim((string) $value);
+        $this->pendingName = $name;
+
+        if ($name === '' || filled($this->attributes['first_name'] ?? null) || filled($this->attributes['last_name'] ?? null)) {
+            return;
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+        $this->attributes['first_name'] = array_shift($parts) ?: 'User';
+        $this->attributes['last_name'] = $parts !== [] ? array_pop($parts) : '';
+        $this->attributes['middle_name'] = implode(' ', $parts);
     }
 
     public function getEmailVerifiedAtAttribute(): mixed

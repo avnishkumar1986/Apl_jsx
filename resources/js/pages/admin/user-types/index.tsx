@@ -131,7 +131,7 @@ export default function UserTypes({
             <div className="mx-auto w-full max-w-[1680px] space-y-4 p-3 md:p-5 lg:p-6">
                 <MasterPageHeader
                     title="User Type Master"
-                    description={`${stats.total} user types · ${stats.active} active · ${stats.assignedUsers} assigned users`}
+                    description={`${stats.total} user types · ${stats.active} active · ${stats.assignedUsers} assigned records`}
                     icon={<ShieldCheck className="size-5" />}
                     action={
                         canManage && (
@@ -248,7 +248,7 @@ export default function UserTypes({
                                         className="px-5 py-3"
                                     />
                                     <DataTableSortHeader
-                                        label="Users"
+                                        label="Count"
                                         column="users_count"
                                         activeColumn={filters.sort}
                                         direction={filters.direction}

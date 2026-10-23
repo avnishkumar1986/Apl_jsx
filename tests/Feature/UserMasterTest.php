@@ -65,7 +65,7 @@ test('authorized users can update and delete user master records', function () {
     expect($user->name)->toBe('Updated User')
         ->and($user->status)->toBeTrue()
         ->and($user->primaryEmail->email)->toBe('updated@example.com')
-        ->and($user->login->login_name)->toBe('updated@example.com')
+        ->and($user->login->username)->toBe('updated@example.com')
         ->and(Hash::check('new-password', $user->login->password))->toBeTrue();
 
     $this->actingAs($this->admin)->delete(route('admin.user-master.destroy', $user))->assertRedirect();

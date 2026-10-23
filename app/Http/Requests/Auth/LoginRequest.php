@@ -30,7 +30,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -47,9 +47,13 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
+        $identifier = $this->string('email')->trim()->toString();
         $login = Login::query()
             ->with('user')
-            ->where('login_name', Str::lower($this->string('email')->toString()))
+            ->where(function ($query) use ($identifier): void {
+                $query->where('username', $identifier)
+                    ->orWhereHas('user.primaryEmail', fn ($emailQuery) => $emailQuery->where('email', $identifier));
+            })
             ->where('status', true)
             ->first();
 

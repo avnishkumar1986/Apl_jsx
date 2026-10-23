@@ -102,7 +102,7 @@ export function AppSidebar() {
             items: [
                 ...(canViewUsers ? [{ title: 'Modules', href: '/admin/modules', icon: Boxes }] : []),
                 ...(canViewUsers ? [{ title: 'User types', href: '/admin/user-types', icon: Tags }] : []),
-                ...(canViewUsers ? [{ title: 'Users', href: '/admin/user-master', icon: ContactRound }] : []),
+                ...(canViewUsers ? [{ title: 'Employee', href: '/admin/user-master', icon: ContactRound }] : []),
                 ...(canViewRoles ? [{ title: 'Roles & permissions', href: '/admin/roles', icon: ShieldCheck }] : []),
             ],
         },

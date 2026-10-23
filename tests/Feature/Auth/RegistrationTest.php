@@ -17,7 +17,7 @@ test('new users can register', function () {
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard', absolute: false));
     $this->assertDatabaseHas('tbl_usrlogin', [
-        'login_name' => 'test@example.com',
+        'username' => 'test@example.com',
         'status' => 1,
     ]);
     $this->assertDatabaseHas('tbl_usrcontact', [

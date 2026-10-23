@@ -39,7 +39,7 @@ class MicrosoftSsoService
 
             if (! $user) {
                 $user = User::create([
-                    'user_type_id' => UserType::query()->where('status', true)->value('uid'),
+                    'user_type' => UserType::query()->where('status', true)->value('uid'),
                     'name' => $microsoftUser->getName() ?: Str::headline(Str::before($email, '@')),
                     'status' => true,
                 ]);
@@ -51,16 +51,18 @@ class MicrosoftSsoService
             }
 
             $login = Login::query()->firstOrCreate(
-                ['user_id' => $user->id],
+                ['user_id' => $user->unique_id],
                 [
-                    'login_name' => $email,
+                    'usr_type' => $user->user_type,
+                    'username' => $email,
                     'password' => Str::password(40),
                     'status' => true,
                 ],
             );
 
             $login->update([
-                'login_name' => $email,
+                'usr_type' => $user->user_type,
+                'username' => $email,
                 'status' => true,
                 'last_login_at' => now(),
                 'updated_by' => $user->id,

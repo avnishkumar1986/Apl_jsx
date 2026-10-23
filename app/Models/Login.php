@@ -11,7 +11,7 @@ class Login extends Model
     protected $table = 'tbl_usrlogin';
 
     protected $fillable = [
-        'user_id', 'login_name', 'password', 'last_login_at', 'jwt_token', 'jwt_token_expires_at',
+        'usr_type', 'user_id', 'username', 'password', 'last_login_at', 'jwt_token', 'jwt_token_expires_at',
         'jwt_token_revoked_at', 'remember_token', 'status', 'created_by', 'updated_by',
     ];
 
@@ -30,7 +30,7 @@ class Login extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id', 'unique_id');
     }
 
     protected static function booted(): void

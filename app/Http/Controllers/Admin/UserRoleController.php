@@ -19,7 +19,7 @@ class UserRoleController extends Controller
     {
         return Inertia::render('admin/users/index', [
             'users' => User::query()
-                ->with(['roles:id,name', 'primaryEmail:id,user_id,email', 'login:id,user_id,login_name'])
+                ->with(['roles:id,name', 'primaryEmail:id,user_id,email', 'login:id,user_id,username'])
                 ->orderBy('first_name')
                 ->orderBy('last_name')
                 ->get(['id', 'first_name', 'last_name', 'status']),

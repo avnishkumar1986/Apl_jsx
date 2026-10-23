@@ -22,7 +22,7 @@ class Address extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id', 'unique_id');
     }
 
     protected static function booted(): void

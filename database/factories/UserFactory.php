@@ -25,7 +25,7 @@ class UserFactory extends Factory
             Login::query()->firstOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'login_name' => $user->email,
+                    'username' => $user->email,
                     'password' => $user->pendingPassword() ?? (static::$password ??= Hash::make('password')),
                     'remember_token' => $user->pendingRememberToken(),
                     'status' => $user->status,

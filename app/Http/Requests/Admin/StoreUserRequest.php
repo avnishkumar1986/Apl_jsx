@@ -42,7 +42,7 @@ class StoreUserRequest extends FormRequest
             'marital_status' => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed'])],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'anniversary_date' => ['nullable', 'date'],
-            'user_type_id' => ['required', Rule::exists('tbl_usertype', 'uid')->where('status', true)],
+            'user_type' => ['required', Rule::exists('tbl_usertype', 'uid')->where('status', true)],
             'company' => ['nullable', 'string', 'max:150'],
             'sitting_location' => ['nullable', 'string', 'max:150'],
             'department_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {
@@ -52,7 +52,8 @@ class StoreUserRequest extends FormRequest
             }],
             'designation_id' => ['nullable', 'integer', Rule::exists('tbl_designations', 'des_id')->where('status', true)],
             'role' => ['required', 'string', Rule::exists('tbl_roles', 'name')->where('guard_name', 'web')->where('status', true)],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:tbl_usrcontact,email', 'unique:tbl_usrlogin,login_name'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:tbl_usrcontact,email', 'unique:tbl_usrlogin,username'],
+            'username' => ['required', 'string', 'max:255', 'unique:tbl_usrlogin,username', 'unique:tbl_usrcontact,email'],
             'password' => ['required', 'string', 'min:8'],
             'aadhaar_number' => ['nullable', 'regex:/^[0-9]{12}$/', Rule::unique('tbl_usrdocument', 'document_number')->where('document_type', 'aadhaar')],
             'aadhaar_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
@@ -96,6 +97,11 @@ class StoreUserRequest extends FormRequest
             'educations.*.grade' => ['nullable', 'string', 'max:50'],
             'educations.*.currently_studying' => ['required', 'boolean'],
             'educations.*.document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'bank_name' => ['nullable', 'string', 'max:150', 'required_with:account_number,account_type,branch_name,ifsc_code'],
+            'account_number' => ['nullable', 'string', 'max:50', 'required_with:bank_name,account_type,branch_name,ifsc_code'],
+            'account_type' => ['nullable', 'string', 'max:30'],
+            'branch_name' => ['nullable', 'string', 'max:150'],
+            'ifsc_code' => ['nullable', 'string', 'max:20'],
         ];
     }
 

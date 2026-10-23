@@ -32,7 +32,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { FormEventHandler, useEffect, useState } from 'react';
+import { FormEventHandler, useEffect, useRef, useState } from 'react';
 
 type UserType = { uid: string; name: string };
 type Department = { id: number; department_name: string };
@@ -77,9 +77,16 @@ type EducationForm = {
     document: File | null;
     document_path?: string | null;
 };
+type Banking = {
+    bank_name: string;
+    account_number: string;
+    account_type: string | null;
+    branch_name: string | null;
+    ifsc_code: string | null;
+};
 type MasterUser = {
     id: number;
-    user_type_id: string;
+    user_type: string;
     unique_id: string | null;
     name: string;
     first_name: string;
@@ -102,10 +109,11 @@ type MasterUser = {
     created_at: string;
     user_type: UserType | null;
     primary_email: { email: string; is_verified: boolean; email_verified_at: string | null } | null;
-    login: { login_name: string; last_login_at: string | null } | null;
+    login: { username: string; last_login_at: string | null } | null;
     addresses: Address[];
     contacts: Contact[];
     educations: Array<Omit<EducationForm, 'document'>>;
+    banking: Banking | null;
     roles: Role[];
     department_assignment: {
         role_id: number | null;
@@ -127,16 +135,22 @@ type UserForm = {
     aadhaar_image: File | null;
     pan_number: string;
     pan_image: File | null;
-    user_type_id: string;
+    user_type: string;
     company: string;
     sitting_location: string;
     department_id: string;
     designation_id: string;
     role: string;
     email: string;
+    username: string;
     password: string;
     contacts: ContactForm[];
     educations: EducationForm[];
+    bank_name: string;
+    account_number: string;
+    account_type: string;
+    branch_name: string;
+    ifsc_code: string;
     address_type: string;
     address_line_1: string;
     address_line_2: string;
@@ -172,7 +186,18 @@ type PaginatedUsers = {
 type Filters = { search: string; per_page: number; sort: string; direction: 'asc' | 'desc' };
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'User Master', href: '/admin/user-master' }];
-const formSteps = ['Personal & employment', 'Contact', 'Address & map', 'Education', 'Login', 'Review'] as const;
+const formSteps = ['Personal & employment', 'Contact', 'Address & map', 'Education', 'Banking', 'Login'] as const;
+const educationLevels = [
+    'Secondary (10th)',
+    'Higher Secondary (12th)',
+    'ITI',
+    'Diploma',
+    'Undergraduate',
+    'Graduate',
+    'Postgraduate',
+    'Doctorate (PhD)',
+    'Post Doctorate',
+] as const;
 const emptyForm: UserForm = {
     first_name: '',
     middle_name: '',
@@ -186,13 +211,14 @@ const emptyForm: UserForm = {
     aadhaar_image: null,
     pan_number: '',
     pan_image: null,
-    user_type_id: '',
+    user_type: 'USR6',
     company: 'APL Apollo',
     sitting_location: '',
     department_id: '',
     designation_id: '',
     role: 'Viewer',
     email: '',
+    username: '',
     password: '',
     contacts: [{ contact_type: 'mobile', contact_value: '', is_primary: true }],
     educations: [
@@ -208,6 +234,11 @@ const emptyForm: UserForm = {
             document: null,
         },
     ],
+    bank_name: '',
+    account_number: '',
+    account_type: '',
+    branch_name: '',
+    ifsc_code: '',
     address_type: 'local',
     address_line_1: '',
     address_line_2: '',
@@ -231,9 +262,10 @@ const emptyForm: UserForm = {
 };
 
 function addressMapUrl(latitude: string, longitude: string) {
+    if (!latitude.trim() || !longitude.trim()) return '';
     const lat = Number(latitude);
     const lon = Number(longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return '';
     const delta = 0.012;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${lon - delta}%2C${lat - delta}%2C${lon + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lon}`;
 }
@@ -259,7 +291,6 @@ function dateForDatabase(value: string) {
 
 export default function UserMaster({
     users,
-    userTypes,
     departments,
     companies,
     sittingLocations,
@@ -285,12 +316,14 @@ export default function UserMaster({
     const [search, setSearch] = useState(filters.search);
     const [open, setOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<MasterUser | null>(null);
+    const explicitSubmitRef = useRef(false);
     const [formStep, setFormStep] = useState(0);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkAction, setBulkAction] = useState('');
     const [importOpen, setImportOpen] = useState(false);
     const [readingDocument, setReadingDocument] = useState<'aadhaar' | 'pan' | null>(null);
     const [geocodingAddress, setGeocodingAddress] = useState<'local' | 'permanent' | null>(null);
+    const [mapError, setMapError] = useState('');
     const [activeAddress, setActiveAddress] = useState<'local' | 'permanent'>('local');
     const [otpOpen, setOtpOpen] = useState(false);
     const [otpChannel, setOtpChannel] = useState<'email' | 'phone'>('email');
@@ -301,34 +334,36 @@ export default function UserMaster({
     const [otpProcessing, setOtpProcessing] = useState(false);
     const form = useForm<UserForm>(emptyForm);
     const importForm = useForm<{ file: File | null }>({ file: null });
-    const employeeUserType = userTypes.find((type) => type.name.trim().toLowerCase() === 'employee');
     const geocodeAddress = async (type: 'local' | 'permanent') => {
         const prefix = type === 'local' ? '' : 'permanent_';
-        const query = [
-            form.data[`${prefix}address_line_1` as keyof UserForm],
-            form.data[`${prefix}address_line_2` as keyof UserForm],
-            form.data[`${prefix}state` as keyof UserForm],
-            form.data[`${prefix}district` as keyof UserForm],
-            form.data[`${prefix}city` as keyof UserForm],
-            form.data[`${prefix}postal_code` as keyof UserForm],
-            form.data[`${prefix}country` as keyof UserForm],
-        ]
-            .filter(Boolean)
-            .join(', ');
-        if (!query) return;
+        const params = new URLSearchParams({
+            postal_code: String(form.data[`${prefix}postal_code` as keyof UserForm] ?? ''),
+            city: String(form.data[`${prefix}city` as keyof UserForm] ?? ''),
+            state: String(form.data[`${prefix}state` as keyof UserForm] ?? ''),
+            district: String(form.data[`${prefix}district` as keyof UserForm] ?? ''),
+        });
+        if (![...params.values()].some(Boolean)) {
+            setMapError('Select a pincode, city or district before fetching the map.');
+            return;
+        }
+        setMapError('');
         setGeocodingAddress(type);
         try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=${encodeURIComponent(query)}`,
-                { headers: { 'Accept-Language': 'en' } },
-            );
-            const result = (await response.json()) as Array<{ lat: string; lon: string }>;
-            if (!result[0]) return;
-            if (type === 'local') {
-                form.setData({ ...form.data, latitude: result[0].lat, longitude: result[0].lon });
-            } else {
-                form.setData({ ...form.data, permanent_latitude: result[0].lat, permanent_longitude: result[0].lon });
+            const response = await fetch(`/admin/user-master/location-coordinates?${params.toString()}`, {
+                headers: { Accept: 'application/json' },
+            });
+            const result = (await response.json()) as { latitude?: string; longitude?: string; message?: string };
+            if (!response.ok || !result.latitude || !result.longitude) {
+                setMapError(result.message ?? 'No saved map coordinates were found for this location.');
+                return;
             }
+            if (type === 'local') {
+                form.setData({ ...form.data, latitude: result.latitude, longitude: result.longitude });
+            } else {
+                form.setData({ ...form.data, permanent_latitude: result.latitude, permanent_longitude: result.longitude });
+            }
+        } catch {
+            setMapError('Unable to read map coordinates from the database.');
         } finally {
             setGeocodingAddress(null);
         }
@@ -409,7 +444,7 @@ export default function UserMaster({
         setActiveAddress('local');
         form.setData({
             ...emptyForm,
-            user_type_id: employeeUserType?.uid ?? userTypes[0]?.uid ?? '',
+            user_type: 'USR6',
             company: companies.find((company) => company.company_code === '1000')?.company_name ?? companies[0]?.company_name ?? '',
             role: roles.find((role) => role.name === 'Viewer')?.name ?? roles[0]?.name ?? '',
         });
@@ -420,8 +455,12 @@ export default function UserMaster({
         const localAddress =
             user.addresses.find((address) => address.address_type === 'local') ?? user.addresses.find((address) => address.is_primary);
         const permanentAddress = user.addresses.find((address) => address.address_type === 'permanent');
+        const hasEducation = user.educations.some((education) =>
+            Boolean(education.education_level || education.institution_name || education.university_name || education.grade),
+        );
+        const hasBanking = Boolean(user.banking?.bank_name && user.banking?.account_number);
         setEditingUser(user);
-        setFormStep(0);
+        setFormStep(!hasEducation ? 3 : !hasBanking ? 4 : 0);
         setActiveAddress('local');
         form.setData({
             first_name: user.first_name,
@@ -436,7 +475,7 @@ export default function UserMaster({
             aadhaar_image: null,
             pan_number: user.pan_number ?? '',
             pan_image: null,
-            user_type_id: String(user.user_type_id),
+            user_type: 'USR6',
             company: user.company ?? '',
             sitting_location: user.sitting_location ?? '',
             department_id: user.department_id ? String(user.department_id) : '',
@@ -448,6 +487,7 @@ export default function UserMaster({
                 roles[0]?.name ??
                 '',
             email: user.email,
+            username: user.login?.username ?? user.email,
             password: '',
             contacts:
                 user.contacts.length > 0
@@ -479,6 +519,11 @@ export default function UserMaster({
                               document: null,
                           },
                       ],
+            bank_name: user.banking?.bank_name ?? '',
+            account_number: user.banking?.account_number ?? '',
+            account_type: user.banking?.account_type ?? '',
+            branch_name: user.banking?.branch_name ?? '',
+            ifsc_code: user.banking?.ifsc_code ?? '',
             address_type: 'local',
             address_line_1: localAddress?.address_line_1 ?? '',
             address_line_2: localAddress?.address_line_2 ?? '',
@@ -511,6 +556,8 @@ export default function UserMaster({
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
+        if (!explicitSubmitRef.current) return;
+        explicitSubmitRef.current = false;
         form.transform((data) => ({
             ...data,
             date_of_birth: dateForDatabase(data.date_of_birth),
@@ -529,7 +576,7 @@ export default function UserMaster({
                     errors.gender ||
                     errors.date_of_birth ||
                     errors.anniversary_date ||
-                    errors.user_type_id ||
+                    errors.user_type ||
                     errors.unique_id ||
                     errors.marital_status ||
                     errors.company ||
@@ -545,7 +592,15 @@ export default function UserMaster({
                     setFormStep(0);
                 else if (Object.keys(errors).some((key) => key.startsWith('contacts'))) setFormStep(1);
                 else if (Object.keys(errors).some((key) => key.startsWith('educations'))) setFormStep(3);
-                else if (errors.email || errors.password) setFormStep(4);
+                else if (
+                    errors.bank_name ||
+                    errors.account_number ||
+                    errors.account_type ||
+                    errors.branch_name ||
+                    errors.ifsc_code
+                )
+                    setFormStep(4);
+                else if (errors.username || errors.password) setFormStep(5);
                 else if (
                     errors.address_line_1 ||
                     errors.address_line_2 ||
@@ -564,12 +619,12 @@ export default function UserMaster({
 
     const nextFormStep = () => {
         if (formStep === 0) {
-            form.clearErrors('first_name', 'last_name', 'user_type_id', 'role');
+            form.clearErrors('first_name', 'last_name', 'user_type', 'role');
             if (!form.data.first_name.trim()) form.setError('first_name', 'First name is required.');
             if (!form.data.last_name.trim()) form.setError('last_name', 'Last name is required.');
-            if (!form.data.user_type_id) form.setError('user_type_id', 'Select a user type.');
+            if (!form.data.user_type) form.setError('user_type', 'Select a user type.');
             if (!form.data.role) form.setError('role', 'Select a role.');
-            if (!form.data.first_name.trim() || !form.data.last_name.trim() || !form.data.user_type_id || !form.data.role) return;
+            if (!form.data.first_name.trim() || !form.data.last_name.trim() || !form.data.user_type || !form.data.role) return;
         }
 
         if (formStep === 1) {
@@ -578,11 +633,11 @@ export default function UserMaster({
             if (!form.data.email.trim()) return;
         }
 
-        if (formStep === 4) {
-            form.clearErrors('email', 'password');
-            if (!form.data.email.trim()) form.setError('email', 'Email is required.');
+        if (formStep === 5) {
+            form.clearErrors('username', 'password');
+            if (!form.data.username.trim()) form.setError('username', 'Username or email is required.');
             if (!editingUser && !form.data.password) form.setError('password', 'Password is required.');
-            if (!form.data.email.trim() || (!editingUser && !form.data.password)) return;
+            if (!form.data.username.trim() || (!editingUser && !form.data.password)) return;
         }
 
         setFormStep((current) => Math.min(current + 1, formSteps.length - 1));
@@ -599,7 +654,7 @@ export default function UserMaster({
     };
 
     const stepCompleted = (index: number) => {
-        if (index === 0) return Boolean(form.data.first_name.trim() && form.data.last_name.trim() && form.data.user_type_id && form.data.role);
+        if (index === 0) return Boolean(form.data.first_name.trim() && form.data.last_name.trim() && form.data.user_type && form.data.role);
         if (index === 1) return Boolean(form.data.email.trim() && form.data.contacts.some((contact) => contact.contact_value.trim() !== ''));
         if (index === 2)
             return Boolean(
@@ -607,14 +662,14 @@ export default function UserMaster({
                     form.data.state &&
                     form.data.district &&
                     form.data.city &&
-                    form.data.postal_code &&
-                    (form.data.permanent_same_as_local || form.data.permanent_address_line_1.trim()),
+                    form.data.postal_code,
             );
         if (index === 3)
             return form.data.educations.some((education) =>
                 Boolean(education.education_level.trim() || education.degree_name.trim() || education.institution_name.trim()),
             );
-        if (index === 4) return Boolean(form.data.email.trim() && (editingUser || form.data.password));
+        if (index === 4) return Boolean(form.data.bank_name.trim() && form.data.account_number.trim());
+        if (index === 5) return Boolean(form.data.username.trim() && (editingUser || form.data.password));
         return false;
     };
 
@@ -707,7 +762,12 @@ export default function UserMaster({
                     action={
                         canManage && (
                             <div className="flex flex-wrap gap-2">
-                                <Button asChild type="button" variant="outline" className="h-9 border-slate-300 bg-white px-4 font-semibold">
+                                <Button
+                                    asChild
+                                    type="button"
+                                    variant="outline"
+                                    className="h-9 border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50 hover:text-slate-950"
+                                >
                                     <a href="/admin/user-master/import-template">
                                         <Download className="size-4 text-emerald-600" /> Download template
                                     </a>
@@ -720,7 +780,7 @@ export default function UserMaster({
                                         importForm.clearErrors();
                                         setImportOpen(true);
                                     }}
-                                    className="h-9 border-slate-300 bg-white px-4 font-semibold"
+                                    className="h-9 border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50 hover:text-slate-950"
                                 >
                                     <FileSpreadsheet className="size-4 text-emerald-600" /> Import Excel
                                 </Button>
@@ -1013,8 +1073,14 @@ export default function UserMaster({
                             }
                         }}
                         onSubmit={submit}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+                                event.preventDefault();
+                            }
+                        }}
                         className="flex max-h-[calc(100dvh-1rem)] min-h-0 w-full flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]"
                     >
+                        <input type="hidden" name="user_type" value="USR6" />
                         <input className="hidden" tabIndex={-1} aria-hidden="true" autoComplete="username" />
                         <input className="hidden" tabIndex={-1} aria-hidden="true" type="password" autoComplete="new-password" />
                         <MasterDialogHeader compact title={editingUser ? 'Edit employee' : 'Create employee'} />
@@ -1031,9 +1097,9 @@ export default function UserMaster({
                                         )}
                                         <button
                                             type="button"
-                                            onClick={() => index <= formStep && setFormStep(index)}
+                                            onClick={() => (editingUser || index <= formStep) && setFormStep(index)}
                                             aria-current={index === formStep ? 'step' : undefined}
-                                            className={`relative z-10 flex w-full flex-col items-center gap-1.5 text-center outline-none ${index <= formStep ? 'cursor-pointer' : 'cursor-default'}`}
+                                            className={`relative z-10 flex w-full flex-col items-center gap-1.5 text-center outline-none ${editingUser || index <= formStep ? 'cursor-pointer' : 'cursor-default'}`}
                                         >
                                             <span
                                                 className={`grid size-9 place-items-center rounded-full border-[3px] text-xs font-bold transition-all duration-300 ease-out ${
@@ -1118,7 +1184,7 @@ export default function UserMaster({
                                                 <DatePickerInput
                                                     value={form.data.date_of_birth}
                                                     onChange={(value) => form.setData('date_of_birth', value)}
-                                                    placeholder="DD-MM-YYYY"
+                                                    placeholder="Date of birth"
                                                     max={new Date().toISOString().slice(0, 10)}
                                                 />
                                             </Field>
@@ -1126,7 +1192,7 @@ export default function UserMaster({
                                                 <DatePickerInput
                                                     value={form.data.anniversary_date}
                                                     onChange={(value) => form.setData('anniversary_date', value)}
-                                                    placeholder="DD-MM-YYYY"
+                                                    placeholder="Anniversary date"
                                                 />
                                             </Field>
                                         </div>
@@ -1865,17 +1931,18 @@ export default function UserMaster({
                                 </section>
                             )}
 
-                            {formStep === 4 && (
+                            {formStep === 5 && (
                                 <fieldset className="form-fieldset !m-0">
                                     <legend>Login information</legend>
                                     <div className="grid gap-4 pt-3 sm:grid-cols-2">
-                                        <Field label="Email / login" error={form.errors.email}>
+                                        <Field label="Username or email" error={form.errors.username}>
                                             <Input
                                                 autoFocus
-                                                type="email"
-                                                placeholder="Email / login"
-                                                value={form.data.email}
-                                                onChange={(e) => form.setData('email', e.target.value)}
+                                                type="text"
+                                                autoComplete="username"
+                                                placeholder="Username or email"
+                                                value={form.data.username}
+                                                onChange={(e) => form.setData('username', e.target.value)}
                                             />
                                         </Field>
                                         <Field label={editingUser ? 'New password (optional)' : 'Password'} error={form.errors.password}>
@@ -2029,6 +2096,9 @@ export default function UserMaster({
                                                         <MapPin className="size-4" />{' '}
                                                         {geocodingAddress === 'local' ? 'Locating…' : 'Fetch map location'}
                                                     </Button>
+                                                    {mapError && activeAddress === 'local' && (
+                                                        <p className="w-full text-sm font-medium text-rose-600">{mapError}</p>
+                                                    )}
                                                     {form.data.latitude && form.data.longitude && (
                                                         <a
                                                             className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500/30 focus-visible:outline-none"
@@ -2147,6 +2217,9 @@ export default function UserMaster({
                                                             <MapPin className="size-4" />{' '}
                                                             {geocodingAddress === 'permanent' ? 'Locating…' : 'Fetch map location'}
                                                         </Button>
+                                                        {mapError && activeAddress === 'permanent' && (
+                                                            <p className="w-full text-sm font-medium text-rose-600">{mapError}</p>
+                                                        )}
                                                         {form.data.permanent_latitude && form.data.permanent_longitude && (
                                                             <a
                                                                 className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500/30 focus-visible:outline-none"
@@ -2265,21 +2338,29 @@ export default function UserMaster({
                                                             label="Education level"
                                                             error={educationErrors[`educations.${educationIndex}.education_level`]}
                                                         >
-                                                            <Input
-                                                                placeholder="Education level"
-                                                                value={education.education_level}
-                                                                onChange={(e) => updateEducation({ education_level: e.target.value })}
-                                                            />
-                                                        </Field>
-                                                        <Field
-                                                            label="Degree name"
-                                                            error={educationErrors[`educations.${educationIndex}.degree_name`]}
-                                                        >
-                                                            <Input
-                                                                placeholder="Degree name"
-                                                                value={education.degree_name}
-                                                                onChange={(e) => updateEducation({ degree_name: e.target.value })}
-                                                            />
+                                                            <Select
+                                                                value={education.education_level || undefined}
+                                                                onValueChange={(value) => updateEducation({ education_level: value })}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select education level" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {[
+                                                                        ...educationLevels,
+                                                                        ...(education.education_level &&
+                                                                        !educationLevels.includes(
+                                                                            education.education_level as (typeof educationLevels)[number],
+                                                                        )
+                                                                            ? [education.education_level]
+                                                                            : []),
+                                                                    ].map((level) => (
+                                                                        <SelectItem key={level} value={level}>
+                                                                            {level}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
                                                         </Field>
                                                         <Field
                                                             label="Institution name"
@@ -2299,20 +2380,6 @@ export default function UserMaster({
                                                                 placeholder="University name"
                                                                 value={education.university_name}
                                                                 onChange={(e) => updateEducation({ university_name: e.target.value })}
-                                                            />
-                                                        </Field>
-                                                        <Field label="Start date" error={educationErrors[`educations.${educationIndex}.start_date`]}>
-                                                            <DatePickerInput
-                                                                value={education.start_date}
-                                                                onChange={(value) => updateEducation({ start_date: value })}
-                                                                placeholder="DD-MM-YYYY"
-                                                            />
-                                                        </Field>
-                                                        <Field label="End date" error={educationErrors[`educations.${educationIndex}.end_date`]}>
-                                                            <DatePickerInput
-                                                                value={education.end_date}
-                                                                onChange={(value) => updateEducation({ end_date: value })}
-                                                                placeholder="DD-MM-YYYY"
                                                             />
                                                         </Field>
                                                         <Field label="Grade" error={educationErrors[`educations.${educationIndex}.grade`]}>
@@ -2373,7 +2440,63 @@ export default function UserMaster({
                                 </section>
                             )}
 
-                            {formStep === 5 && (
+                            {formStep === 4 && (
+                                <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                                    <div className="mb-4">
+                                        <h3 className="font-semibold text-slate-900">
+                                            Banking details <span className="font-normal text-slate-500">(optional)</span>
+                                        </h3>
+                                        <p className="mt-1 text-sm text-slate-500">Enter the employee's primary bank account details.</p>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <Field label="Bank name" error={form.errors.bank_name}>
+                                            <Input
+                                                placeholder="Bank name"
+                                                value={form.data.bank_name}
+                                                onChange={(event) => form.setData('bank_name', event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field label="Account number" error={form.errors.account_number}>
+                                            <Input
+                                                placeholder="Account number"
+                                                value={form.data.account_number}
+                                                onChange={(event) => form.setData('account_number', event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field label="Account type" error={form.errors.account_type}>
+                                            <Select
+                                                value={form.data.account_type || undefined}
+                                                onValueChange={(value) => form.setData('account_type', value)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select account type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="savings">Savings</SelectItem>
+                                                    <SelectItem value="current">Current</SelectItem>
+                                                    <SelectItem value="salary">Salary</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </Field>
+                                        <Field label="Branch name" error={form.errors.branch_name}>
+                                            <Input
+                                                placeholder="Branch name"
+                                                value={form.data.branch_name}
+                                                onChange={(event) => form.setData('branch_name', event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field label="IFSC code" error={form.errors.ifsc_code}>
+                                            <Input
+                                                placeholder="IFSC code"
+                                                value={form.data.ifsc_code}
+                                                onChange={(event) => form.setData('ifsc_code', event.target.value.toUpperCase())}
+                                            />
+                                        </Field>
+                                    </div>
+                                </section>
+                            )}
+
+                            {formStep === 6 && (
                                 <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                                     <div className="mb-5 border-b border-slate-200 pb-4">
                                         <h3 className="text-lg font-semibold text-slate-900">Review employee information</h3>
@@ -2414,8 +2537,21 @@ export default function UserMaster({
                                         <ReviewSection
                                             title="Login information"
                                             items={[
-                                                ['Email / username', form.data.email || '—'],
+                                                ['Username or email', form.data.username || '—'],
                                                 ['Password', editingUser ? (form.data.password ? 'Will be changed' : 'Unchanged') : 'Set securely'],
+                                            ]}
+                                        />
+                                        <ReviewSection
+                                            title="Banking information"
+                                            items={[
+                                                ['Bank', form.data.bank_name || '—'],
+                                                [
+                                                    'Account number',
+                                                    form.data.account_number ? `••••${form.data.account_number.slice(-4)}` : '—',
+                                                ],
+                                                ['Account type', form.data.account_type || '—'],
+                                                ['Branch', form.data.branch_name || '—'],
+                                                ['IFSC', form.data.ifsc_code || '—'],
                                             ]}
                                         />
                                         <ReviewSection
@@ -2516,15 +2652,6 @@ export default function UserMaster({
                                         <ChevronLeft className="size-4" /> Back
                                     </Button>
                                 )}
-                                {editingUser && formStep < formSteps.length - 1 && (
-                                    <Button
-                                        type="submit"
-                                        disabled={form.processing}
-                                        className="bg-brand-teal hover:bg-brand-plum h-10 flex-1 px-5 font-semibold text-white shadow-sm sm:flex-none"
-                                    >
-                                        {form.processing ? 'Saving…' : 'Save changes'}
-                                    </Button>
-                                )}
                                 {formStep < formSteps.length - 1 ? (
                                     <Button
                                         type="button"
@@ -2535,6 +2662,10 @@ export default function UserMaster({
                                     </Button>
                                 ) : (
                                     <Button
+                                        type="submit"
+                                        onClick={() => {
+                                            explicitSubmitRef.current = true;
+                                        }}
                                         disabled={form.processing}
                                         className="bg-brand-teal hover:bg-brand-plum h-10 min-w-32 flex-1 font-semibold text-white shadow-sm sm:flex-none"
                                     >
