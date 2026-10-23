@@ -50,6 +50,14 @@ return [
     'encrypt' => env('SESSION_ENCRYPT', false),
 
     /*
+    | Keep PHP serialization during the framework upgrade so existing sessions
+    | remain valid. Set SESSION_SERIALIZATION=json during a planned logout
+    | window to adopt Laravel 13's safer default.
+    */
+
+    'serialization' => env('SESSION_SERIALIZATION', 'php'),
+
+    /*
     |--------------------------------------------------------------------------
     | Session File Location
     |--------------------------------------------------------------------------

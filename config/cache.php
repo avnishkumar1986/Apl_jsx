@@ -6,6 +6,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Serializable Cache Classes
+    |--------------------------------------------------------------------------
+    |
+    | Laravel 13 restricts the PHP classes that may be restored from cached
+    | values. Query-builder cache entries in this application contain support
+    | collections of stdClass rows, so only those classes are allow-listed.
+    |
+    */
+
+    'serializable_classes' => [
+        Illuminate\Support\Collection::class,
+        stdClass::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Cache Store
     |--------------------------------------------------------------------------
     |
