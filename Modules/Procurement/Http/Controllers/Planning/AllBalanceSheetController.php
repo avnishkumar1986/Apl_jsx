@@ -40,20 +40,24 @@ class AllBalanceSheetController extends Controller
         $plantCode = trim((string) $request->string('plant_code'));
         $materialCode = trim((string) $request->string('material'));
         $search = trim((string) $request->string('search'));
-        $perPage = max(10, min(200, $request->integer('per_page', 50)));
-        $sortable = ['material_name', 'material', 'plant_name', 'plant_code', 'opening_stock', 'daily_consumption', 'days', 'consumption', 'planned_buying', 'imports', 'supplier_receipts', 'total_buying', 'total_availability', 'closing_stock', 'shortage'];
+        $pageSizeOptions = config('datatable.page_size_options');
+        $perPage = $request->integer('per_page', config('datatable.per_page'));
+        if (! in_array($perPage, $pageSizeOptions, true)) {
+            $perPage = (int) config('datatable.per_page');
+        }
+        $sortable = ['material_name', 'material', 'plant_name', 'plant_code', 'opening_stock', 'auto_monthly_consumption', 'auto_perday_consumption', 'daily_consumption', 'consumption', 'planned_buying', 'imports', 'supplier_receipts', 'total_buying', 'total_availability', 'closing_stock', 'shortage'];
         $sort = (string) $request->string('sort', 'material_name');
         $sort = in_array($sort, $sortable, true) ? $sort : 'material_name';
         $direction = strtolower((string) $request->string('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $plants = Cache::remember('procurement:active-plants:'.$companyCode, now()->addMinute(), fn () => DB::table('tbl_company')
-            ->where('status', 1)->whereIn('record_type', [2, 3])
+            ->where('status', 1)->where('record_type', 2)
             ->where('parent_company_id', $companyCode)
             ->whereRaw("LOWER(TRIM(company_name)) NOT IN ('head office', 'other plant')")
             ->orderBy('company_name')->get(['id', 'company_code', 'company_name', 'parent_company_id']));
         $materials = Cache::remember('procurement:active-materials:'.($materialType ?? 'none'), now()->addMinute(), fn () => DB::table('tbl_materials')
             ->where('status', 1)
-            ->when($materialType, fn ($query) => $query->where('mtart', $materialType))
+            ->when($materialType, fn ($query) => $query->whereRaw('UPPER(TRIM(mtart)) = ?', [$materialType]))
             ->when(! $materialType, fn ($query) => $query->whereRaw('1 = 0'))
             ->orderBy('maktx')->get(['matnr', 'maktx', 'meins', 'mtart']));
         if ($plantCode !== '' && ! $plants->contains('company_code', $plantCode)) {
@@ -64,21 +68,61 @@ class AllBalanceSheetController extends Controller
         }
         $selectedPlants = $plantCode !== '' ? $plants->where('company_code', $plantCode) : $plants;
         $selectedMaterials = $materialCode !== '' ? $materials->where('matnr', $materialCode) : $materials;
-        $plantIds = $selectedPlants->pluck('id');
         $plantCodes = $selectedPlants->pluck('company_code');
         $materialCodes = $selectedMaterials->pluck('matnr');
 
-        $stocks = DB::table('tbl_material_stocks')->where('status', 1)
+        $stockQuery = DB::table('tbl_material_stocks')->where('status', 1)
             ->whereIn('plant_code', $plantCodes)->whereIn('matnr', $materialCodes)
-            ->select('matnr', 'plant_code', DB::raw('SUM(current_stock) as current_stock'))
-            ->groupBy('matnr', 'plant_code')->get()->keyBy(fn ($row) => $row->matnr.'|'.$row->plant_code);
+            ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
+                ->where('matnr', 'like', "%{$search}%")
+                ->orWhere('material_desc', 'like', "%{$search}%")
+                ->orWhere('plant_code', 'like', "%{$search}%")))
+            ->select(
+                'matnr',
+                'plant_code',
+                DB::raw('SUM(current_stock) as current_stock'),
+                DB::raw('SUM(auto_perday_consumption) * '.((int) $monthEnd->day).' as auto_monthly_consumption'),
+                DB::raw('SUM(auto_perday_consumption) as auto_perday_consumption'),
+            )
+            ->groupBy('matnr', 'plant_code');
+        $stockSortColumn = match ($sort) {
+            'plant_name', 'plant_code' => 'plant_code',
+            'opening_stock' => 'current_stock',
+            'auto_monthly_consumption' => 'auto_monthly_consumption',
+            'auto_perday_consumption' => 'auto_perday_consumption',
+            default => 'matnr',
+        };
+        $stockPage = $stockQuery
+            ->orderBy($stockSortColumn, $direction)
+            ->orderBy('matnr')
+            ->orderBy('plant_code')
+            ->paginate($perPage, ['*'], 'page', max(1, $request->integer('page', 1)));
+        $stocks = collect($stockPage->items())->keyBy(fn ($row) => $row->matnr.'|'.$row->plant_code);
+        $pageMaterialCodes = $stocks->pluck('matnr')->unique()->values();
+        $plantsByCode = $selectedPlants->keyBy('company_code');
+        $pagePlantIds = $stocks->pluck('plant_code')->unique()->map(fn ($code) => $plantsByCode->get($code)?->id)->filter()->values();
+        $scopeDecisions = DB::table('procurement_planning_decisions')
+            ->where('company_id', $selectedCompany->id)
+            ->whereDate('planning_month', $monthStart->toDateString())
+            ->where('status', 1);
+        $planningMode = (clone $scopeDecisions)->where('planning_mode', 'auto')->exists() || ! (clone $scopeDecisions)->exists()
+            ? 'auto'
+            : 'manual';
+        $planningDecisions = DB::table('procurement_planning_decisions')
+            ->where('company_id', $selectedCompany->id)
+            ->whereDate('planning_month', $monthStart->toDateString())
+            ->where('status', 1)
+            ->whereIn('plant_id', $pagePlantIds)
+            ->whereIn('material', $pageMaterialCodes)
+            ->get(['plant_id', 'material', 'planning_mode'])
+            ->keyBy(fn ($decision) => $decision->material.'|'.$decision->plant_id);
         $consumptions = DB::table('procurement_daily_consumptions')->where('status', 1)
-            ->whereIn('plant_id', $plantIds)->whereIn('material', $materialCodes)
+            ->whereIn('plant_id', $pagePlantIds)->whereIn('material', $pageMaterialCodes)
             ->whereDate('consumption_date', '<=', $monthEnd->toDateString())
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $monthStart->toDateString()))
             ->orderByDesc('consumption_date')->get()->groupBy(fn ($row) => $row->material.'|'.$row->plant_id);
         $purchases = DB::table('vw_procurement_purchase_receipts')->where('status', 1)
-            ->where('delivery_status', '!=', 'cancelled')->whereIn('plant_id', $plantIds)->whereIn('material', $materialCodes)
+            ->where('delivery_status', '!=', 'cancelled')->whereIn('plant_id', $pagePlantIds)->whereIn('material', $pageMaterialCodes)
             ->whereBetween('expected_delivery_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
             ->select(
                 'material',
@@ -88,40 +132,52 @@ class AllBalanceSheetController extends Controller
             )
             ->groupBy('material', 'plant_id')->get()->keyBy(fn ($row) => $row->material.'|'.$row->plant_id);
 
-        $rows = $selectedMaterials->flatMap(function ($material) use ($selectedPlants, $stocks, $consumptions, $purchases, $monthStart, $monthEnd) {
-            return $selectedPlants->map(function ($plant) use ($material, $stocks, $consumptions, $purchases, $monthStart, $monthEnd) {
-                $key = $material->matnr.'|'.$plant->id;
-                $activePlan = $consumptions->get($key, collect())->first();
-                $openingStock = (float) ($stocks->get($material->matnr.'|'.$plant->company_code)?->current_stock ?? 0) / 1000;
-                $dailyConsumption = (float) ($activePlan?->quantity_mt ?? 0);
-                $isStartMonth = $activePlan && CarbonImmutable::parse($activePlan->consumption_date)->format('Y-m') === $monthStart->format('Y-m');
-                $days = $activePlan ? ($activePlan->period_type === 'datewise' ? 1 : ($isStartMonth ? max(1, (int) $activePlan->day_count) : $monthEnd->day)) : $monthEnd->day;
-                $consumption = $dailyConsumption * $days;
-                $plannedBuying = (float) ($activePlan?->planned_buying_mt ?? 0);
-                $localPurchases = (float) ($purchases->get($key)?->local_quantity_mt ?? 0);
-                $sapPurchases = (float) ($purchases->get($key)?->sap_quantity_mt ?? 0);
-                $imports = $localPurchases + $sapPurchases;
-                $supplierReceipts = $imports;
-                $totalBuying = $plannedBuying + $imports;
-                $availability = $openingStock + $totalBuying;
-                $closingStock = $availability - $consumption;
+        $materialsByCode = $selectedMaterials->keyBy('matnr');
+        $rows = $stocks->values()->map(function ($stock) use ($materialsByCode, $plantsByCode, $consumptions, $purchases, $monthStart, $monthEnd, $planningDecisions) {
+            $material = $materialsByCode->get($stock->matnr);
+            $plant = $plantsByCode->get($stock->plant_code);
+            $key = $stock->matnr.'|'.$plant->id;
+            $activePlan = $consumptions->get($key, collect())->first();
+            $openingStock = (float) $stock->current_stock / 1000;
+            $autoMonthlyConsumption = (float) $stock->auto_monthly_consumption / 1000;
+            $autoPerdayConsumption = (float) $stock->auto_perday_consumption / 1000;
+            $manualPerdayConsumption = (float) ($activePlan?->quantity_mt ?? 0);
+            $rowPlanningMode = $planningDecisions->get($key)?->planning_mode ?? 'auto';
+            if ($rowPlanningMode === 'manual' && ! $activePlan) {
+                return null;
+            }
+            $dailyConsumption = $rowPlanningMode === 'auto' ? $autoPerdayConsumption : $manualPerdayConsumption;
+            $isStartMonth = $activePlan && CarbonImmutable::parse($activePlan->consumption_date)->format('Y-m') === $monthStart->format('Y-m');
+            $days = $rowPlanningMode === 'auto'
+                ? $monthEnd->day
+                : ($activePlan ? ($activePlan->period_type === 'datewise' ? 1 : ($isStartMonth ? max(1, (int) $activePlan->day_count) : $monthEnd->day)) : $monthEnd->day);
+            $consumption = $dailyConsumption * $days;
+            $plannedBuying = (float) ($activePlan?->planned_buying_mt ?? 0);
+            $localPurchases = (float) ($purchases->get($key)?->local_quantity_mt ?? 0);
+            $sapPurchases = (float) ($purchases->get($key)?->sap_quantity_mt ?? 0);
+            $imports = $localPurchases + $sapPurchases;
+            $supplierReceipts = $imports;
+            $totalBuying = $plannedBuying + $imports;
+            $availability = $openingStock + $totalBuying;
+            $closingStock = $availability - $consumption;
 
-                return [
-                    'material' => $material->matnr, 'material_name' => $material->maktx, 'unit' => $material->meins,
-                    'plant_code' => $plant->company_code, 'plant_name' => $plant->company_name,
-                    'opening_stock' => $openingStock, 'daily_consumption' => $dailyConsumption, 'days' => $days,
-                    'consumption' => $consumption, 'planned_buying' => $plannedBuying, 'imports' => $imports,
-                    'supplier_receipts' => $supplierReceipts, 'total_buying' => $totalBuying,
-                    'total_availability' => $availability, 'closing_stock' => $closingStock,
-                    'shortage' => max(0, $consumption - $availability),
-                ];
-            });
-        })->filter(fn (array $row) => $search === '' || str_contains(strtolower(implode(' ', [$row['material'], $row['material_name'], $row['plant_code'], $row['plant_name']])), strtolower($search)));
+            return [
+                'material' => $stock->matnr, 'material_name' => $material?->maktx ?? $stock->matnr, 'unit' => $material?->meins,
+                'plant_code' => $stock->plant_code, 'plant_name' => $plant->company_name,
+                'opening_stock' => $openingStock,
+                'auto_monthly_consumption' => $autoMonthlyConsumption,
+                'auto_perday_consumption' => $autoPerdayConsumption,
+                'planning_mode' => $rowPlanningMode,
+                'daily_consumption' => $dailyConsumption, 'days' => $days,
+                'consumption' => $consumption, 'planned_buying' => $plannedBuying, 'imports' => $imports,
+                'supplier_receipts' => $supplierReceipts, 'total_buying' => $totalBuying,
+                'total_availability' => $availability, 'closing_stock' => $closingStock,
+                'shortage' => max(0, $consumption - $availability),
+            ];
+        })->filter()->filter(fn (array $row) => $search === '' || str_contains(strtolower(implode(' ', [$row['material'], $row['material_name'], $row['plant_code'], $row['plant_name']])), strtolower($search)));
 
-        $rows = ($direction === 'desc' ? $rows->sortByDesc($sort) : $rows->sortBy($sort))->values();
-
-        $page = max(1, $request->integer('page', 1));
-        $paginated = new LengthAwarePaginator($rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page, ['path' => $request->url(), 'query' => $request->query()]);
+        $rows = $rows->unique(fn (array $row) => $row['material'].'|'.$row['plant_code'])->values();
+        $paginated = new LengthAwarePaginator($rows, $stockPage->total(), $perPage, $stockPage->currentPage(), ['path' => $request->url(), 'query' => $request->query()]);
 
         return Inertia::render('modules/procurement/planning/all-balance-sheet', [
             'rows' => $paginated,
@@ -129,6 +185,7 @@ class AllBalanceSheetController extends Controller
             'plants' => $plants,
             'materials' => $materials,
             'filters' => ['month' => $month->format('Y-m'), 'company_code' => $companyCode, 'plant_code' => $plantCode, 'material' => $materialCode, 'search' => $search, 'per_page' => $perPage, 'sort' => $sort, 'direction' => $direction],
+            'planningMode' => $planningMode,
             'summary' => [
                 'plants' => $selectedPlants->count(), 'materials' => $selectedMaterials->count(),
                 'opening_stock' => $rows->sum('opening_stock'), 'consumption' => $rows->sum('consumption'),

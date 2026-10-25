@@ -3,7 +3,8 @@ import ProcurementPageHeader from '@/components/procurement-page-header';
 import { RowExpandButton } from '@/components/row-expand-button';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Boxes,
@@ -29,6 +30,8 @@ type Row = {
     plant_code: string;
     plant_name: string;
     opening_stock: number;
+    auto_monthly_consumption: number;
+    auto_perday_consumption: number;
     daily_consumption: number;
     days: number;
     consumption: number;
@@ -100,7 +103,7 @@ function SearchableFilterSelect({
                 value={query}
                 placeholder={placeholder}
                 className="border-input h-10 w-full rounded-lg border bg-white pr-9 pl-9 text-sm font-medium shadow-sm transition outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-                onFocus={(event) => {
+                onFocus={() => {
                     setOpen(true);
                     setQuery('');
                 }}
@@ -160,6 +163,7 @@ export default function AllBalanceSheet({
     materials,
     filters,
     summary,
+    planningMode,
 }: {
     rows: Page<Row>;
     companies: { id: number; company_code: string; company_name: string }[];
@@ -174,14 +178,18 @@ export default function AllBalanceSheet({
         closing_stock: number;
         shortage: number;
     };
+    planningMode: 'auto' | 'manual';
 }) {
-    const month = filters.month;
+    const { datatable } = usePage<SharedData>().props;
+    const [month, setMonth] = useState(filters.month);
     const [companyCode, setCompanyCode] = useState(filters.company_code);
     const [plantCode, setPlantCode] = useState(filters.plant_code || 'all');
     const [material, setMaterial] = useState(filters.material || 'all');
     const [expanded, setExpanded] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const tableRef = useRef<HTMLElement>(null);
+    useEffect(() => setMonth(filters.month), [filters.month]);
+    const availablePlants = plants.filter((plant) => String(plant.parent_company_id) === companyCode);
     const apply = (event?: FormEvent) => {
         event?.preventDefault();
         router.get(
@@ -226,8 +234,9 @@ export default function AllBalanceSheet({
             'plant_code',
             'plant_name',
             'opening_stock',
+            'auto_monthly_consumption',
+            'auto_perday_consumption',
             'daily_consumption',
-            'days',
             'consumption',
             'planned_buying',
             'imports',
@@ -252,16 +261,16 @@ export default function AllBalanceSheet({
             breadcrumbs={[
                 { title: 'Procurement', href: '/admin/procurement' },
                 {
-                    title: 'All Material Stock',
+                    title: 'Balance sheet',
                     href: '/admin/procurement/all-balance-sheet',
                 },
             ]}
         >
-            <Head title="All Material Stock" />
+            <Head title="Procurement Balance Sheet" />
             <main className="procurement-compact w-full min-w-0 space-y-3 p-3 sm:p-4">
                 <div className="relative z-30 grid items-center overflow-visible rounded-2xl border border-t-[3px] border-white/10 border-t-orange-500 bg-gradient-to-br from-[#062f42] via-[#075b70] to-[#0b91a7] p-3 shadow-lg shadow-slate-900/15 xl:grid-cols-[minmax(420px,0.75fr)_minmax(0,2fr)] xl:gap-4 print:hidden">
                     <ProcurementPageHeader
-                        title="All Material Stock"
+                        title="Procurement Balance Sheet"
                         icon={FileSpreadsheet}
                         embedded
                         actions={
@@ -290,8 +299,8 @@ export default function AllBalanceSheet({
                         }
                     />
                     <section className="rounded-xl border border-white/15 bg-white/10 p-3 shadow-inner shadow-black/5 backdrop-blur-md">
-                        <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1.5fr_auto] xl:items-end">
-                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
+                        <form onSubmit={apply} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end">
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase xl:col-span-3">
                                 Company
                                 <SearchableFilterSelect
                                     value={companyCode}
@@ -313,19 +322,19 @@ export default function AllBalanceSheet({
                                                 sort: filters.sort,
                                                 direction: filters.direction,
                                             },
-                                            { preserveState: true, replace: true },
+                                            { preserveState: false, replace: true },
                                         );
                                     }}
                                 />
                             </label>
-                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase xl:col-span-3">
                                 Plant
                                 <SearchableFilterSelect
                                     value={plantCode}
                                     onValueChange={setPlantCode}
                                     options={[
                                         { value: 'all', label: 'All Plants' },
-                                        ...plants.map((plant) => ({
+                                        ...availablePlants.map((plant) => ({
                                             value: plant.company_code,
                                             label: `${plant.company_code} · ${plant.company_name}`,
                                         })),
@@ -333,7 +342,7 @@ export default function AllBalanceSheet({
                                     placeholder="Search plant..."
                                 />
                             </label>
-                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase">
+                            <label className="space-y-1 text-[10px] font-bold tracking-wide text-cyan-50 uppercase xl:col-span-4">
                                 Material
                                 <SearchableFilterSelect
                                     value={material}
@@ -348,7 +357,7 @@ export default function AllBalanceSheet({
                                     placeholder="Search material code or description..."
                                 />
                             </label>
-                            <Button className="h-10 rounded-lg bg-cyan-500 px-6 font-semibold text-white shadow-md shadow-cyan-950/15 hover:bg-cyan-400">
+                            <Button className="h-10 rounded-lg bg-cyan-500 px-6 font-semibold text-white shadow-md shadow-cyan-950/15 hover:bg-cyan-400 xl:col-span-2">
                                 <Filter className="size-4" />
                                 Apply
                             </Button>
@@ -387,7 +396,8 @@ export default function AllBalanceSheet({
                             <h2 className="font-semibold text-slate-900">Balance details</h2>
                             <p className="text-xs text-slate-500">
                                 {filters.company_code} · {filters.plant_code || 'All Plants'} ·{' '}
-                                {filters.material || `All ${materials[0]?.mtart || ''} Materials`} · {filters.month}
+                                {filters.material || `All ${materials[0]?.mtart || ''} Materials`} · {filters.month} ·{' '}
+                                {planningMode === 'auto' ? 'Auto' : 'Manual'} mode
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -401,7 +411,7 @@ export default function AllBalanceSheet({
                         </div>
                     </header>
                     <div className={`min-h-[420px] overflow-auto ${expanded ? 'min-h-0 flex-1' : 'max-h-[calc(100vh-330px)]'}`}>
-                        <table className="w-full min-w-[1022px] border-separate border-spacing-0 text-xs">
+                        <table className="w-full min-w-[1380px] border-separate border-spacing-0 text-xs">
                             <thead className="sticky top-0 z-20 bg-slate-100 text-[10px] font-bold tracking-wide text-slate-600 uppercase">
                                 <tr>
                                     <th className="sticky left-0 z-30 w-14 min-w-14 border-b bg-slate-100 px-1 py-3 text-center">Action</th>
@@ -424,8 +434,9 @@ export default function AllBalanceSheet({
                                     />
                                     {[
                                         ['Opening Stock', 'opening_stock'],
-                                        ['Avg/Day', 'daily_consumption'],
-                                        ['Days', 'days'],
+                                        ['Auto Monthly', 'auto_monthly_consumption'],
+                                        ['Auto/Day', 'auto_perday_consumption'],
+                                        [`Avg/Day (${planningMode === 'auto' ? 'Auto' : 'Manual'})`, 'daily_consumption'],
                                     ].map(([label, column]) => (
                                         <DataTableSortHeader
                                             key={column}
@@ -478,15 +489,20 @@ export default function AllBalanceSheet({
                                                     <b>{row.plant_name}</b>
                                                     <span className="block text-[11px] text-slate-500">{row.plant_code}</span>
                                                 </td>
-                                                {[row.opening_stock, row.daily_consumption, row.days].map((value, index) => (
+                                                {[
+                                                    row.opening_stock,
+                                                    row.auto_monthly_consumption,
+                                                    row.auto_perday_consumption,
+                                                    row.daily_consumption,
+                                                ].map((value, index) => (
                                                     <td key={index} className="px-3 py-3 text-right tabular-nums">
-                                                        {index === 2 ? value : number(value)}
+                                                        {number(value)}
                                                     </td>
                                                 ))}
                                             </tr>
                                             {rowOpen && (
                                                 <tr className="bg-orange-50/40">
-                                                    <td colSpan={7} className="border-y border-orange-100 p-0">
+                                                    <td colSpan={8} className="border-y border-orange-100 p-0">
                                                         <div
                                                             className={`sticky left-0 px-4 py-5 sm:px-6 ${expanded ? 'w-[calc(100vw-1rem)]' : 'w-[calc(100vw-1rem)] lg:w-[calc(100vw-17rem)]'}`}
                                                         >
@@ -517,7 +533,7 @@ export default function AllBalanceSheet({
                                                                             <Link
                                                                                 href={`/admin/procurement/balance-sheet?material=${encodeURIComponent(row.material)}&month=${encodeURIComponent(filters.month)}&months=3`}
                                                                             >
-                                                                                <FileSpreadsheet className="size-3.5" /> View balance sheet
+                                                                                <FileSpreadsheet className="size-3.5" /> View RM Inventories
                                                                             </Link>
                                                                         </Button>
                                                                     </div>
@@ -525,8 +541,9 @@ export default function AllBalanceSheet({
                                                                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                                                     {[
                                                                         ['Opening stock', row.opening_stock],
+                                                                        ['Auto monthly consumption', row.auto_monthly_consumption],
+                                                                        ['Auto consumption/day', row.auto_perday_consumption],
                                                                         ['Average per day', row.daily_consumption],
-                                                                        ['Days', row.days],
                                                                         ['Monthly consumption', row.consumption],
                                                                         ['Planned buying', row.planned_buying],
                                                                         ['Imports', row.imports],
@@ -544,7 +561,7 @@ export default function AllBalanceSheet({
                                                                                 {label}
                                                                             </p>
                                                                             <p className="mt-1 text-sm font-bold text-slate-800 tabular-nums">
-                                                                                {label === 'Days' ? Number(value) : `${number(Number(value))} MT`}
+                                                                                {`${number(Number(value))} MT`}
                                                                             </p>
                                                                         </div>
                                                                     ))}
@@ -573,7 +590,7 @@ export default function AllBalanceSheet({
                                 value={filters.per_page}
                                 onChange={(event) => loadTable(filters.sort, filters.direction, Number(event.target.value))}
                             >
-                                {[25, 50, 100, 200].map((size) => (
+                                {datatable.pageSizeOptions.map((size) => (
                                     <option key={size} value={size}>
                                         {size}
                                     </option>

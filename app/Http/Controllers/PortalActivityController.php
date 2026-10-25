@@ -21,7 +21,7 @@ class PortalActivityController extends Controller
 
         $logs = PortalLog::query()
             ->with('user:id,first_name,last_name')
-            ->when(! $request->user()->hasRole('Super Admin'), fn ($query) => $query->where('user_id', $request->user()->getKey()))
+            ->when(! $request->user()->hasRole('Owner'), fn ($query) => $query->where('user_id', $request->user()->getKey()))
             ->when(isset($validated['from']), fn ($query) => $query->whereDate('created_at', '>=', $validated['from']))
             ->when(isset($validated['to']), fn ($query) => $query->whereDate('created_at', '<=', $validated['to']))
             ->when(isset($validated['method']), fn ($query) => $query->where('method', $validated['method']))

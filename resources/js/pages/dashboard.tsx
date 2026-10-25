@@ -118,7 +118,7 @@ export default function Dashboard({
     }>;
 }) {
     const { auth, activeModules } = usePage<SharedData>().props;
-    const isSuperAdmin = auth.roles.includes('Super Admin');
+    const isSuperAdmin = auth.roles.some((role) => role.toLowerCase() === 'owner');
     const procurementActive = activeModules.includes('procurement');
     const salesActive = activeModules.includes('sales');
     const canViewProcurement = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('procurement.'));
@@ -395,12 +395,12 @@ export default function Dashboard({
     const maximumProductSale = Math.max(...productSales.map((sale) => sale.value), 1);
     const accessRows = isSuperAdmin
         ? [
-              { resource: 'Users', capability: 'Full access', source: 'Super Admin' },
-              { resource: 'Roles', capability: 'Full access', source: 'Super Admin' },
+              { resource: 'Users', capability: 'Full access', source: 'Owner' },
+              { resource: 'Roles', capability: 'Full access', source: 'Owner' },
               {
                   resource: 'Permissions',
                   capability: 'Full access',
-                  source: 'Super Admin',
+                  source: 'Owner',
               },
               { resource: 'Profile', capability: 'Manage own', source: 'Account' },
           ]

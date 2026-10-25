@@ -9,6 +9,8 @@ export default function ProcurementPageHeader({
     meta,
     actions,
     embedded = false,
+    showEyebrow = true,
+    compact = false,
 }: {
     title: string;
     subtitle?: string;
@@ -16,16 +18,19 @@ export default function ProcurementPageHeader({
     meta?: string;
     actions?: ReactNode;
     embedded?: boolean;
+    showEyebrow?: boolean;
+    compact?: boolean;
 }) {
     return (
         <ProjectPageHeader
-            eyebrow="Procurement"
+            eyebrow={showEyebrow ? 'Procurement' : undefined}
             title={title}
             subtitle={subtitle}
             icon={<Icon className="size-5" />}
             meta={meta}
             actions={actions}
             embedded={embedded}
+            compact={compact}
         />
     );
 }

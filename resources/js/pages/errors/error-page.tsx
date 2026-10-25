@@ -12,7 +12,7 @@ interface ErrorPageProps {
 export default function ErrorPage({ status, title, description }: ErrorPageProps) {
     const { auth } = usePage<SharedData>().props;
     const Icon = status === 403 ? LockKeyhole : SearchX;
-    const canViewDashboard = auth.roles.includes('Super Admin') || auth.permissions.includes('dashboard.view');
+    const canViewDashboard = auth.roles.some((role) => role.toLowerCase() === 'owner') || auth.permissions.includes('dashboard.view');
     const safeDestination = canViewDashboard ? '/dashboard' : '/settings/profile';
     const SafeDestinationIcon = canViewDashboard ? Home : UserRound;
     const safeDestinationLabel = canViewDashboard ? 'Dashboard' : 'My profile';

@@ -9,7 +9,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Super Admin');
+    $this->admin->assignRole('Owner');
 });
 
 test('an authorized user can assign normalized roles to a user', function () {
@@ -22,10 +22,10 @@ test('an authorized user can assign normalized roles to a user', function () {
     expect($user->refresh()->hasAllRoles(['Administrator', 'Viewer']))->toBeTrue();
 });
 
-test('a super administrator cannot remove their own privileged role', function () {
+test('an owner cannot remove their own privileged role', function () {
     $this->actingAs($this->admin)->put(route('admin.users.roles.update', $this->admin), [
         'roles' => ['Viewer'],
     ])->assertSessionHasErrors('roles');
 
-    expect($this->admin->refresh()->hasRole('Super Admin'))->toBeTrue();
+    expect($this->admin->refresh()->hasRole('Owner'))->toBeTrue();
 });

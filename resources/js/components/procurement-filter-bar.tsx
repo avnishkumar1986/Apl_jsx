@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Check, ChevronDown, Filter, RotateCcw, Search } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, Filter, RotateCcw, Search } from 'lucide-react';
 import { type FormEvent, type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 type Option = { value: string; label: string };
@@ -102,9 +102,134 @@ function SearchSelect({
     );
 }
 
-function Field({ label, children, dark = false }: { label: string; children: ReactNode; dark?: boolean }) {
+function MonthYearPicker({
+    value,
+    min,
+    max,
+    availableMonths,
+    onChange,
+}: {
+    value: string;
+    min?: string;
+    max?: string;
+    availableMonths?: string[];
+    onChange: (value: string) => void;
+}) {
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+    const selectedYear = Number(value.slice(0, 4)) || new Date().getFullYear();
+    const allMonthsSelected = value.endsWith('-all');
+    const selectedMonth = Number(value.slice(5, 7)) || new Date().getMonth() + 1;
+    const [year, setYear] = useState(selectedYear);
+    const minYear = Number(min?.slice(0, 4)) || new Date().getFullYear();
+    const maxYear = Number(max?.slice(0, 4)) || minYear + 20;
+    const years = Array.from({ length: maxYear - minYear + 1 }, (_, index) => minYear + index);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const availableSet = useMemo(() => new Set(availableMonths || []), [availableMonths]);
+    const availableInYear = availableMonths?.filter((item) => item.startsWith(`${year}-`)).length ?? 0;
+    const label = allMonthsSelected
+        ? `All months ${selectedYear}`
+        : new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(selectedYear, selectedMonth - 1, 1));
+
+    useEffect(() => setYear(selectedYear), [selectedYear]);
+    useEffect(() => {
+        const close = (event: MouseEvent) => {
+            if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, []);
+
+    const chooseMonth = (month: number) => {
+        const next = `${year}-${String(month).padStart(2, '0')}`;
+        if ((!min || next >= min) && (!max || next <= max)) {
+            onChange(next);
+            setOpen(false);
+        }
+    };
+
     return (
-        <div className="min-w-0 space-y-1">
+        <div ref={rootRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+                className="border-input flex h-10 w-full items-center justify-between gap-3 rounded-lg border bg-white px-3 text-left text-sm font-semibold text-slate-800 shadow-sm transition outline-none hover:border-cyan-300 focus:border-cyan-500 focus:ring-[3px] focus:ring-cyan-500/20"
+            >
+                <span className="truncate">{label}</span>
+                <CalendarDays className="size-4 shrink-0 text-cyan-700" />
+            </button>
+            {open && (
+                <div className="absolute right-0 z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-slate-800 shadow-2xl shadow-slate-900/15">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-[10px] font-black tracking-wide text-cyan-700 uppercase">Planning period</p>
+                            <p className="text-xs font-semibold text-slate-500">Choose month and year</p>
+                        </div>
+                        <select
+                            value={year}
+                            onChange={(event) => setYear(Number(event.target.value))}
+                            className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                        >
+                            {years.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onChange(`${year}-all`);
+                            setOpen(false);
+                        }}
+                        disabled={availableMonths !== undefined && availableInYear === 0}
+                        className={`mb-2.5 h-9 w-full rounded-lg border text-xs font-bold transition ${allMonthsSelected && year === selectedYear ? 'border-cyan-600 bg-cyan-600 text-white shadow-sm' : 'border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100'} disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                        All available months of {year} {availableMonths !== undefined && `(${availableInYear})`}
+                    </button>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {months.map((month, index) => {
+                            const monthNumber = index + 1;
+                            const option = `${year}-${String(monthNumber).padStart(2, '0')}`;
+                            const selected = !allMonthsSelected && year === selectedYear && monthNumber === selectedMonth;
+                            const disabled = Boolean(
+                                (min && option < min)
+                                || (max && option > max)
+                                || (availableMonths !== undefined && !availableSet.has(option))
+                            );
+                            return (
+                                <button
+                                    key={month}
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() => chooseMonth(monthNumber)}
+                                    className={`h-9 rounded-lg text-xs font-bold transition ${selected ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'} disabled:cursor-not-allowed disabled:opacity-30`}
+                                >
+                                    {month}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const today = new Date();
+                            const current = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                            if (availableMonths !== undefined && !availableSet.has(current)) return;
+                            onChange(current);
+                            setYear(today.getFullYear());
+                            setOpen(false);
+                        }}
+                        className="mt-3 h-9 w-full rounded-lg border border-cyan-200 bg-cyan-50 text-xs font-bold text-cyan-800 transition hover:bg-cyan-100"
+                    >
+                        Current month
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function Field({ label, children, dark = false, className = '' }: { label: string; children: ReactNode; dark?: boolean; className?: string }) {
+    return (
+        <div className={`min-w-0 space-y-1 ${className}`}>
             <span className={`block text-xs font-semibold ${dark ? 'text-white/90' : 'text-slate-700'}`}>{label}</span>
             {children}
         </div>
@@ -123,6 +248,11 @@ export default function ProcurementFilterBar({
     onMaterialChange,
     onApply,
     onReset,
+    period,
+    onPeriodChange,
+    minPeriod,
+    maxPeriod,
+    availableMonths,
     embedded = false,
     showReset = false,
 }: {
@@ -137,11 +267,15 @@ export default function ProcurementFilterBar({
     onMaterialChange: (value: string) => void;
     onApply: (event: FormEvent) => void;
     onReset: () => void;
+    period?: string;
+    onPeriodChange?: (value: string) => void;
+    minPeriod?: string;
+    maxPeriod?: string;
+    availableMonths?: string[];
     embedded?: boolean;
     showReset?: boolean;
 }) {
-    const availablePlants =
-        companyCode === 'all' ? [] : plants.filter((plant) => !plant.parent_company_id || plant.parent_company_id === companyCode);
+    const availablePlants = companyCode === 'all' ? [] : plants.filter((plant) => plant.parent_company_id === companyCode);
     const selectedMaterialType = MATERIAL_TYPE_BY_COMPANY[companyCode];
     const availableMaterials = useMemo(
         () => (selectedMaterialType ? materials.filter((material) => material.mtart?.trim().toUpperCase() === selectedMaterialType) : []),
@@ -164,9 +298,9 @@ export default function ProcurementFilterBar({
         >
             <form
                 onSubmit={onApply}
-                className={`grid gap-3 md:grid-cols-2 ${showReset ? 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto_auto]' : 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto]'} xl:items-end`}
+                className={`grid gap-3 md:grid-cols-2 ${period && showReset ? 'xl:grid-cols-12' : showReset ? 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto_auto]' : 'xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(260px,1.45fr)_auto]'} xl:items-end`}
             >
-                <Field label="Company" dark={embedded}>
+                <Field label="Company" dark={embedded} className={period && showReset ? 'xl:col-span-2' : ''}>
                     <SearchSelect
                         value={companyCode}
                         options={companies.map((item) => ({ value: item.company_code, label: item.company_name }))}
@@ -179,7 +313,7 @@ export default function ProcurementFilterBar({
                         }}
                     />
                 </Field>
-                <Field label="Plant" dark={embedded}>
+                <Field label="Plant" dark={embedded} className={period && showReset ? 'xl:col-span-2' : ''}>
                     <SearchSelect
                         value={plantCode}
                         options={availablePlants.map((item) => ({ value: item.company_code, label: item.company_name }))}
@@ -190,7 +324,7 @@ export default function ProcurementFilterBar({
                         onChange={onPlantChange}
                     />
                 </Field>
-                <Field label="Material" dark={embedded}>
+                <Field label="Material" dark={embedded} className={period && showReset ? 'xl:col-span-4' : ''}>
                     <SearchSelect
                         value={materialCode}
                         options={availableMaterials.map((item) => ({
@@ -204,11 +338,22 @@ export default function ProcurementFilterBar({
                         onChange={onMaterialChange}
                     />
                 </Field>
-                <Button type="submit" className="h-10 gap-2 rounded-lg bg-cyan-500 px-5 font-semibold text-white shadow-sm hover:bg-cyan-400">
+                {period && onPeriodChange && (
+                    <Field label="Month & Year" dark={embedded} className="xl:col-span-2">
+                        <MonthYearPicker
+                            value={period}
+                            min={minPeriod}
+                            max={maxPeriod}
+                            availableMonths={availableMonths}
+                            onChange={onPeriodChange}
+                        />
+                    </Field>
+                )}
+                <Button type="submit" className={`h-10 w-full gap-1.5 rounded-lg bg-cyan-500 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 hover:shadow-md ${period && showReset ? 'xl:col-span-1' : ''}`}>
                     <Filter className="size-4" /> Apply
                 </Button>
                 {showReset && (
-                    <Button type="button" variant="outline" className="gap-2" onClick={onReset}>
+                    <Button type="button" variant="outline" className={`h-10 w-full gap-1.5 rounded-lg border-white/30 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:shadow-md ${period ? 'xl:col-span-1' : ''}`} onClick={onReset}>
                         <RotateCcw className="size-4" /> Reset
                     </Button>
                 )}

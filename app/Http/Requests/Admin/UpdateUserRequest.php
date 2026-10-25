@@ -16,6 +16,8 @@ class UpdateUserRequest extends FormRequest
         $this->merge([
             'role' => $this->input('role', 'Viewer'),
             'permanent_same_as_local' => $this->boolean('permanent_same_as_local'),
+            'gender' => filled($this->input('gender')) ? strtolower((string) $this->input('gender')) : null,
+            'marital_status' => filled($this->input('marital_status')) ? strtolower((string) $this->input('marital_status')) : null,
         ]);
     }
 
@@ -57,17 +59,28 @@ class UpdateUserRequest extends FormRequest
             'designation_id' => ['nullable', 'integer', Rule::exists('tbl_designations', 'des_id')->where('status', true)],
             'role' => ['required', 'string', Rule::exists('tbl_roles', 'name')->where('guard_name', 'web')->where('status', true)],
             'email' => [
-                'required', 'string', 'lowercase', 'email', 'max:255',
+                'nullable', 'string', 'lowercase', 'email', 'max:255',
                 Rule::unique('tbl_usrcontact', 'email')->ignore($user->primaryEmail?->id),
                 Rule::unique('tbl_usrlogin', 'username')->ignore($user->login?->id),
             ],
             'username' => [
-                'required', 'string', 'max:255',
+                'nullable', 'required_with:password', 'string', 'max:255',
                 Rule::unique('tbl_usrlogin', 'username')->ignore($user->login?->id),
                 Rule::unique('tbl_usrcontact', 'email')->ignore($user->primaryEmail?->id),
             ],
             'password' => ['nullable', 'string', 'min:8'],
-            'aadhaar_number' => ['nullable', 'regex:/^[0-9]{12}$/', Rule::unique('tbl_usrdocument', 'document_number')->where('document_type', 'aadhaar')->ignore($user->documents()->where('document_type', 'aadhaar')->value('id'))],
+            'aadhaar_number' => [
+                'nullable',
+                function (string $attribute, mixed $value, \Closure $fail) use ($user): void {
+                    $number = (string) $value;
+                    $storedNumber = (string) ($user->documents()->where('document_type', 'aadhaar')->value('document_number') ?? '');
+
+                    if (! preg_match('/^[0-9]{12}$/', $number) && ! ($storedNumber !== '' && hash_equals($storedNumber, $number))) {
+                        $fail('The Aadhaar number must contain exactly 12 digits.');
+                    }
+                },
+                Rule::unique('tbl_usrdocument', 'document_number')->where('document_type', 'aadhaar')->ignore($user->documents()->where('document_type', 'aadhaar')->value('id')),
+            ],
             'aadhaar_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'pan_number' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/', Rule::unique('tbl_usrdocument', 'document_number')->where('document_type', 'pan')->ignore($user->documents()->where('document_type', 'pan')->value('id'))],
             'pan_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],

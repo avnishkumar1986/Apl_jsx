@@ -452,13 +452,16 @@ class UserMasterController extends Controller
             $this->saveDepartment($user, $data);
             $this->saveIdentityDocuments($user, $data, $request);
 
-            $loginData = ['usr_type' => self::EMPLOYEE_USER_TYPE, 'username' => trim($data['username']), 'status' => $data['status']];
-            if (! empty($data['password'])) {
-                $loginData['password'] = $data['password'];
-            } elseif (! $user->login) {
-                $loginData['password'] = Str::password(24);
+            $username = trim((string) ($data['username'] ?? ''));
+            if ($username !== '') {
+                $loginData = ['usr_type' => self::EMPLOYEE_USER_TYPE, 'username' => $username, 'status' => $data['status']];
+                if (! empty($data['password'])) {
+                    $loginData['password'] = $data['password'];
+                } elseif (! $user->login) {
+                    $loginData['password'] = Str::password(24);
+                }
+                $user->login()->updateOrCreate(['user_id' => $user->unique_id], $loginData);
             }
-            $user->login()->updateOrCreate(['user_id' => $user->unique_id], $loginData);
             $this->saveContact($user, $data);
             $this->saveAddress($user, $data);
             $this->saveEducation($user, $data);
@@ -494,7 +497,7 @@ class UserMasterController extends Controller
                 'user_type' => self::EMPLOYEE_USER_TYPE,
                 'document_number' => $type === 'pan' && filled($number) ? Str::upper($number) : $number,
                 'document_name' => strtoupper($type),
-                'status' => 'active',
+                'status' => true,
             ];
 
             if ($file) {

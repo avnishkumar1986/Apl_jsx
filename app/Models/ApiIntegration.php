@@ -10,11 +10,13 @@ class ApiIntegration extends Model
 {
     protected $table = 'tbl_api_integrations';
 
-    protected $fillable = ['name', 'code', 'description', 'base_url', 'endpoint', 'method', 'auth_type', 'credential_key', 'target_table', 'retries', 'retry_delay_seconds', 'timeout_seconds', 'status', 'last_run_status', 'last_run_at', 'created_by', 'updated_by'];
+    protected $fillable = ['name', 'code', 'description', 'api_type', 'endpoint', 'credentials', 'target_table', 'retries', 'retry_delay_seconds', 'timeout_seconds', 'status', 'last_run_status', 'last_run_at', 'created_by', 'updated_by'];
+
+    protected $hidden = ['credentials'];
 
     protected function casts(): array
     {
-        return ['target_table' => 'array', 'status' => 'boolean', 'last_run_at' => 'datetime', 'retries' => 'integer', 'retry_delay_seconds' => 'integer', 'timeout_seconds' => 'integer'];
+        return ['target_table' => 'array', 'credentials' => 'encrypted:array', 'status' => 'boolean', 'last_run_at' => 'datetime', 'retries' => 'integer', 'retry_delay_seconds' => 'integer', 'timeout_seconds' => 'integer'];
     }
 
     public function logs(): HasMany

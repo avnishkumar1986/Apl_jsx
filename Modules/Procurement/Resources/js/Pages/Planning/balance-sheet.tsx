@@ -18,12 +18,13 @@ import {
     Maximize2,
     Minimize2,
     Pencil,
+    Search,
     X,
 } from 'lucide-react';
 import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 type Company = { id: number; company_code: string; company_name: string };
-type Plant = Company & { record_type: number };
+type Plant = Company & { record_type: number; parent_company_id: string | null };
 type Material = { matnr: string; maktx: string; mtart: string | null; matkl: string | null; meins: string | null };
 type Metric =
     | 'opening_stock'
@@ -45,7 +46,20 @@ type PlantColumn = Plant &
         month: string;
         consumption_id: number | null;
         remarks: Partial<Record<Metric, string>>;
-        purchase_orders: { po_number: string; vendor_name: string; quantity_mt: number; eta: string; source: string; status: string }[];
+        purchase_orders: {
+            po_number: string;
+            vendor_name: string;
+            quantity_mt: number;
+            total_quantity_mt: number;
+            reduced_quantity_mt: number;
+            balance_quantity_mt: number;
+            rate: number;
+            amount: number;
+            currency: string | null;
+            eta: string;
+            source: string;
+            status: string;
+        }[];
     };
 type Filters = { company_code: string; plant_code: string | null; material: string; month: string; months: number };
 type MouPlan = { vendor_name: string; vendor_code: string | null; quantity_mt: number };
@@ -106,8 +120,6 @@ const metricFormulas: Record<Metric, { formula: string; note: string }> = {
         note: 'Each active PO is deducted once; cancelled POs are excluded.',
     },
 };
-const purchaseTotalBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
-    purchaseOrdersBySource(plant, source).reduce((total, purchase) => total + Number(purchase.quantity_mt), 0);
 const purchaseOrdersBySource = (plant: PlantColumn, source: 'sap' | 'local') =>
     plant.purchase_orders.filter(
         (purchase) => purchase.status !== 'cancelled' && (source === 'local' ? purchase.source === 'local' : purchase.source !== 'local'),
@@ -135,14 +147,16 @@ export default function BalanceSheet({
     const [companyCode, setCompanyCode] = useState(filters.company_code || '');
     const [plantCode, setPlantCode] = useState(filters.plant_code || 'all');
     const [material, setMaterial] = useState(filters.material);
+    const [planningMonth, setPlanningMonth] = useState(filters.month);
     const [showRemarks, setShowRemarks] = useState(true);
     const [expanded, setExpanded] = useState(false);
     const balanceRef = useRef<HTMLElement>(null);
-    const expandedReceipts = useMemo(() => new Set<string>(), []);
+    const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(() => new Set());
     const [viewingOrders, setViewingOrders] = useState<{ plant: PlantColumn; source: 'sap' | 'local' } | null>(null);
     const [editing, setEditing] = useState<{ plant: PlantColumn; metric: Metric } | null>(null);
     const [formulaMetric, setFormulaMetric] = useState<Metric | null>(null);
     const [remark, setRemark] = useState('');
+    const [materialSearch, setMaterialSearch] = useState('');
     const [mobilePlantIndex, setMobilePlantIndex] = useState(0);
     const mobilePlantSlider = useRef<HTMLDivElement>(null);
     const showMobilePlant = (index: number) => {
@@ -158,17 +172,17 @@ export default function BalanceSheet({
     useEffect(() => {
         setMobilePlantIndex((current) => Math.max(0, Math.min(current, columns.length - 1)));
     }, [columns.length]);
+    useEffect(() => {
+        setCompanyCode(filters.company_code || '');
+        setPlantCode(filters.plant_code || 'all');
+        setMaterial(filters.material);
+        setPlanningMonth(filters.month);
+    }, [filters.company_code, filters.material, filters.month, filters.plant_code]);
     const toggleExpanded = async () => (document.fullscreenElement ? document.exitFullscreen() : balanceRef.current?.requestFullscreen());
     useEffect(() => {
         const sync = () => setExpanded(document.fullscreenElement === balanceRef.current);
         document.addEventListener('fullscreenchange', sync);
         return () => document.removeEventListener('fullscreenchange', sync);
-    }, []);
-    useEffect(() => {
-        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-        if (navigation?.type === 'reload' && window.location.search) {
-            router.get('/admin/procurement/balance-sheet', {}, { preserveState: false, replace: true });
-        }
     }, []);
     const columnTints = [
         { header: 'bg-cyan-100/70', body: 'bg-cyan-50/45' },
@@ -176,7 +190,30 @@ export default function BalanceSheet({
         { header: 'bg-amber-100/70', body: 'bg-amber-50/45' },
         { header: 'bg-emerald-100/70', body: 'bg-emerald-50/45' },
     ];
+    const filteredMaterials = useMemo(() => {
+        const query = materialSearch.trim().toLowerCase();
+        return query
+            ? materials.filter((item) => `${item.matnr} ${item.maktx}`.toLowerCase().includes(query))
+            : materials;
+    }, [materialSearch, materials]);
+    const visibleMaterials = useMemo(() => filteredMaterials.slice(0, 100), [filteredMaterials]);
+    const openMaterial = (materialCode: string) =>
+        router.get(
+            '/admin/procurement/balance-sheet',
+            {
+                company_code: companyCode,
+                plant_code: plantCode === 'all' ? undefined : plantCode,
+                material,
+                selected_material: materialCode,
+                month: planningMonth,
+                months: filters.months,
+            },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
     const monthLabel = useMemo(() => {
+        if (!columns.length && filters.month.endsWith('-all')) {
+            return `All months ${filters.month.slice(0, 4)}`;
+        }
         const formatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
         const firstMonth = columns[0]?.month || filters.month;
         const lastMonth = columns.at(-1)?.month || firstMonth;
@@ -185,7 +222,6 @@ export default function BalanceSheet({
 
         return firstMonth === lastMonth ? firstLabel : `${firstLabel} – ${lastLabel}`;
     }, [columns, filters.month]);
-
     const applyFilters = (event?: FormEvent) => {
         event?.preventDefault();
         router.get(
@@ -194,7 +230,7 @@ export default function BalanceSheet({
                 company_code: companyCode,
                 plant_code: plantCode === 'all' ? undefined : plantCode,
                 material,
-                month: filters.month,
+                month: planningMonth,
                 months: filters.months,
             },
             { preserveState: true },
@@ -208,13 +244,22 @@ export default function BalanceSheet({
         if (!editing) return;
         router.put(
             '/admin/procurement/balance-sheet/remarks',
-            { material: filters.material, plant_id: editing.plant.id, month: editing.plant.month, metric: editing.metric, remark },
+            { material: selectedMaterial?.matnr || filters.material, plant_id: editing.plant.id, month: editing.plant.month, metric: editing.metric, remark },
             { preserveScroll: true, onSuccess: () => setEditing(null) },
         );
     };
     const toggleReceipts = (columnKey: string, source: 'sap' | 'local' = 'sap') => {
         const plant = columns.find((item) => item.column_key === columnKey);
-        setViewingOrders(plant ? { plant, source } : null);
+        if (source === 'local') {
+            setViewingOrders(plant ? { plant, source } : null);
+            return;
+        }
+        setExpandedReceipts((current) => {
+            const next = new Set(current);
+            if (next.has(columnKey)) next.delete(columnKey);
+            else next.add(columnKey);
+            return next;
+        });
     };
     const formatExportValue = (plant: PlantColumn, row: (typeof rows)[number]) => {
         const total = formatValue(plant[row.key], row.unit);
@@ -237,14 +282,16 @@ export default function BalanceSheet({
         const sheetRows: (string | number)[][] = [
             [`PROCUREMENT BALANCE SHEET · ${selectedMaterial?.maktx || filters.material}`],
             [`Company: ${company ? `${company.company_code} - ${company.company_name}` : filters.company_code}`],
-            [`Material: ${filters.material}`, `Planning horizon: ${monthLabel}`],
+            [`Material: ${selectedMaterial?.matnr || filters.material}`, `Planning horizon: ${monthLabel}`],
             [],
             ['Metric', ...columns.flatMap((plant) => (showRemarks ? [plant.name, ''] : [plant.name]))],
             ['Material / Unit', ...columns.flatMap(() => (showRemarks ? ['Value', 'Remarks'] : ['Value']))],
             ...rows.map((row) => [
                 row.label,
                 ...columns.flatMap((plant) =>
-                    showRemarks ? [formatExportValue(plant, row), plant.remarks[row.key] || ''] : [formatExportValue(plant, row)],
+                    showRemarks
+                        ? [plant[row.key] === null ? '' : Number(plant[row.key]), plant.remarks[row.key] || '']
+                        : [plant[row.key] === null ? '' : Number(plant[row.key])],
                 ),
             ]),
         ];
@@ -263,6 +310,35 @@ export default function BalanceSheet({
             },
         });
         worksheet.addRows(sheetRows);
+        columns.forEach((plant, plantIndex) => {
+            const valueColumn = 2 + plantIndex * (showRemarks ? 2 : 1);
+            const columnLetter = worksheet.getColumn(valueColumn).letter;
+            const setFormula = (rowNumber: number, formula: string, result: number | null) => {
+                worksheet.getCell(rowNumber, valueColumn).value = {
+                    formula,
+                    result: result === null ? undefined : Number(result),
+                };
+            };
+            const previousPlantIndex = columns.slice(0, plantIndex).findLastIndex((candidate) => candidate.id === plant.id);
+            if (previousPlantIndex >= 0) {
+                const previousColumn = 2 + previousPlantIndex * (showRemarks ? 2 : 1);
+                setFormula(7, `${worksheet.getColumn(previousColumn).letter}17`, plant.opening_stock);
+            }
+            setFormula(8, `IF(${columnLetter}13>0,${columnLetter}7/${columnLetter}13,0)`, plant.cover_days);
+            setFormula(11, `${columnLetter}9+${columnLetter}10`, plant.total_buying);
+            setFormula(12, `${columnLetter}7+${columnLetter}11`, plant.total_availability);
+            setFormula(15, `${columnLetter}13*${columnLetter}14`, plant.consumption);
+            setFormula(17, `${columnLetter}12-${columnLetter}15`, plant.closing_stock);
+            const sapOrders = purchaseOrdersBySource(plant, 'sap');
+            if (sapOrders.length) {
+                worksheet.getCell(10, valueColumn).note = sapOrders
+                    .map(
+                        (purchase) =>
+                            `${purchase.vendor_name}\n${purchase.source.toUpperCase()} PO ${purchase.po_number} · ${Number(purchase.quantity_mt).toFixed(3)} MT\nETA ${formatDateForDisplay(purchase.eta)} · ${purchase.status.replaceAll('_', ' ')}`,
+                    )
+                    .join('\n\n');
+            }
+        });
         worksheet.mergeCells(1, 1, 1, columnCount);
         if (showRemarks) columns.forEach((_, index) => worksheet.mergeCells(5, 2 + index * 2, 5, 3 + index * 2));
         worksheet.columns = Array.from({ length: columnCount }, (_, index) => {
@@ -313,6 +389,7 @@ export default function BalanceSheet({
                 if (Number(plant[row.key]) < 0) {
                     excelRow.getCell(valueColumn).font = { bold: true, color: { argb: 'FFDC2626' } };
                 }
+                excelRow.getCell(valueColumn).numFmt = row.key === 'days' ? '0' : '0.000';
                 if (row.key === 'buying_imports') {
                     excelRow.getCell(valueColumn).font = { size: 9, color: { argb: 'FF023249' } };
                     excelRow.getCell(valueColumn).alignment = { vertical: 'top', horizontal: 'left', wrapText: true, indent: 1 };
@@ -345,11 +422,70 @@ export default function BalanceSheet({
         worksheet.pageSetup.printTitlesRow = '1:6';
         worksheet.headerFooter.oddFooter = '&LProcurement Balance Sheet&CPage &P of &N&R&D';
         worksheet.headerFooter.evenFooter = '&LProcurement Balance Sheet&CPage &P of &N&R&D';
+        const poWorksheet = workbook.addWorksheet('PO Details', {
+            views: [{ state: 'frozen', ySplit: 1 }],
+            properties: { outlineProperties: { summaryBelow: false, summaryRight: false } },
+        });
+        poWorksheet.columns = [
+            { header: 'Plant / Month', key: 'plant', width: 34 },
+            { header: 'Vendor', key: 'vendor', width: 38 },
+            { header: 'Source', key: 'source', width: 12 },
+            { header: 'PO Number', key: 'po', width: 22 },
+            { header: 'Total Quantity (MT)', key: 'total_quantity', width: 20 },
+            { header: 'Reduced Quantity (MT)', key: 'reduced_quantity', width: 22 },
+            { header: 'Balance Quantity (MT)', key: 'balance_quantity', width: 22 },
+            { header: 'Rate', key: 'rate', width: 16 },
+            { header: 'Amount', key: 'amount', width: 18 },
+            { header: 'Currency', key: 'currency', width: 12 },
+            { header: 'ETA', key: 'eta', width: 14 },
+            { header: 'Status', key: 'status', width: 20 },
+        ];
+        poWorksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        poWorksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF075B70' } };
+        columns.forEach((plant) => {
+            const orders = plant.purchase_orders || [];
+            const summary = poWorksheet.addRow({
+                plant: plant.name,
+                vendor: `${orders.length} purchase order${orders.length === 1 ? '' : 's'} — use the + / − outline control to show or hide details`,
+                total_quantity: Number(orders.filter((order) => order.status !== 'cancelled').reduce((total, order) => total + Number(order.total_quantity_mt), 0)),
+            });
+            summary.font = { bold: true, color: { argb: 'FF023249' } };
+            summary.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F7FA' } };
+            orders.forEach((order) => {
+                const detail = poWorksheet.addRow({
+                    plant: '',
+                    vendor: order.vendor_name,
+                    source: order.source.toUpperCase(),
+                    po: order.po_number,
+                    total_quantity: Number(order.total_quantity_mt),
+                    reduced_quantity: Number(order.reduced_quantity_mt),
+                    balance_quantity: Number(order.balance_quantity_mt),
+                    rate: Number(order.rate),
+                    amount: Number(order.amount),
+                    currency: order.currency || '',
+                    eta: formatDateForDisplay(order.eta),
+                    status: order.status.replaceAll('_', ' '),
+                });
+                detail.outlineLevel = 1;
+                detail.hidden = true;
+            });
+        });
+        ['total_quantity', 'reduced_quantity', 'balance_quantity'].forEach((key) => (poWorksheet.getColumn(key).numFmt = '0.000'));
+        poWorksheet.getColumn('rate').numFmt = '#,##0.0000';
+        poWorksheet.getColumn('amount').numFmt = '#,##0.00';
+        poWorksheet.eachRow((row) => {
+            row.alignment = { vertical: 'middle', wrapText: true };
+            row.eachCell((cell) => {
+                cell.border = {
+                    bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } },
+                };
+            });
+        });
         const buffer = await workbook.xlsx.writeBuffer();
         const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
         const link = document.createElement('a');
         link.href = url;
-        link.download = `procurement-balance-${filters.material}-${filters.month}.xlsx`;
+        link.download = `procurement-balance-${selectedMaterial?.matnr || filters.material}-${filters.month}.xlsx`;
         link.click();
         URL.revokeObjectURL(url);
     };
@@ -480,12 +616,13 @@ export default function BalanceSheet({
         >
             <Head title="Procurement balance sheet" />
             <div className="procurement-compact mx-auto w-full max-w-full min-w-0 space-y-3 p-[clamp(10px,1.5vw,20px)]">
-                <div className="relative z-30 grid items-stretch overflow-visible rounded-2xl border-t-4 border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10 xl:grid-cols-[minmax(420px,0.8fr)_minmax(0,2fr)] xl:gap-3">
+                <div className="relative z-30 grid items-center gap-3 overflow-visible rounded-2xl border-t-4 border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10 xl:grid-cols-[minmax(290px,.55fr)_minmax(0,2.45fr)]">
                     <ProcurementPageHeader
-                        title="Procurement Balance Sheet"
-                        subtitle="Plant-wise demand, availability, purchasing, and closing stock planning"
+                        title="RM Inventories"
+                        subtitle="Material-wise Plant Stocks"
                         icon={FileText}
                         embedded
+                        showEyebrow={false}
                     />
                     <ProcurementFilterBar
                         companyCode={companyCode}
@@ -502,7 +639,7 @@ export default function BalanceSheet({
                                 '/admin/procurement/balance-sheet',
                                 {
                                     company_code: value === 'all' ? undefined : value,
-                                    month: filters.month,
+                                    month: planningMonth,
                                     months: filters.months,
                                 },
                                 { preserveState: true, replace: true },
@@ -513,7 +650,7 @@ export default function BalanceSheet({
                         onApply={applyFilters}
                         onReset={() => router.get('/admin/procurement/balance-sheet', {}, { preserveState: false, replace: true })}
                         embedded
-                        showReset={false}
+                        showReset
                     />
                 </div>
 
@@ -521,8 +658,8 @@ export default function BalanceSheet({
                     ref={balanceRef}
                     className={`relative z-10 min-w-0 overflow-hidden border bg-white shadow-sm ${expanded ? 'flex h-screen flex-col rounded-none' : 'rounded-xl'}`}
                 >
-                    <div className="flex items-center justify-between border-b px-4 py-3">
-                        <div className="flex gap-2">
+                    <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap gap-2">
                             <Button size="icon" variant="outline" title="Export Excel" onClick={exportExcel}>
                                 <FileSpreadsheet className="size-4" />
                             </Button>
@@ -548,12 +685,31 @@ export default function BalanceSheet({
                                 <span className="hidden sm:inline">{expanded ? 'Collapse' : 'Expand'}</span>
                             </Button>
                         </div>
-                        <b className="text-xs">{monthLabel}</b>
                     </div>
                     {columns.length === 0 ? (
-                        <div className="p-12 text-center text-sm text-slate-500">No active plants were found for the selected company.</div>
+                        <div className="p-12 text-center text-sm font-medium text-slate-500">
+                            {filters.plant_code
+                                ? 'No consumption plan exists for the selected plant, material, and month.'
+                                : 'No eligible planning data exists for the selected company, material, and month.'}
+                        </div>
                     ) : (
                         <>
+                            {filters.material === 'all' && (
+                                <div className="border-b bg-gradient-to-r from-cyan-50 to-white p-3 lg:hidden">
+                                    <label className="mb-1.5 block text-[10px] font-black tracking-[0.12em] text-cyan-800 uppercase">
+                                        {(selectedMaterial?.mtart || materials[0]?.mtart || 'Raw').trim().toUpperCase()} Materials
+                                    </label>
+                                    <select
+                                        value={selectedMaterial?.matnr || ''}
+                                        onChange={(event) => openMaterial(event.target.value)}
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                    >
+                                        {materials.map((item) => (
+                                            <option key={item.matnr} value={item.matnr}>{item.maktx} · {item.matnr}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div className="min-w-0 bg-slate-50/70 lg:hidden">
                                 <div
                                     ref={mobilePlantSlider}
@@ -663,7 +819,9 @@ export default function BalanceSheet({
                                                                             }}
                                                                             className="mt-1 ml-auto flex items-center gap-1 text-[9px] font-bold text-cyan-700"
                                                                         >
-                                                                            View SAP orders ({purchaseOrdersBySource(plant, 'sap').length})
+                                                                            {expandedReceipts.has(plant.column_key)
+                                                                                ? 'Show less'
+                                                                                : `Show more (${purchaseOrdersBySource(plant, 'sap').length})`}
                                                                             {expandedReceipts.has(plant.column_key) ? (
                                                                                 <ChevronUp className="size-3" />
                                                                             ) : (
@@ -698,6 +856,13 @@ export default function BalanceSheet({
                                                                                     <span className="shrink-0">
                                                                                         ETA {formatDateForDisplay(purchase.eta)}
                                                                                     </span>
+                                                                                </div>
+                                                                                <div className="mt-2 grid grid-cols-2 gap-1 border-t pt-2 text-slate-600">
+                                                                                    <span>Rate: <b>{purchase.currency || ''} {Number(purchase.rate).toLocaleString('en-IN')}</b></span>
+                                                                                    <span>Amount: <b>{purchase.currency || ''} {Number(purchase.amount).toLocaleString('en-IN')}</b></span>
+                                                                                    <span>Total: <b>{Number(purchase.total_quantity_mt).toFixed(3)} MT</b></span>
+                                                                                    <span>Reduced: <b>{Number(purchase.reduced_quantity_mt).toFixed(3)} MT</b></span>
+                                                                                    <span className="col-span-2">Balance: <b>{Number(purchase.balance_quantity_mt).toFixed(3)} MT</b></span>
                                                                                 </div>
                                                                             </div>
                                                                         ))}
@@ -747,13 +912,57 @@ export default function BalanceSheet({
                                     </Button>
                                 </div>
                             </div>
-                            <div
-                                className={`hidden w-full max-w-full overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto] lg:block ${expanded ? 'min-h-0 flex-1' : ''}`}
-                            >
+                            <div className={`hidden min-w-0 lg:flex ${expanded ? 'min-h-0 flex-1' : ''}`}>
+                                {filters.material === 'all' && (
+                                    <aside className="flex w-56 min-w-56 flex-col border-r border-slate-200 bg-slate-50/80">
+                                        <div className="border-b border-slate-200 bg-gradient-to-br from-cyan-50 to-white px-3 py-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-[10px] font-black tracking-[0.12em] text-cyan-900 uppercase">
+                                                    {(selectedMaterial?.mtart || materials[0]?.mtart || 'Raw').trim().toUpperCase()} Materials
+                                                </p>
+                                                <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[9px] font-bold text-cyan-700">{materials.length}</span>
+                                            </div>
+                                            <div className="relative mt-2.5">
+                                                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="search"
+                                                    value={materialSearch}
+                                                    onChange={(event) => setMaterialSearch(event.target.value)}
+                                                    placeholder="Search material..."
+                                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-2 pl-8 text-[10px] outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-[32rem] flex-1 overflow-y-auto p-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:thin]">
+                                            {visibleMaterials.map((item) => (
+                                                <button
+                                                    key={item.matnr}
+                                                    type="button"
+                                                    onClick={() => openMaterial(item.matnr)}
+                                                    className={`mb-1.5 block w-full overflow-hidden rounded-lg border px-2.5 py-2.5 text-left transition-all ${item.matnr === selectedMaterial?.matnr ? 'border-cyan-600 bg-gradient-to-r from-cyan-700 to-cyan-600 text-white shadow-sm shadow-cyan-900/15' : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-px hover:border-cyan-300 hover:bg-cyan-50 hover:shadow-sm'}`}
+                                                >
+                                                    <span className="block truncate text-[11px] font-bold">{item.maktx}</span>
+                                                    <span className={`mt-0.5 block truncate text-[9px] ${item.matnr === selectedMaterial?.matnr ? 'text-cyan-100' : 'text-slate-400'}`}>
+                                                        {item.matnr}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                            {filteredMaterials.length === 0 && (
+                                                <p className="px-2 py-10 text-center text-[10px] font-medium text-slate-400">No materials found</p>
+                                            )}
+                                            {filteredMaterials.length > visibleMaterials.length && (
+                                                <p className="px-2 py-2 text-center text-[9px] font-semibold text-slate-400">
+                                                    Showing {visibleMaterials.length} of {filteredMaterials.length}. Search to find another material.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </aside>
+                                )}
+                                <div className="min-w-0 flex-1 overflow-auto pb-2 [scrollbar-color:#0891b2_#e2e8f0] [scrollbar-width:auto]">
                                 <table className="w-max min-w-full border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-amber-50/60">
-                                            <th className="sticky left-0 z-20 w-72 max-w-72 min-w-72 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
+                                            <th className="sticky left-0 z-20 w-64 max-w-64 min-w-64 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
                                                 PROCUREMENT BALANCE SHEET · {selectedMaterial?.maktx || filters.material}
                                             </th>
                                             {columns.map((plant, plantIndex) => (
@@ -767,7 +976,7 @@ export default function BalanceSheet({
                                             ))}
                                         </tr>
                                         <tr className="bg-slate-50">
-                                            <th className="sticky left-0 z-20 w-72 max-w-72 min-w-72 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
+                                            <th className="sticky left-0 z-20 w-64 max-w-64 min-w-64 border bg-amber-50 px-3 py-3 text-left text-sm font-black break-words whitespace-normal">
                                                 {selectedMaterial?.mtart || 'MATERIAL'} · {selectedMaterial?.meins || 'UNIT'}
                                             </th>
                                             {columns.map((plant, plantIndex) => (
@@ -792,7 +1001,7 @@ export default function BalanceSheet({
                                         {rows.map((row) => (
                                             <tr key={row.key}>
                                                 <th
-                                                    className={`sticky left-0 z-10 w-72 max-w-72 min-w-72 border px-3 py-3 text-left font-semibold break-words whitespace-normal ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
+                                                    className={`sticky left-0 z-10 w-64 max-w-64 min-w-64 border px-3 py-3 text-left font-semibold break-words whitespace-normal ${row.labelHighlight ? 'bg-brand-berry text-white' : 'bg-white'}`}
                                                 >
                                                     <button
                                                         type="button"
@@ -809,7 +1018,7 @@ export default function BalanceSheet({
                                                 {columns.map((plant, plantIndex) => (
                                                     <Fragment key={`${plant.column_key}-${row.key}`}>
                                                         <td
-                                                            className={`w-48 max-w-48 min-w-48 border px-3 py-3 tabular-nums ${row.key === 'buying_imports' ? '!py-1.5 text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
+                                                            className={`${row.key === 'buying_imports' && expandedReceipts.has(plant.column_key) ? 'w-[330px] min-w-[330px]' : 'w-48 max-w-48 min-w-48'} border px-3 py-3 tabular-nums transition-[width] duration-200 ${row.key === 'buying_imports' ? '!py-1.5 text-left align-top' : 'text-right whitespace-nowrap'} ${row.highlight ? 'bg-fuchsia-100' : columnTints[plantIndex % columnTints.length].body} ${Number(plant[row.key]) < 0 ? 'text-lg font-black text-red-600' : ''}`}
                                                         >
                                                             {row.key === 'buying_imports' && plant.purchase_orders?.length ? (
                                                                 <div className="space-y-1.5">
@@ -825,7 +1034,7 @@ export default function BalanceSheet({
                                                                         >
                                                                             {expandedReceipts.has(plant.column_key) ? (
                                                                                 <>
-                                                                                    Less <ChevronUp className="size-3" />
+                                                                                    Show less <ChevronUp className="size-3" />
                                                                                 </>
                                                                             ) : (
                                                                                 <>
@@ -840,35 +1049,37 @@ export default function BalanceSheet({
                                                                             {purchaseOrdersBySource(plant, 'sap').map((purchase, purchaseIndex) => (
                                                                                 <div
                                                                                     key={`${purchase.po_number}-${purchaseIndex}`}
-                                                                                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] leading-4 shadow-sm transition-all hover:border-cyan-200 hover:shadow-md"
+                                                                                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-[10px] shadow-sm transition-all hover:border-cyan-300 hover:shadow-md"
                                                                                 >
-                                                                                    <div
-                                                                                        className="font-bold break-words whitespace-normal text-slate-900"
-                                                                                        title={purchase.vendor_name}
-                                                                                    >
-                                                                                        {purchase.vendor_name}
-                                                                                    </div>
-                                                                                    <div className="mt-0.5 flex items-center justify-between gap-1.5">
-                                                                                        <span
-                                                                                            className="min-w-0 truncate text-slate-400"
-                                                                                            title={`${purchase.source.toUpperCase()} PO ${purchase.po_number}`}
-                                                                                        >
-                                                                                            {purchase.source.toUpperCase()} · {purchase.po_number}
-                                                                                        </span>
-                                                                                        <span className="shrink-0 font-black text-slate-900">
-                                                                                            {Number(purchase.quantity_mt).toFixed(3)} MT
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="mt-1 flex items-center justify-between gap-1">
-                                                                                        <span className="text-[9px] text-slate-500">
-                                                                                            ETA {formatDateForDisplay(purchase.eta)}
-                                                                                        </span>
-                                                                                        <span
-                                                                                            className={`max-w-[68px] truncate rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${purchase.status === 'cancelled' ? 'bg-red-50 text-red-600' : purchase.status === 'received' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
-                                                                                            title={purchase.status.replaceAll('_', ' ')}
-                                                                                        >
+                                                                                    <div className="flex items-start justify-between gap-2 border-b bg-slate-50/80 px-2.5 py-2">
+                                                                                        <div className="min-w-0">
+                                                                                            <div className="text-[10px] leading-3.5 font-black break-words whitespace-normal text-slate-900">
+                                                                                                {purchase.vendor_name}
+                                                                                            </div>
+                                                                                            <div className="mt-0.5 font-mono text-[9px] text-slate-500">
+                                                                                                {purchase.source.toUpperCase()} · {purchase.po_number}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-black uppercase ${purchase.status === 'cancelled' ? 'bg-red-50 text-red-600' : purchase.status === 'received' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                                                                                             {purchase.status.replaceAll('_', ' ')}
                                                                                         </span>
+                                                                                    </div>
+                                                                                    <div className="grid grid-cols-3 gap-px bg-slate-200">
+                                                                                        {[
+                                                                                            ['Rate', `${purchase.currency || '—'} ${Number(purchase.rate).toLocaleString('en-IN')}`],
+                                                                                            ['Amount', `${purchase.currency || '—'} ${Number(purchase.amount).toLocaleString('en-IN')}`],
+                                                                                            ['ETA', formatDateForDisplay(purchase.eta)],
+                                                                                            ['Total quantity', `${Number(purchase.total_quantity_mt).toFixed(3)} MT`],
+                                                                                            ['Reduced quantity', `${Number(purchase.reduced_quantity_mt).toFixed(3)} MT`],
+                                                                                            ['Balance quantity', `${Number(purchase.balance_quantity_mt).toFixed(3)} MT`],
+                                                                                        ].map(([label, value]) => (
+                                                                                            <div key={label} className="min-w-0 bg-white px-2 py-1.5">
+                                                                                                <div className="text-[7px] font-bold tracking-wide text-slate-400 uppercase">{label}</div>
+                                                                                                <div className={`truncate text-[9px] font-black ${label === 'Balance quantity' ? 'text-cyan-700' : 'text-slate-800'}`} title={value}>
+                                                                                                    {value}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ))}
                                                                                     </div>
                                                                                 </div>
                                                                             ))}
@@ -927,6 +1138,7 @@ export default function BalanceSheet({
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </>
                     )}
@@ -1202,6 +1414,20 @@ function PurchaseOrdersModal({ plant, source, onClose }: { plant: PlantColumn; s
                                                     {order.status.replaceAll('_', ' ')}
                                                 </span>
                                             </div>
+                                        </div>
+                                        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border bg-slate-50 p-3 text-[10px] sm:grid-cols-5">
+                                            {[
+                                                ['Rate', `${order.currency || ''} ${Number(order.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`],
+                                                ['Amount', `${order.currency || ''} ${Number(order.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                                                ['Total quantity', `${Number(order.total_quantity_mt).toFixed(3)} MT`],
+                                                ['Reduced quantity', `${Number(order.reduced_quantity_mt).toFixed(3)} MT`],
+                                                ['Balance quantity', `${Number(order.balance_quantity_mt).toFixed(3)} MT`],
+                                            ].map(([label, value]) => (
+                                                <div key={label}>
+                                                    <p className="font-bold text-slate-400 uppercase">{label}</p>
+                                                    <p className="mt-0.5 font-black text-slate-800 tabular-nums">{value}</p>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>

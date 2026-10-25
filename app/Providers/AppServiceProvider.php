@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::before(function (User $user): ?bool {
-            return $user->hasRole('Super Admin') ? true : null;
+            return $user->hasRole('Owner') ? true : null;
         });
 
         Event::listen(function (SocialiteWasCalled $event): void {

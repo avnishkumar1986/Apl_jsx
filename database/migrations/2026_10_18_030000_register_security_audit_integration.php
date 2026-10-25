@@ -12,8 +12,8 @@ return new class extends Migration
             [
                 'name' => 'OWASP Security Audit',
                 'description' => 'OWASP A06-aligned Composer and npm dependency vulnerability audit',
-                'base_url' => 'http://127.0.0.1:8001/',
-                'endpoint' => '/api/security-audits/run',
+                'base_url' => null,
+                'endpoint' => env('SECURITY_AUDIT_URL'),
                 'method' => 'POST',
                 'auth_type' => 'none',
                 'credential_key' => null,

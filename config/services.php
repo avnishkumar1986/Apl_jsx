@@ -4,6 +4,7 @@ return [
     'api_integrations' => [
         'environment_code' => env('API_ENVIRONMENT', 'production'),
         'allowed_hosts' => env('API_ALLOWED_HOSTS', ''),
+        'insecure_tls_hosts' => env('API_INSECURE_TLS_HOSTS', ''),
         'credentials' => [
             'PROCUREMENT_STOCK_API_TOKEN' => [
                 'username' => env('API_AUTH_USERNAME'),

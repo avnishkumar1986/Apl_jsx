@@ -18,9 +18,7 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Download,
     Edit3,
-    FileSpreadsheet,
     Mail,
     MapPin,
     MessageCircle,
@@ -289,6 +287,8 @@ function dateForDatabase(value: string) {
     return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
 }
 
+const hasText = (value: unknown) => String(value ?? '').trim();
+
 export default function UserMaster({
     users,
     departments,
@@ -463,12 +463,12 @@ export default function UserMaster({
         setFormStep(!hasEducation ? 3 : !hasBanking ? 4 : 0);
         setActiveAddress('local');
         form.setData({
-            first_name: user.first_name,
+            first_name: user.first_name ?? '',
             middle_name: user.middle_name ?? '',
-            last_name: user.last_name,
+            last_name: user.last_name ?? '',
             unique_id: user.unique_id ?? '',
-            gender: user.gender ?? '',
-            marital_status: user.marital_status ?? '',
+            gender: user.gender?.toLowerCase() ?? '',
+            marital_status: user.marital_status?.toLowerCase() ?? '',
             date_of_birth: dateForInput(user.date_of_birth),
             anniversary_date: dateForInput(user.anniversary_date),
             aadhaar_number: user.aadhaar_number ?? '',
@@ -486,8 +486,8 @@ export default function UserMaster({
                 roles.find((role) => role.name === 'Viewer')?.name ??
                 roles[0]?.name ??
                 '',
-            email: user.email,
-            username: user.login?.username ?? user.email,
+            email: user.email ?? '',
+            username: user.login?.username ?? user.email ?? '',
             password: '',
             contacts:
                 user.contacts.length > 0
@@ -620,24 +620,24 @@ export default function UserMaster({
     const nextFormStep = () => {
         if (formStep === 0) {
             form.clearErrors('first_name', 'last_name', 'user_type', 'role');
-            if (!form.data.first_name.trim()) form.setError('first_name', 'First name is required.');
-            if (!form.data.last_name.trim()) form.setError('last_name', 'Last name is required.');
+            if (!hasText(form.data.first_name)) form.setError('first_name', 'First name is required.');
+            if (!hasText(form.data.last_name)) form.setError('last_name', 'Last name is required.');
             if (!form.data.user_type) form.setError('user_type', 'Select a user type.');
             if (!form.data.role) form.setError('role', 'Select a role.');
-            if (!form.data.first_name.trim() || !form.data.last_name.trim() || !form.data.user_type || !form.data.role) return;
+            if (!hasText(form.data.first_name) || !hasText(form.data.last_name) || !form.data.user_type || !form.data.role) return;
         }
 
         if (formStep === 1) {
             form.clearErrors('email');
-            if (!form.data.email.trim()) form.setError('email', 'Email is required.');
-            if (!form.data.email.trim()) return;
+            if (!editingUser && !hasText(form.data.email)) form.setError('email', 'Email is required.');
+            if (!editingUser && !hasText(form.data.email)) return;
         }
 
         if (formStep === 5) {
             form.clearErrors('username', 'password');
-            if (!form.data.username.trim()) form.setError('username', 'Username or email is required.');
+            if (!editingUser && !hasText(form.data.username)) form.setError('username', 'Username or email is required.');
             if (!editingUser && !form.data.password) form.setError('password', 'Password is required.');
-            if (!form.data.username.trim() || (!editingUser && !form.data.password)) return;
+            if (!editingUser && (!hasText(form.data.username) || !form.data.password)) return;
         }
 
         setFormStep((current) => Math.min(current + 1, formSteps.length - 1));
@@ -654,11 +654,11 @@ export default function UserMaster({
     };
 
     const stepCompleted = (index: number) => {
-        if (index === 0) return Boolean(form.data.first_name.trim() && form.data.last_name.trim() && form.data.user_type && form.data.role);
-        if (index === 1) return Boolean(form.data.email.trim() && form.data.contacts.some((contact) => contact.contact_value.trim() !== ''));
+        if (index === 0) return Boolean(hasText(form.data.first_name) && hasText(form.data.last_name) && form.data.user_type && form.data.role);
+        if (index === 1) return editingUser ? true : Boolean(hasText(form.data.email) && form.data.contacts.some((contact) => hasText(contact.contact_value)));
         if (index === 2)
             return Boolean(
-                form.data.address_line_1.trim() &&
+                hasText(form.data.address_line_1) &&
                     form.data.state &&
                     form.data.district &&
                     form.data.city &&
@@ -666,10 +666,10 @@ export default function UserMaster({
             );
         if (index === 3)
             return form.data.educations.some((education) =>
-                Boolean(education.education_level.trim() || education.degree_name.trim() || education.institution_name.trim()),
+                Boolean(hasText(education.education_level) || hasText(education.degree_name) || hasText(education.institution_name)),
             );
-        if (index === 4) return Boolean(form.data.bank_name.trim() && form.data.account_number.trim());
-        if (index === 5) return Boolean(form.data.username.trim() && (editingUser || form.data.password));
+        if (index === 4) return Boolean(hasText(form.data.bank_name) && hasText(form.data.account_number));
+        if (index === 5) return editingUser ? true : Boolean(hasText(form.data.username) && form.data.password);
         return false;
     };
 
@@ -762,28 +762,6 @@ export default function UserMaster({
                     action={
                         canManage && (
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    asChild
-                                    type="button"
-                                    variant="outline"
-                                    className="h-9 border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50 hover:text-slate-950"
-                                >
-                                    <a href="/admin/user-master/import-template">
-                                        <Download className="size-4 text-emerald-600" /> Download template
-                                    </a>
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        importForm.reset();
-                                        importForm.clearErrors();
-                                        setImportOpen(true);
-                                    }}
-                                    className="h-9 border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50 hover:text-slate-950"
-                                >
-                                    <FileSpreadsheet className="size-4 text-emerald-600" /> Import Excel
-                                </Button>
                                 <Button
                                     type="button"
                                     onClick={openCreate}
@@ -1548,7 +1526,7 @@ export default function UserMaster({
                                             </div>
                                         </div>
 
-                                        {(form.data.email.trim() || form.data.contacts.some((contact) => contact.contact_value.trim())) && (
+                                        {(hasText(form.data.email) || form.data.contacts.some((contact) => hasText(contact.contact_value))) && (
                                             <div className="order-1 mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                                                 <table className="w-full min-w-[760px] text-left text-sm">
                                                     <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold tracking-[0.08em] text-slate-600 uppercase">
@@ -1561,7 +1539,7 @@ export default function UserMaster({
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-200">
-                                                        {form.data.email.trim() && (
+                                                        {hasText(form.data.email) && (
                                                             <tr className="transition-colors hover:bg-slate-50/70">
                                                                 <td className="px-4 py-3.5 text-slate-500">1</td>
                                                                 <td className="px-4 py-3.5">
@@ -1657,7 +1635,7 @@ export default function UserMaster({
                                                         )}
                                                         {form.data.contacts.map(
                                                             (contact, index) =>
-                                                                contact.contact_value.trim() && (
+                                                                hasText(contact.contact_value) && (
                                                                     <tr
                                                                         key={`summary-${contact.id ?? index}`}
                                                                         className="transition-colors hover:bg-slate-50/70"
@@ -1817,7 +1795,7 @@ export default function UserMaster({
                                                                 Contact {contactIndex + 1}
                                                             </span>
                                                             <span className="capitalize">{contact.contact_type}</span>
-                                                            {contact.contact_value.trim() && (
+                                                            {hasText(contact.contact_value) && (
                                                                 <span className="max-w-[320px] truncate font-normal text-slate-600">
                                                                     {contact.contact_value}
                                                                 </span>

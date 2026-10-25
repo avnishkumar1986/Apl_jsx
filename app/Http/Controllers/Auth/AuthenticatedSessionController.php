@@ -50,11 +50,24 @@ class AuthenticatedSessionController extends Controller
         }
 
         $user = $request->user();
-        $defaultDestination = ! $user->hasRole('Super Admin') && $user->can('procurement.overview.view')
-            ? route('admin.procurement.dashboard', absolute: false)
-            : route('dashboard', absolute: false);
+        $defaultDestination = match (true) {
+            $user->can('dashboard.view') => route('dashboard', absolute: false),
+            $user->can('procurement.dashboard.view') => route('admin.procurement.dashboard', absolute: false),
+            $user->can('procurement.planning_decisions.view') => route('admin.procurement.planning-decisions.index', absolute: false),
+            $user->can('procurement.materials_balance.view') => route('admin.procurement.all-balance-sheet', absolute: false),
+            $user->can('procurement.consumption.view') => route('admin.procurement.daily-consumption.index', absolute: false),
+            $user->can('procurement.rm_inventories.view') => route('admin.procurement.balance-sheet', absolute: false),
+            $user->can('sales.overview.view') => '/admin/sales',
+            $user->can('users.view') => route('admin.users.index', absolute: false),
+            $user->can('roles.view') => route('admin.roles.index', absolute: false),
+            default => '/settings/profile',
+        };
 
-        return redirect()->intended($defaultDestination);
+        // Do not reuse a protected URL saved in the session before login. A role
+        // change can make that URL invalid and would immediately produce a 403.
+        $request->session()->forget('url.intended');
+
+        return redirect()->to($defaultDestination);
     }
 
     /**

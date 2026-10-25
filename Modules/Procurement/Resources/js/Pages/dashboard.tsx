@@ -1,10 +1,9 @@
-import ProcurementFilterBar from '@/components/procurement-filter-bar';
 import ProcurementPageHeader from '@/components/procurement-page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { Boxes, Clock3, PackageCheck, ShoppingCart, TrendingUp } from 'lucide-react';
-import { FormEvent, memo, useEffect, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 
 type MetricRow = { label: string | null; value: number };
 type MaterialDemand = { code: string; name: string | null; value: number };
@@ -18,11 +17,6 @@ type DeliveryStatus = {
     expected_delivery_date: string;
 };
 type Props = {
-    filters: { company_code: string; plant_code: string; material: string };
-    companies: { company_code: string; company_name: string }[];
-    plants: { company_code: string; company_name: string; parent_company_id: string | null }[];
-    materials: { matnr: string; maktx: string | null; mtart: string | null }[];
-    updatedAt: string;
     kpis: {
         active_consumptions: number;
         monthly_demand_mt: number;
@@ -40,43 +34,7 @@ type Props = {
 const number = (value: number) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
 const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-export default function ProcurementDashboard({
-    filters,
-    companies,
-    plants,
-    materials,
-    updatedAt,
-    kpis,
-    plantDemand,
-    materialDemand,
-    stockByPlant,
-    deliveryStatus,
-}: Props) {
-    const [companyCode, setCompanyCode] = useState(filters.company_code || 'all');
-    const [plantCode, setPlantCode] = useState(filters.plant_code || 'all');
-    const [materialCode, setMaterialCode] = useState(filters.material || 'all');
-    const applyFilters = (event: FormEvent) => {
-        event.preventDefault();
-        router.get(
-            '/admin/procurement/dashboard',
-            {
-                company_code: companyCode === 'all' ? undefined : companyCode,
-                plant_code: plantCode === 'all' ? undefined : plantCode,
-                material: materialCode === 'all' ? undefined : materialCode,
-            },
-            { preserveState: true, replace: true },
-        );
-    };
-    const resetFilters = () => {
-        setCompanyCode('all');
-        setPlantCode('all');
-        setMaterialCode('all');
-        router.get('/admin/procurement/dashboard', {}, { preserveState: false, replace: true });
-    };
-    useEffect(() => {
-        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-        if (navigation?.type === 'reload' && window.location.search) resetFilters();
-    }, []);
+export default function ProcurementDashboard({ kpis, plantDemand, materialDemand, stockByPlant, deliveryStatus }: Props) {
     const plantDemandGraph = useMemo(
         () => plantDemand.map((item) => ({ label: item.label ?? 'Unknown plant', value: Number(item.value) })),
         [plantDemand],
@@ -120,27 +78,8 @@ export default function ProcurementDashboard({
         >
             <Head title="Procurement Dashboard" />
             <div className="procurement-compact mx-auto w-full max-w-[1680px] space-y-3 p-3 md:p-4">
-                <div className="relative z-30 grid items-stretch overflow-visible rounded-2xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10 xl:grid-cols-[minmax(390px,0.75fr)_minmax(0,2fr)] xl:gap-4">
-                    <ProcurementPageHeader title="Procurement Dashboard" icon={PackageCheck} meta={`Updated ${updatedAt}`} embedded />
-
-                    <ProcurementFilterBar
-                        companyCode={companyCode}
-                        plantCode={plantCode}
-                        materialCode={materialCode}
-                        companies={companies}
-                        plants={plants}
-                        materials={materials}
-                        onCompanyChange={(value) => {
-                            setCompanyCode(value);
-                            setPlantCode('all');
-                            setMaterialCode('all');
-                        }}
-                        onPlantChange={setPlantCode}
-                        onMaterialChange={setMaterialCode}
-                        onApply={applyFilters}
-                        onReset={resetFilters}
-                        embedded
-                    />
+                <div className="relative z-30 overflow-hidden rounded-2xl border-t-[3px] border-orange-500 bg-gradient-to-r from-[#07374b] via-[#075b70] to-[#0b8da3] p-3 shadow-lg shadow-slate-900/10">
+                    <ProcurementPageHeader title="Dashboard" icon={PackageCheck} embedded />
                 </div>
 
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -291,7 +230,7 @@ const StockLineGraph = memo(function StockLineGraph({ items }: { items: GraphIte
 
     return (
         <div className="overflow-x-auto">
-            <div className="min-w-[560px]">
+            <div className="min-w-[480px] sm:min-w-[560px]">
                 <svg viewBox="0 0 700 210" className="h-52 w-full" role="img" aria-label="Current stock by plant line chart">
                     <defs>
                         <linearGradient id="stock-fill" x1="0" y1="0" x2="0" y2="1">

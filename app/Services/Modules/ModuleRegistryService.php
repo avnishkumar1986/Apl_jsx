@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Modules\CorporateChat\Services\CorporateChatService;
 use Modules\Procurement\Services\ProcurementService;
 use Modules\Sales\Services\SalesService;
+use Modules\Support\Services\SupportService;
 
 class ModuleRegistryService
 {
@@ -16,6 +17,7 @@ class ModuleRegistryService
         'procurement' => ProcurementService::class,
         'sales' => SalesService::class,
         'corporate-chat' => CorporateChatService::class,
+        'support' => SupportService::class,
     ];
 
     /** @var array<string,string> */
@@ -23,6 +25,7 @@ class ModuleRegistryService
         'procurement' => 'Modules/Procurement/Services/ProcurementService.php',
         'sales' => 'Modules/Sales/Services/SalesService.php',
         'corporate-chat' => 'Modules/CorporateChat/Services/CorporateChatService.php',
+        'support' => 'Modules/Support/Services/SupportService.php',
     ];
 
     /** @var array<string,array{module_path:string,sections:list<string>}> */
@@ -38,6 +41,10 @@ class ModuleRegistryService
         'corporate-chat' => [
             'module_path' => 'Modules/CorporateChat',
             'sections' => ['Conversations'],
+        ],
+        'support' => [
+            'module_path' => 'Modules/Support',
+            'sections' => ['Support Desk', 'Ticket Management', 'Internal Notes', 'Reports'],
         ],
     ];
 

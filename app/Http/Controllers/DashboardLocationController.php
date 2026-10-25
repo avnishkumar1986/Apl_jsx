@@ -47,7 +47,7 @@ class DashboardLocationController extends Controller
             'organization_type' => ['nullable', 'in:company,plant,head_office'],
             'organization_code' => ['nullable', 'string', 'max:100'],
         ]);
-        $isSuperAdmin = $request->user()->hasRole('Super Admin');
+        $isSuperAdmin = $request->user()->hasRole('Owner');
         $organizationType = $validated['organization_type'] ?? null;
         $organizationCode = $validated['organization_code'] ?? null;
         $recordType = match ($organizationType) {

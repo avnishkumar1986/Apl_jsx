@@ -14,7 +14,7 @@ export function UserMenuContent({ user, showHeader = true }: UserMenuContentProp
     const cleanup = useMobileNavigation();
     const { auth } = usePage<SharedData>().props;
     const canManageSupport =
-        auth.roles.includes('Super Admin') || auth.permissions.includes('support.manage') || auth.permissions.includes('support.view-all');
+        auth.roles.some((role) => role.toLowerCase() === 'owner') || auth.permissions.includes('support.manage') || auth.permissions.includes('support.view-all');
 
     return (
         <>

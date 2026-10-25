@@ -48,9 +48,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'roles' => fn (): array => $request->user()?->getRoleNames()->values()->all() ?? [],
                 'permissions' => fn (): array => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
-                'homeUrl' => fn (): string => $request->user() && ! $request->user()->hasRole('Super Admin') && $request->user()->can('procurement.overview.view')
-                    ? '/admin/procurement/dashboard'
-                    : '/dashboard',
+                'homeUrl' => fn (): string => $this->homeUrl($request),
             ],
             'notifications' => fn (): array => $request->user() && Schema::hasTable('notifications') ? [
                 'unreadCount' => $request->user()->unreadNotifications()->count(),
@@ -88,5 +86,26 @@ class HandleInertiaRequests extends Middleware
                     ->values()
                     ->all(),
         ]);
+    }
+
+    private function homeUrl(Request $request): string
+    {
+        $user = $request->user();
+
+        if (! $user || $user->can('dashboard.view')) {
+            return '/dashboard';
+        }
+
+        return match (true) {
+            $user->can('procurement.dashboard.view') => '/admin/procurement/dashboard',
+            $user->can('procurement.planning_decisions.view') => '/admin/procurement/planning-decisions',
+            $user->can('procurement.materials_balance.view') => '/admin/procurement/all-balance-sheet',
+            $user->can('procurement.consumption.view') => '/admin/procurement/daily-consumption',
+            $user->can('procurement.rm_inventories.view') => '/admin/procurement/balance-sheet',
+            $user->can('sales.overview.view') => '/admin/sales',
+            $user->can('users.view') => '/admin/users',
+            $user->can('roles.view') => '/admin/roles',
+            default => '/settings/profile',
+        };
     }
 }

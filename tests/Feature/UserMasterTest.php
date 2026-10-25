@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Super Admin');
+    $this->admin->assignRole('Owner');
     $this->userType = UserType::query()->firstOrFail();
 });
 

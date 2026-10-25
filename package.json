@@ -4,7 +4,9 @@
     "scripts": {
         "build": "vite build",
         "build:ssr": "vite build && vite build --ssr",
-        "dev": "vite",
+        "dev": "node tools/dev.mjs",
+        "dev:backend": "php artisan serve --host=127.0.0.1 --port=8001 --no-reload",
+        "dev:frontend": "vite --host=127.0.0.1 --port=5173 --strictPort",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix"
