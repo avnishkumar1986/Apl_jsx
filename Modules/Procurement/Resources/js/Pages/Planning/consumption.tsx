@@ -54,7 +54,10 @@ type Consumption = {
     plant_id: number;
     company_name: string | null;
     plant_name: string | null;
+    plant_code: string;
     material: string;
+    material_desc: string;
+    meins: string;
     consumption_date: string;
     effective_to: string | null;
     period_type: string;
@@ -65,6 +68,8 @@ type Consumption = {
     total_buying_mt: number;
     remarks: string | null;
     opening_stock_mt: number | null;
+    stock_value: number;
+    planned_po_mt: number;
     planned_buying_mt: number;
     total_availability_mt: number;
     total_required_mt: number;
@@ -127,6 +132,8 @@ const formatMt = (value: number | null, decimals = 3) =>
               minimumFractionDigits: decimals,
               maximumFractionDigits: decimals,
           });
+const formatMoney = (value: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value || 0));
 const emptyStats = {
     purchases: 0,
     purchase_mt: 0,
@@ -210,6 +217,7 @@ export default function Procurement({
     };
     const openPurchase = () => {
         setManualVendor(false);
+        purchase.setData('purchase_date', todayInIndia());
         setPurchaseOpen(true);
         void loadReferenceData();
     };
@@ -607,7 +615,7 @@ export default function Procurement({
                                 </tbody>
                             </table>
                         ) : (
-                            <table className="w-full min-w-[1450px] border-separate border-spacing-0 text-sm">
+                            <table className="w-full min-w-[1250px] border-separate border-spacing-0 text-sm">
                                 <thead className="sticky top-0 z-10 text-left text-[11px] font-bold tracking-[0.06em] text-slate-600 uppercase shadow-[0_1px_0_0_#cbd5e1]">
                                     <tr>
                                         <th className="w-12 bg-slate-100/95 px-3 py-3.5 backdrop-blur"></th>
@@ -623,22 +631,23 @@ export default function Procurement({
                                             )}
                                         </th>
                                         <th className="w-16 bg-slate-100/95 px-3 py-3.5 text-center backdrop-blur">S.No.</th>
-                                        <SortHeading column="material">Material</SortHeading>
-                                        <SortHeading column="plant_name">Plant</SortHeading>
-                                        <SortHeading column="consumption_date">Planning period</SortHeading>
-                                        <SortHeading column="planning_mode">Planning mode</SortHeading>
+                                        <SortHeading column="material">MATNR</SortHeading>
+                                        <SortHeading column="plant_name">Plant Name</SortHeading>
+                                        <SortHeading column="material_desc">Material Description</SortHeading>
+                                        <SortHeading column="meins">MEINS</SortHeading>
                                         <SortHeading column="opening_stock_mt" align="right">
                                             Current stock (MT)
                                         </SortHeading>
-                                        <SortHeading column="planned_buying_mt" align="right">
-                                            Buying / Imports (MT)
+                                        <SortHeading column="stock_value" align="right">
+                                            Stock Value
                                         </SortHeading>
-                                        <SortHeading column="total_availability_mt" align="right">
-                                            Total availability (MT)
+                                        <SortHeading column="planned_po_mt" align="right">
+                                            Planned PO (MT)
                                         </SortHeading>
                                         <SortHeading column="quantity_mt" align="right">
                                             Daily consumption (MT/day)
                                         </SortHeading>
+                                        <SortHeading column="planning_mode">Planning Mode</SortHeading>
                                     </tr>
                                 </thead>
                                 <tbody className="text-[13px] text-slate-700">
@@ -689,34 +698,34 @@ export default function Procurement({
                                                         {c.plant_name || '—'}
                                                     </td>
                                                     <td className="border-b border-slate-200 px-3 py-3.5">
-                                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[10px] font-bold tracking-wide text-cyan-700 uppercase ring-1 ring-cyan-100">
-                                                            {c.period_type}
-                                                        </span>
-                                                        <div className="mt-1.5 font-semibold text-slate-700">{formatDate(c.consumption_date)}</div>
+                                                        <span className="font-semibold text-slate-800">{c.material_desc || '—'}</span>
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-center font-semibold text-slate-700">
+                                                        {c.meins || '—'}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(c.opening_stock_mt)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-semibold tabular-nums">
+                                                        {formatMoney(c.stock_value)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(c.planned_po_mt)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(Number(c.quantity_mt))}
                                                     </td>
                                                     <td className="border-b border-slate-200 px-3 py-3.5">
                                                         <span
                                                             className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase ring-1 ${c.planning_mode === 'auto' ? 'bg-cyan-50 text-cyan-700 ring-cyan-100' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}
                                                         >
-                                                            {c.planning_mode}
+                                                            {c.planning_mode === 'auto' ? 'SAP Auto' : 'Manual'}
                                                         </span>
-                                                    </td>
-                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
-                                                        {formatMt(c.opening_stock_mt)}
-                                                    </td>
-                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right tabular-nums">
-                                                        {formatMt(c.planned_buying_mt)}
-                                                    </td>
-                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-bold text-cyan-800 tabular-nums">
-                                                        {formatMt(c.total_availability_mt)}
-                                                    </td>
-                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
-                                                        {formatMt(Number(c.quantity_mt))}
                                                     </td>
                                                 </tr>
                                                 {expanded && (
                                                     <tr className="bg-cyan-50/30">
-                                                        <td colSpan={11} className="border-b border-slate-200 px-6 py-4">
+                                                        <td colSpan={12} className="border-b border-slate-200 px-6 py-4">
                                                             <div className="grid gap-x-12 gap-y-0 rounded-xl border border-slate-200 bg-white px-8 py-3 shadow-inner md:grid-cols-2">
                                                                 {[
                                                                     ['Days in plan', String(c.day_count ?? 1), ''],
@@ -1014,17 +1023,6 @@ export default function Procurement({
                                 value={purchase.data.quantity_mt}
                                 onChange={(e) => purchase.setData('quantity_mt', e.target.value)}
                             />
-                            <label className="relative block min-w-0">
-                                <span className="pointer-events-none absolute top-1.5 left-3 z-10 text-[10px] font-medium text-slate-500">
-                                    Booking date
-                                </span>
-                                <Input
-                                    className="h-11 pt-4"
-                                    type="date"
-                                    value={purchase.data.purchase_date}
-                                    onChange={(e) => purchase.setData('purchase_date', e.target.value)}
-                                />
-                            </label>
                             <label className="relative block min-w-0">
                                 <span className="pointer-events-none absolute top-1.5 left-3 z-10 text-[10px] font-medium text-slate-500">
                                     Delivery date

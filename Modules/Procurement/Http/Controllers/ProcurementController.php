@@ -849,6 +849,40 @@ class ProcurementController extends Controller
                 ->get();
 
             $consumptions = $automaticConsumptions->concat($manualConsumptions)->values();
+
+            $materialDescriptions = DB::table('tbl_materials')
+                ->whereIn('matnr', $consumptions->pluck('material')->unique())
+                ->pluck('maktx', 'matnr');
+            $materialUnits = DB::table('tbl_materials')
+                ->whereIn('matnr', $consumptions->pluck('material')->unique())
+                ->pluck('meins', 'matnr');
+            $plantCodes = DB::table('tbl_company')
+                ->whereIn('id', $consumptions->pluck('plant_id')->unique())
+                ->pluck('company_code', 'id');
+            $stockValues = DB::table('tbl_material_stocks')
+                ->where('status', 1)
+                ->whereIn('matnr', $consumptions->pluck('material')->unique())
+                ->select('matnr', 'plant_code', DB::raw('SUM(stock_value) as stock_value'))
+                ->groupBy('matnr', 'plant_code')
+                ->get()
+                ->keyBy(fn ($stock) => $stock->matnr.'|'.$stock->plant_code);
+            $plannedPurchaseOrders = DB::table('vw_procurement_purchase_receipts')
+                ->where('status', 1)
+                ->where('delivery_status', 'planned')
+                ->whereBetween('expected_delivery_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                ->whereIn('material', $consumptions->pluck('material')->unique())
+                ->select('material', 'plant_code', DB::raw('SUM(quantity_mt) as planned_po_mt'))
+                ->groupBy('material', 'plant_code')
+                ->get()
+                ->keyBy(fn ($purchase) => $purchase->material.'|'.$purchase->plant_code);
+
+            $consumptions->each(function ($consumption) use ($materialDescriptions, $materialUnits, $plantCodes, $stockValues, $plannedPurchaseOrders): void {
+                $consumption->material_desc = (string) ($materialDescriptions[$consumption->material] ?? '');
+                $consumption->meins = (string) ($materialUnits[$consumption->material] ?? '');
+                $consumption->plant_code = (string) ($consumption->plant_code ?? $plantCodes[$consumption->plant_id] ?? '');
+                $consumption->stock_value = (float) ($stockValues->get($consumption->material.'|'.$consumption->plant_code)?->stock_value ?? 0);
+                $consumption->planned_po_mt = (float) ($plannedPurchaseOrders->get($consumption->material.'|'.$consumption->plant_code)?->planned_po_mt ?? 0);
+            });
         }
 
         // Row-level decisions now control the calculation. Keep manual entry tools

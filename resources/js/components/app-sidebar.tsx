@@ -104,7 +104,7 @@ export function AppSidebar() {
                 ...(procurementApiTools.length > 0 ? [{ title: 'API Integrations', href: '/admin/api-integrations', icon: PlugZap }] : []),
                 ...procurementInventoryTools,
                 ...(canViewMaterialInventory
-                    ? [{ title: 'Material Inventory', href: '/admin/procurement/material-inventory', icon: PackageSearch }]
+                    ? [{ title: 'Vendor List', href: '/admin/procurement/vendor-list', icon: ShoppingCart }]
                     : []),
             ],
         },

@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -130,10 +131,13 @@ class PlanningDecisionController extends Controller
     public function lock(Request $request, int $decision): RedirectResponse
     {
         $this->releaseExpiredLocks();
-        $updated = DB::table('procurement_planning_decisions')->where('id', $decision)->whereNull('locked_at')->update([
-            'locked_at' => now(), 'locked_by' => $request->user()?->id, 'updated_at' => now(),
-        ]);
-        abort_unless($updated === 1, 422, 'This planning decision is already locked.');
+        DB::transaction(function () use ($request, $decision): void {
+            $updated = DB::table('procurement_planning_decisions')->where('id', $decision)->whereNull('locked_at')->update([
+                'locked_at' => now(), 'locked_by' => $request->user()?->id, 'updated_at' => now(),
+            ]);
+            abort_unless($updated === 1, 422, 'This planning decision is already locked.');
+            $this->persistLockedCalculation($decision);
+        });
 
         return back()->with('success', 'Planning decision locked.');
     }
@@ -169,15 +173,27 @@ class PlanningDecisionController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ])->all());
-        $count = 0;
-        foreach ($selections as $selection) {
-            $count += DB::table('procurement_planning_decisions')
-                ->where('company_id', $data['company_id'])->where('plant_id', $selection['plant_id'])
-                ->whereDate('planning_month', $data['planning_month'].'-01')->where('material', $selection['material'])
-                ->whereNull('locked_at')->update([
+        $count = DB::transaction(function () use ($data, $selections, $request): int {
+            $count = 0;
+            foreach ($selections as $selection) {
+                $decision = DB::table('procurement_planning_decisions')
+                    ->where('company_id', $data['company_id'])->where('plant_id', $selection['plant_id'])
+                    ->whereDate('planning_month', $data['planning_month'].'-01')->where('material', $selection['material'])
+                    ->whereNull('locked_at')->first(['id']);
+                if (! $decision) {
+                    continue;
+                }
+                $updated = DB::table('procurement_planning_decisions')->where('id', $decision->id)->whereNull('locked_at')->update([
                     'locked_at' => now(), 'locked_by' => $request->user()?->id, 'updated_at' => now(),
                 ]);
-        }
+                if ($updated === 1) {
+                    $this->persistLockedCalculation((int) $decision->id);
+                    $count++;
+                }
+            }
+
+            return $count;
+        });
 
         return back()->with('success', $count.' planning decision(s) locked.');
     }
@@ -213,6 +229,95 @@ class PlanningDecisionController extends Controller
             'selections.*.plant_id' => ['required', 'integer', 'exists:tbl_company,id'],
             'selections.*.material' => ['required', 'string', 'max:50', 'exists:tbl_materials,matnr'],
         ]);
+    }
+
+    private function persistLockedCalculation(int $decisionId): void
+    {
+        $decision = DB::table('procurement_planning_decisions')->where('id', $decisionId)->first();
+        if (! $decision) {
+            throw new RuntimeException('The planning decision could not be loaded.');
+        }
+
+        $month = CarbonImmutable::parse($decision->planning_month)->startOfMonth();
+        $monthEnd = $month->endOfMonth();
+        $plantCode = DB::table('tbl_company')->where('id', $decision->plant_id)->value('company_code');
+        $materialUnit = strtoupper(trim((string) DB::table('tbl_materials')->where('matnr', $decision->material)->value('meins')));
+        $stock = DB::table('tbl_material_stocks')
+            ->where('status', 1)
+            ->where('plant_code', $plantCode)
+            ->where('matnr', $decision->material)
+            ->selectRaw('COALESCE(SUM(current_stock), 0) as opening_stock, COALESCE(SUM(auto_perday_consumption), 0) as auto_perday_consumption')
+            ->first();
+        $openingStock = $this->quantityToMt((float) ($stock?->opening_stock ?? 0), $materialUnit);
+
+        $manualPlan = DB::table('procurement_daily_consumptions')
+            ->where('status', 1)
+            ->where('company_id', $decision->company_id)
+            ->where('plant_id', $decision->plant_id)
+            ->where('material', $decision->material)
+            ->whereDate('consumption_date', '<=', $monthEnd->toDateString())
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $month->toDateString()))
+            ->orderByDesc('consumption_date')
+            ->first();
+        if ($decision->planning_mode === 'manual' && ! $manualPlan) {
+            abort(422, 'A manual consumption plan is required before locking this decision.');
+        }
+
+        $dailyConsumption = $decision->planning_mode === 'auto'
+            ? $this->quantityToMt((float) ($stock?->auto_perday_consumption ?? 0), $materialUnit)
+            : (float) $manualPlan->quantity_mt;
+        $isStartMonth = $manualPlan && CarbonImmutable::parse($manualPlan->consumption_date)->format('Y-m') === $month->format('Y-m');
+        $days = $decision->planning_mode === 'auto'
+            ? $monthEnd->day
+            : ($manualPlan->period_type === 'datewise' ? 1 : ($isStartMonth ? max(1, (int) $manualPlan->day_count) : $monthEnd->day));
+        $plannedBuying = (float) ($manualPlan?->planned_buying_mt ?? 0);
+        $purchaseOrders = (float) DB::table('vw_procurement_purchase_receipts')
+            ->where('status', 1)
+            ->where('delivery_status', '!=', 'cancelled')
+            ->where('plant_id', $decision->plant_id)
+            ->where('material', $decision->material)
+            ->whereBetween('expected_delivery_date', [$month->toDateString(), $monthEnd->toDateString()])
+            ->sum('quantity_mt');
+        $totalBuying = $plannedBuying + $purchaseOrders;
+        $totalRequired = $dailyConsumption * $days;
+        $availability = $openingStock + $totalBuying;
+        $closingStock = $availability - $totalRequired;
+        $calculatedAt = now();
+
+        DB::table('procurement_balance_results')->updateOrInsert(
+            ['material' => $decision->material, 'plant_id' => $decision->plant_id, 'month' => $month->toDateString()],
+            [
+                'calculations' => json_encode([
+                    'planning_mode' => $decision->planning_mode,
+                    'opening_stock_mt' => $openingStock,
+                    'daily_consumption_mt' => $dailyConsumption,
+                    'day_count' => $days,
+                    'total_required_mt' => $totalRequired,
+                    'planned_buying_mt' => $plannedBuying,
+                    'purchase_order_mt' => $purchaseOrders,
+                    'total_buying_mt' => $totalBuying,
+                    'total_availability_mt' => $availability,
+                    'projected_closing_mt' => $closingStock,
+                    'gross_shortage_mt' => max($totalRequired - $openingStock, 0),
+                    'remaining_shortage_mt' => max($totalRequired - $availability, 0),
+                    'cover_days' => $dailyConsumption > 0 ? $openingStock / $dailyConsumption : 0,
+                    'locked_decision_id' => $decisionId,
+                    'calculated_at' => $calculatedAt->toISOString(),
+                ], JSON_THROW_ON_ERROR),
+                'remarks' => 'Automatically stored when the '.strtoupper((string) $decision->planning_mode).' planning decision was locked.',
+                'created_at' => $calculatedAt,
+                'updated_at' => $calculatedAt,
+            ],
+        );
+    }
+
+    private function quantityToMt(float $quantity, string $unit): float
+    {
+        return match ($unit) {
+            'KG', 'KGM' => $quantity / 1000,
+            'MT', 'MTN', 'MTO', 'TON', 'TO', 'T' => $quantity,
+            default => $quantity / 1000,
+        };
     }
 
     private function validateSelections(string $companyCode, array $selections): array

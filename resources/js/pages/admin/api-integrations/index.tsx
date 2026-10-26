@@ -47,6 +47,7 @@ type Api = {
   has_credential_password: boolean;
   subscription_name: string;
   has_api_token: boolean;
+  credentials_unreadable: boolean;
   target_table: string[] | null;
   retries: number;
   retry_delay_seconds: number;
@@ -567,6 +568,11 @@ export default function ApiIntegrations({
                     ? "GET · shared Basic credentials are encrypted on this environment API"
                     : `GET · uses shared Basic credentials from ${credentialSourceCode} API`}
               </div>
+              {editing?.credentials_unreadable && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                  The saved credential cannot be decrypted with the current application key. Enter the username and password or token again, then save this integration.
+                </div>
+              )}
               {form.data.api_type === "sap" && ["production", "quality"].includes(form.data.code) ? (
                 <>
                   <Field label="API_AUTH_USERNAME" error={form.errors.credential_username}>

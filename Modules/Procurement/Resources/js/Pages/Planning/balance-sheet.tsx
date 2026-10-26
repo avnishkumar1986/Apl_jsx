@@ -1415,20 +1415,22 @@ function PurchaseOrdersModal({ plant, source, onClose }: { plant: PlantColumn; s
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border bg-slate-50 p-3 text-[10px] sm:grid-cols-5">
-                                            {[
-                                                ['Rate', `${order.currency || ''} ${Number(order.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`],
-                                                ['Amount', `${order.currency || ''} ${Number(order.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-                                                ['Total quantity', `${Number(order.total_quantity_mt).toFixed(3)} MT`],
-                                                ['Reduced quantity', `${Number(order.reduced_quantity_mt).toFixed(3)} MT`],
-                                                ['Balance quantity', `${Number(order.balance_quantity_mt).toFixed(3)} MT`],
-                                            ].map(([label, value]) => (
-                                                <div key={label}>
-                                                    <p className="font-bold text-slate-400 uppercase">{label}</p>
-                                                    <p className="mt-0.5 font-black text-slate-800 tabular-nums">{value}</p>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        {!isLocal && (
+                                            <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border bg-slate-50 p-3 text-[10px] sm:grid-cols-5">
+                                                {[
+                                                    ['Rate', `${order.currency || ''} ${Number(order.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`],
+                                                    ['Amount', `${order.currency || ''} ${Number(order.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                                                    ['Total quantity', `${Number(order.total_quantity_mt).toFixed(3)} MT`],
+                                                    ['Reduced quantity', `${Number(order.reduced_quantity_mt).toFixed(3)} MT`],
+                                                    ['Balance quantity', `${Number(order.balance_quantity_mt).toFixed(3)} MT`],
+                                                ].map(([label, value]) => (
+                                                    <div key={label}>
+                                                        <p className="font-bold text-slate-400 uppercase">{label}</p>
+                                                        <p className="mt-0.5 font-black text-slate-800 tabular-nums">{value}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </article>

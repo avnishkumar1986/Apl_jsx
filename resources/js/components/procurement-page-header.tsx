@@ -15,7 +15,7 @@ export default function ProcurementPageHeader({
     title: string;
     subtitle?: string;
     icon: LucideIcon;
-    meta?: string;
+    meta?: ReactNode;
     actions?: ReactNode;
     embedded?: boolean;
     showEyebrow?: boolean;

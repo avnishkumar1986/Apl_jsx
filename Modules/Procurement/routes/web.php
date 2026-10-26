@@ -6,6 +6,7 @@ use Modules\Procurement\Http\Controllers\Planning\BalanceSheetController;
 use Modules\Procurement\Http\Controllers\Planning\ConsumptionController;
 use Modules\Procurement\Http\Controllers\Planning\MaterialInventoryController;
 use Modules\Procurement\Http\Controllers\Planning\PlanningDecisionController;
+use Modules\Procurement\Http\Controllers\Planning\VendorListController;
 use Modules\Procurement\Http\Controllers\ProcurementController;
 
 Route::middleware(['auth', 'module.active:procurement'])
@@ -28,6 +29,7 @@ Route::middleware(['auth', 'module.active:procurement'])
         Route::get('all-balance-sheet', [AllBalanceSheetController::class, 'index'])->middleware('permission:procurement.materials_balance.view')->name('all-balance-sheet');
         Route::put('balance-sheet/remarks', [BalanceSheetController::class, 'updateBalanceRemark'])->middleware('permission:procurement.materials_balance.edit')->name('balance-sheet.remarks');
         Route::get('material-inventory', [MaterialInventoryController::class, 'inventory'])->middleware('permission:procurement.rm_inventories.view')->name('material-inventory');
+        Route::get('vendor-list', [VendorListController::class, 'index'])->middleware('permission:procurement.rm_inventories.view')->name('vendor-list');
         Route::get('planning-decisions', [PlanningDecisionController::class, 'index'])->middleware('permission:procurement.planning_decisions.view')->name('planning-decisions.index');
         Route::post('planning-decisions', [PlanningDecisionController::class, 'store'])->middleware('permission:procurement.planning_decisions.create')->name('planning-decisions.store');
         Route::patch('planning-decisions/lock-all', [PlanningDecisionController::class, 'lockAll'])->middleware('permission:procurement.planning_decisions.edit')->name('planning-decisions.lock-all');

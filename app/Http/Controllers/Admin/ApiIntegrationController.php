@@ -57,11 +57,13 @@ class ApiIntegrationController extends Controller
                 ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")->orWhere('endpoint', 'like', "%{$search}%")->orWhere('target_table', 'like', "%{$search}%")))
                 ->orderByDesc('status')->orderBy('name')->paginate($perPage)->withQueryString()
                 ->through(function (ApiIntegration $integration): ApiIntegration {
-                    $credentials = $integration->credentials ?? [];
+                    $credentialState = $integration->credentialState();
+                    $credentials = $credentialState['credentials'];
                     $integration->setAttribute('credential_username', (string) ($credentials['username'] ?? ''));
                     $integration->setAttribute('has_credential_password', filled($credentials['password'] ?? null));
                     $integration->setAttribute('subscription_name', (string) ($credentials['subscription_name'] ?? ''));
                     $integration->setAttribute('has_api_token', filled($credentials['token'] ?? null));
+                    $integration->setAttribute('credentials_unreadable', $credentialState['unreadable']);
 
                     return $integration;
                 }),
@@ -89,7 +91,20 @@ class ApiIntegrationController extends Controller
     public function update(Request $request, ApiIntegration $apiIntegration): RedirectResponse
     {
         $this->authorizeCode($request, (string) $apiIntegration->code);
-        $apiIntegration->update($this->validated($request, $apiIntegration));
+        $data = $this->validated($request, $apiIntegration);
+
+        // Eloquent compares cast values while determining dirty attributes. If
+        // the existing value was encrypted with an obsolete APP_KEY, that
+        // comparison attempts to decrypt it again and prevents replacement.
+        if ($apiIntegration->credentialState()['unreadable']) {
+            $apiIntegration->setRawAttributes([
+                ...$apiIntegration->getAttributes(),
+                'credentials' => null,
+            ]);
+            $apiIntegration->syncOriginalAttribute('credentials');
+        }
+
+        $apiIntegration->update($data);
 
         return back()->with('success', 'API integration updated.');
     }
@@ -203,7 +218,7 @@ class ApiIntegrationController extends Controller
         }
 
         $validated['target_table'] = $targets->all();
-        $existingCredentials = $api?->credentials ?? [];
+        $existingCredentials = $api?->credentialState()['credentials'] ?? [];
 
         if ($validated['api_type'] === 'external') {
             if (filter_var($validated['endpoint'], FILTER_VALIDATE_URL) === false) {
