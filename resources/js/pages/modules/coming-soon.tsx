@@ -37,7 +37,7 @@ export default function ModuleComingSoon({ module }: { module: ModuleSummary }) 
                         </p>
                         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                             <Button asChild size="lg" className="gap-2 bg-cyan-500 text-white hover:bg-cyan-400">
-                                <Link href="/admin/dashboard">Return to dashboard <ArrowRight className="size-4" /></Link>
+                                <Link href="/">Return to dashboard <ArrowRight className="size-4" /></Link>
                             </Button>
                             <div className="flex items-center gap-2 px-2 text-sm text-slate-400">
                                 <ShieldCheck className="size-4 text-emerald-400" /> Your existing access settings are preserved
