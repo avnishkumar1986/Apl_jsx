@@ -26,6 +26,21 @@ return new class extends Migration
                     ], JSON_THROW_ON_ERROR)),
                 ]);
         }
+
+        $securityUsername = (string) env('SECURITY_AUDIT_USERNAME', '');
+        $securityPassword = (string) env('SECURITY_AUDIT_PASSWORD', '');
+        if ($securityUsername !== '' && $securityPassword !== '') {
+            DB::table('tbl_api_integrations')
+                ->where('code', 'security')
+                ->update([
+                    'auth_type' => 'basic',
+                    'credentials' => Crypt::encryptString(json_encode([
+                        'username' => $securityUsername,
+                        'password' => $securityPassword,
+                    ], JSON_THROW_ON_ERROR)),
+                    'updated_at' => now(),
+                ]);
+        }
     }
 
     public function down(): void

@@ -15,6 +15,12 @@ return new class extends Migration
             });
         }
 
+        if (! Schema::hasColumn('tbl_usrlogin', 'usr_type')) {
+            Schema::table('tbl_usrlogin', function (Blueprint $table): void {
+                $table->string('usr_type', 20)->nullable()->after('user_id')->index();
+            });
+        }
+
         if (! Schema::hasTable('tbl_users') || ! Schema::hasTable('tbl_usrlogin')) {
             return;
         }
@@ -29,6 +35,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasColumn('tbl_usrlogin', 'usr_type')) {
+            Schema::table('tbl_usrlogin', function (Blueprint $table): void {
+                $table->dropColumn('usr_type');
+            });
+        }
+
         if (Schema::hasColumn('tbl_usrlogin', 'username') && ! Schema::hasColumn('tbl_usrlogin', 'login_name')) {
             Schema::table('tbl_usrlogin', function (Blueprint $table): void {
                 $table->renameColumn('username', 'login_name');
