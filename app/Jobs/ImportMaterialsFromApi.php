@@ -9,6 +9,7 @@ use App\Models\MaterialStock;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -24,28 +25,65 @@ class ImportMaterialsFromApi implements ShouldQueue
 
     public int $timeout = 600;
 
-    public function __construct(public int $apiId, public ?int $requestedBy = null, public ?string $material = null) {}
+    public function __construct(
+        public int $apiId,
+        public ?int $requestedBy = null,
+        public ?string $material = null,
+        public ?int $logId = null,
+    ) {
+        $this->onQueue('api-imports');
+    }
 
     public function handle(): void
     {
+        set_time_limit($this->timeout);
+        ini_set('memory_limit', '512M');
+
         $api = ApiIntegration::findOrFail($this->apiId);
-        $runId = (string) Str::uuid();
+        $runLog = $this->logId
+            ? ApiIntegrationLog::query()->where('api_integration_id', $api->id)->find($this->logId)
+            : null;
+        $runLog ??= $api->logs()->create([
+            'run_id' => (string) Str::uuid(),
+            'status' => 'running',
+            'attempt' => 1,
+            'message' => 'API run started.',
+            'created_by' => $this->requestedBy,
+            'created_at' => now(),
+        ]);
         $started = microtime(true);
 
         try {
             $environmentCode = (string) config('services.api_integrations.environment_code', 'production');
-            $environmentApi = ApiIntegration::where('code', $environmentCode)->where('status', true)->first();
-            $baseUrl = filled($api->base_url) ? (string) $api->base_url : (string) $environmentApi?->base_url;
+            $environmentApi = ApiIntegration::query()
+                ->where('code', $environmentCode)
+                ->where('status', true)
+                ->first();
+            $endpoint = trim((string) $api->endpoint);
+            $externalAbsoluteUrl = $api->api_type === 'external' && filter_var($endpoint, FILTER_VALIDATE_URL);
+            $baseUrl = trim((string) ($environmentApi?->endpoint ?? ''));
 
-            if ($baseUrl === '') {
-                throw new RuntimeException("Base URL is not configured for API environment [{$environmentCode}].");
+            if (! $externalAbsoluteUrl && $baseUrl === '') {
+                throw new RuntimeException("The [{$environmentCode}] environment API URL is not configured in the database.");
             }
 
-            $url = rtrim($baseUrl, '/').'/'.ltrim((string) $api->endpoint, '/');
+            $url = $externalAbsoluteUrl
+                ? $endpoint
+                : rtrim($baseUrl, '/').'/'.ltrim($endpoint, '/');
             if ($api->code === 'vendor' && filled($this->material)) {
                 $material = str_replace("'", "''", trim((string) $this->material));
-                $separator = str_contains($url, '?') ? '&' : '?';
-                $url .= $separator.'$filter='.rawurlencode("Material eq '{$material}'").'&$format=json';
+                $parts = parse_url($url);
+                parse_str((string) ($parts['query'] ?? ''), $query);
+                unset($query['Material'], $query['material']);
+                $query['$filter'] = "Material eq '{$material}'";
+                $query['$format'] = 'json';
+                $base = (isset($parts['scheme']) ? $parts['scheme'].'://' : '')
+                    .($parts['host'] ?? '')
+                    .(isset($parts['port']) ? ':'.$parts['port'] : '')
+                    .($parts['path'] ?? '');
+                $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+                $queryString = str_replace(['%24filter', '%24format'], ['$filter', '$format'], $queryString);
+                $url = $base.'?'.$queryString;
             }
             $host = parse_url($url, PHP_URL_HOST);
             $allowedHosts = array_filter(array_map('trim', explode(',', (string) config('services.api_integrations.allowed_hosts'))));
@@ -55,32 +93,51 @@ class ImportMaterialsFromApi implements ShouldQueue
             }
 
             $client = Http::timeout($api->timeout_seconds)->acceptJson();
-            $credentialKey = (string) $api->credential_key;
-            $credential = config("services.api_integrations.credentials.{$credentialKey}", []);
+
+            // The Quality SAP appliance presents its internal QASFIORIAPP.local
+            // certificate while it is reached through its configured IP address.
+            // Keep this exception restricted to that environment and host.
+            $insecureTlsHosts = array_filter(array_map('trim', explode(',', (string) config('services.api_integrations.insecure_tls_hosts'))));
+            if ($environmentCode === 'quality' && in_array($host, $insecureTlsHosts, true)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $credential = $api->api_type === 'sap'
+                ? ($environmentApi?->credentials ?? [])
+                : ($api->credentials ?? []);
             $token = is_array($credential) ? (string) ($credential['token'] ?? '') : (string) $credential;
             $username = is_array($credential) ? (string) ($credential['username'] ?? '') : '';
             $password = is_array($credential) ? (string) ($credential['password'] ?? '') : '';
+            $subscriptionName = is_array($credential) ? (string) ($credential['subscription_name'] ?? '') : '';
 
-            if ($api->auth_type === 'bearer' && $token !== '') {
-                $client = $client->withToken($token);
-            } elseif ($api->auth_type === 'basic' && $username !== '' && $password !== '') {
+            if ($api->api_type === 'sap' && $username !== '' && $password !== '') {
                 $client = $client->withBasicAuth($username, $password);
-            } elseif ($api->auth_type !== 'none') {
-                throw new RuntimeException("Credentials are not configured for [{$credentialKey}].");
+            } elseif ($api->api_type === 'sap') {
+                throw new RuntimeException("SAP credentials are not configured on the [{$environmentCode}] environment API.");
             }
 
-            $response = $client->get($url);
+            $payload = [];
+            if ($api->api_type === 'external') {
+                if ($subscriptionName === '' || $token === '') {
+                    throw new RuntimeException('External API credentials are not configured.');
+                }
+                $payload = ['SubscriptionName' => $subscriptionName, 'Token' => $token];
+            }
+
+            $response = $api->api_type === 'external'
+                ? $client->post($url, $payload)
+                : $client->get($url);
             $response->throw();
             $json = $response->json();
-            $items = data_get($json, 'd.results') ?? data_get($json, 'value') ?? data_get($json, 'data') ?? $json;
+            $apiCode = strtolower((string) $api->code);
+            $items = $this->extractApiItems($json, $apiCode);
 
             if (! is_array($items)) {
-                throw new RuntimeException('API response does not contain a material list.');
+                throw new RuntimeException('API response does not contain an importable record list.');
             }
 
-            $apiCode = strtolower((string) $api->code);
             $targets = $api->target_table ?: match ($apiCode) {
-                'stock' => ['tbl_material_stocks'],
+                'stock', 'mrmcon' => ['tbl_material_stocks'],
                 'vendor' => ['tbl_vendors', 'tbl_vendor_purchase_orders'],
                 'employee' => ['tbl_users', 'tbl_usrcontact', 'tbl_usrdept'],
                 default => ['tbl_materials'],
@@ -98,7 +155,7 @@ class ImportMaterialsFromApi implements ShouldQueue
             }
 
             if (in_array('tbl_material_stocks', $targets, true)) {
-                [$synchronized, $skipped] = $this->importStock($items);
+                [$synchronized, $skipped] = $this->importStock($items, $apiCode === 'mrmcon');
                 $messages[] = "tbl_material_stocks: {$synchronized} synchronized, {$skipped} skipped";
             }
 
@@ -128,27 +185,28 @@ class ImportMaterialsFromApi implements ShouldQueue
                 throw new RuntimeException('No supported target table is configured for this API.');
             }
 
-            ApiIntegrationLog::create([
-                'api_integration_id' => $api->id,
-                'run_id' => $runId,
+            $runLog->update([
                 'status' => 'success',
                 'http_status' => $response->status(),
                 'attempt' => 1,
                 'duration_ms' => (int) round((microtime(true) - $started) * 1000),
                 'records_received' => count($items),
                 'message' => implode('; ', $messages).'.',
-                'created_by' => $this->requestedBy,
             ]);
             $api->update(['last_run_status' => 'success', 'last_run_at' => now()]);
         } catch (Throwable $exception) {
-            ApiIntegrationLog::create([
-                'api_integration_id' => $api->id,
-                'run_id' => $runId,
+            $httpStatus = $exception instanceof RequestException
+                ? $exception->response->status()
+                : null;
+            $message = $httpStatus === 401
+                ? 'API authentication failed: the remote server rejected the configured username or password.'
+                : $exception->getMessage();
+            $runLog->update([
                 'status' => 'failed',
+                'http_status' => $httpStatus,
                 'attempt' => 1,
                 'duration_ms' => (int) round((microtime(true) - $started) * 1000),
-                'message' => $exception->getMessage(),
-                'created_by' => $this->requestedBy,
+                'message' => $message,
             ]);
             $api->update(['last_run_status' => 'failed', 'last_run_at' => now()]);
             throw $exception;
@@ -209,10 +267,13 @@ class ImportMaterialsFromApi implements ShouldQueue
                 continue;
             }
 
-            $row = array_change_key_case($item, CASE_LOWER);
-            $pernr = trim((string) ($row['pernr'] ?? ''));
-            if ($pernr !== '') {
-                $uniqueItems[$pernr] = $item;
+            $row = $this->normalizeEmployeeRow($item);
+            $employeeCode = trim((string) $this->employeeValue($row, [
+                'pernr', 'employeecode', 'empcode', 'employeenumber', 'employeeno', 'employeeid', 'uniqueid',
+            ]));
+            $employmentStatus = trim((string) $this->employeeValue($row, ['employmentstatus']));
+            if ($employeeCode !== '' && strtolower($employmentStatus) !== 'inactive') {
+                $uniqueItems[$employeeCode] = $item;
             }
         }
         $skipped = count($items) - count($uniqueItems);
@@ -226,25 +287,36 @@ class ImportMaterialsFromApi implements ShouldQueue
         }
 
         foreach ($uniqueItems as $item) {
-            $row = array_change_key_case($item, CASE_LOWER);
-            $pernr = trim((string) ($row['pernr'] ?? ''));
-            $fullName = trim((string) ($row['name'] ?? $row['ename'] ?? ''));
-            if ($pernr === '' || $fullName === '') {
+            $row = $this->normalizeEmployeeRow($item);
+            $employeeCode = trim((string) $this->employeeValue($row, [
+                'pernr', 'employeecode', 'empcode', 'employeenumber', 'employeeno', 'employeeid', 'uniqueid',
+            ]));
+            $firstName = trim((string) $this->employeeValue($row, ['firstname', 'givenname']));
+            $middleName = trim((string) $this->employeeValue($row, ['middlename']));
+            $lastName = trim((string) $this->employeeValue($row, ['lastname', 'surname', 'familyname']));
+            $fullName = trim((string) $this->employeeValue($row, ['name', 'ename', 'employeename', 'fullname']));
+            if ($firstName === '' && $fullName !== '') {
+                [$firstName, $splitMiddleName, $lastName] = $this->splitEmployeeName($fullName);
+                $middleName = $middleName !== '' ? $middleName : ($splitMiddleName ?? '');
+            }
+            if ($employeeCode === '' || $firstName === '') {
                 $skipped++;
 
                 continue;
             }
 
-            [$firstName, $middleName, $lastName] = $this->splitEmployeeName($fullName);
-            $existingUser = DB::table('tbl_users')->where('unique_id', $pernr)->first();
+            $existingUser = DB::table('tbl_users')->where('unique_id', $employeeCode)->first();
             $now = now();
 
-            DB::transaction(function () use ($row, $pernr, $firstName, $middleName, $lastName, $existingUser, $employeeTypeId, $now): void {
+            DB::transaction(function () use ($row, $employeeCode, $firstName, $middleName, $lastName, $existingUser, $employeeTypeId, $now): void {
                 $userValues = [
                     'user_type' => $employeeTypeId,
                     'first_name' => $firstName,
-                    'middle_name' => $middleName,
+                    'middle_name' => $middleName !== '' ? $middleName : null,
                     'last_name' => $lastName,
+                    'gender' => $this->nullableEmployeeString($row, ['gender', 'gendername']),
+                    'marital_status' => $this->nullableEmployeeString($row, ['maritalstatus', 'maritalstatusname']),
+                    'date_of_birth' => $this->normalizeApiDate($this->employeeValue($row, ['dateofbirth', 'birthdate', 'dob'])),
                     'status' => true,
                     'updated_by' => $this->requestedBy,
                     'updated_at' => $now,
@@ -255,19 +327,24 @@ class ImportMaterialsFromApi implements ShouldQueue
                     $userId = $existingUser->id;
                 } else {
                     $userId = DB::table('tbl_users')->insertGetId([
-                        'unique_id' => $pernr,
+                        'unique_id' => $employeeCode,
                         'created_by' => $this->requestedBy,
                         'created_at' => $now,
                         ...$userValues,
                     ]);
                 }
 
-                $email = strtolower(trim((string) ($row['emailaddress'] ?? $row['email'] ?? $row['emailid'] ?? $row['email_id'] ?? '')));
-                $contactNumber = trim((string) ($row['contact_number'] ?? $row['contactnumber'] ?? $row['mobile'] ?? $row['mobileno'] ?? $row['tel_number'] ?? ''));
+                $email = strtolower(trim((string) $this->employeeValue($row, [
+                    'officialemail', 'officialemailid', 'emailaddress', 'email', 'emailid', 'workemail',
+                ])));
+                $contactNumber = trim((string) $this->employeeValue($row, [
+                    'contactnumber', 'mobile', 'mobileno', 'mobilenumber', 'phonenumber', 'telnumber',
+                ]));
                 if ($email !== '' || $contactNumber !== '') {
                     DB::table('tbl_usrcontact')->updateOrInsert(
-                        ['user_id' => $pernr, 'is_primary' => true],
+                        ['user_id' => $employeeCode, 'is_primary' => true],
                         [
+                            'usr_type' => $employeeTypeId,
                             'contact_type' => 'primary',
                             'email' => $email !== '' ? $email : null,
                             'contact_number' => $contactNumber !== '' ? $contactNumber : null,
@@ -281,26 +358,40 @@ class ImportMaterialsFromApi implements ShouldQueue
                     );
                 }
 
-                $departmentValue = trim((string) ($row['zdepartment'] ?? $row['zdepartement'] ?? ''));
-                $designationValue = trim((string) ($row['zposition'] ?? ''));
+                $this->syncEmployeeIdentityDocuments($row, $employeeCode, $employeeTypeId, $now);
+
+                $departmentValue = trim((string) $this->employeeValue($row, [
+                    'zdepartment', 'zdepartement', 'departmentcode', 'departmentid', 'department',
+                ]));
+                $departmentName = trim((string) $this->employeeValue($row, ['departmentdesc', 'departmentname']));
+                $designationValue = trim((string) $this->employeeValue($row, [
+                    'zposition', 'positioncode', 'designationcode', 'positionid', 'designationid',
+                ]));
+                $designationName = trim((string) $this->employeeValue($row, [
+                    'positiondesc', 'positionname', 'designationname', 'designation',
+                ]));
                 $departmentId = $this->sapIdOrMasterId(
                     $departmentValue,
                     'tbl_departments',
                     'department_code',
                     'department_name',
-                    trim((string) ($row['departmentdesc'] ?? '')),
+                    $departmentName,
                 );
                 $designationId = $this->sapIdOrMasterId(
                     $designationValue,
                     'tbl_designations',
                     'des_id',
                     'designation_name',
-                    trim((string) ($row['positiondesc'] ?? '')),
+                    $designationName,
                 );
 
                 DB::table('tbl_usrdept')->updateOrInsert(
-                    ['user_id' => $pernr],
+                    ['user_id' => $employeeCode],
                     [
+                        'user_type' => $employeeTypeId,
+                        'sitting_location' => $this->nullableEmployeeString($row, [
+                            'sittinglocation', 'worklocation', 'locationname', 'location', 'branchname',
+                        ]),
                         'department_id' => $departmentId,
                         'designation_id' => $designationId,
                         'status' => true,
@@ -316,6 +407,93 @@ class ImportMaterialsFromApi implements ShouldQueue
         }
 
         return [$created, $updated, $skipped];
+    }
+
+    /** @param array<string, mixed> $row */
+    private function syncEmployeeIdentityDocuments(array $row, string $employeeCode, string $employeeTypeId, mixed $now): void
+    {
+        $aadhaarNumber = preg_replace('/[\s-]+/', '', trim((string) $this->employeeValue($row, [
+            'aadhaarnumber', 'aadharnumber', 'adhaarnumber', 'aadhaarno', 'aadharno', 'adhaarno', 'aadhaar', 'aadhar',
+        ]))) ?: null;
+        $panNumber = strtoupper(preg_replace('/\s+/', '', trim((string) $this->employeeValue($row, [
+            'pannumber', 'panno', 'pancardnumber', 'pancardno', 'pancard', 'pan',
+        ]))) ?: '');
+
+        foreach (['aadhaar' => $aadhaarNumber, 'pan' => $panNumber ?: null] as $type => $number) {
+            if ($number === null) {
+                continue;
+            }
+
+            DB::table('tbl_usrdocument')->updateOrInsert(
+                ['user_id' => $employeeCode, 'document_type' => $type],
+                [
+                    'user_type' => $employeeTypeId,
+                    'document_number' => $number,
+                    'document_name' => strtoupper($type),
+                    'status' => true,
+                    'created_by' => $this->requestedBy,
+                    'updated_by' => $this->requestedBy,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
+        }
+    }
+
+    private function extractApiItems(mixed $json, string $apiCode): array
+    {
+        if (! is_array($json)) {
+            throw new RuntimeException('API response is not valid JSON data.');
+        }
+
+        $paths = $apiCode === 'employee'
+            ? [
+                'EmployeeMasterDetails', 'employeeMasterDetails', 'EmployeeDetails', 'employeeDetails',
+                'Employees', 'employees', 'Result.EmployeeMasterDetails', 'result.employeeMasterDetails',
+                'Data.EmployeeMasterDetails', 'data.employeeMasterDetails', 'data', 'value',
+            ]
+            : ['d.results', 'value', 'data'];
+
+        foreach ($paths as $path) {
+            $candidate = data_get($json, $path);
+            if (is_array($candidate) && array_is_list($candidate)) {
+                return $candidate;
+            }
+        }
+
+        if (array_is_list($json)) {
+            return $json;
+        }
+
+        throw new RuntimeException("API response does not contain a record list for [{$apiCode}].");
+    }
+
+    private function normalizeEmployeeRow(array $item): array
+    {
+        $normalized = [];
+        foreach ($item as $key => $value) {
+            $normalized[strtolower((string) preg_replace('/[^A-Za-z0-9]/', '', (string) $key))] = $value;
+        }
+
+        return $normalized;
+    }
+
+    private function employeeValue(array $row, array $keys): mixed
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $row) && $row[$key] !== null && $row[$key] !== '') {
+                return $row[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function nullableEmployeeString(array $row, array $keys): ?string
+    {
+        $value = trim((string) $this->employeeValue($row, $keys));
+
+        return $value !== '' ? $value : null;
     }
 
     /** @return array{string, string|null, string} */
@@ -416,11 +594,12 @@ class ImportMaterialsFromApi implements ShouldQueue
     }
 
     /** @return array{int, int} */
-    private function importStock(array $items): array
+    private function importStock(array $items, bool $consumptionOnly = false): array
     {
         $batch = [];
         $synchronized = 0;
         $skipped = 0;
+        $syncedAt = now();
 
         foreach ($items as $item) {
             if (! is_array($item)) {
@@ -438,17 +617,38 @@ class ImportMaterialsFromApi implements ShouldQueue
                 continue;
             }
 
-            $batch[$matnr."\0".$plantCode] = [
+            $row = [
                 'matnr' => $matnr,
                 'plant_code' => $plantCode,
-                'material_desc' => trim((string) ($item['material_desc'] ?? $item['maktx'] ?? '')) ?: null,
-                'current_stock' => (float) ($item['current_stock'] ?? $item['labst'] ?? 0),
-                'stock_value' => (float) ($item['stock_value'] ?? 0),
                 'status' => true,
-                'synced_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
+                'synced_at' => $syncedAt,
+                'created_at' => $syncedAt,
+                'updated_at' => $syncedAt,
             ];
+
+            if ($consumptionOnly) {
+                $apiNumber = static function (mixed $value): float {
+                    $normalized = str_replace([',', ' '], '', trim((string) $value));
+
+                    return is_numeric($normalized) ? (float) $normalized : 0.0;
+                };
+                $currentMonth = $apiNumber($item['m_consump'] ?? 0);
+                $previousMonth = $apiNumber($item['l_consump'] ?? 0);
+                $twoMonthsAgo = $apiNumber($item['ll_consump'] ?? 0);
+                $monthlyAverage = ($currentMonth + $previousMonth + $twoMonthsAgo) / 3;
+
+                $row['sap_current_month_consumption'] = round($currentMonth, 3);
+                $row['sap_previous_month_consumption'] = round($previousMonth, 3);
+                $row['sap_two_months_ago_consumption'] = round($twoMonthsAgo, 3);
+                $row['auto_monthly_consumption'] = round($monthlyAverage, 3);
+                $row['auto_perday_consumption'] = round($monthlyAverage / CarbonImmutable::now()->daysInMonth, 3);
+            } else {
+                $row['material_desc'] = trim((string) ($item['material_desc'] ?? $item['maktx'] ?? '')) ?: null;
+                $row['current_stock'] = (float) ($item['current_stock'] ?? $item['labst'] ?? 0);
+                $row['stock_value'] = (float) ($item['stock_value'] ?? 0);
+            }
+
+            $batch[$matnr."\0".$plantCode] = $row;
 
             if (count($batch) >= 500) {
                 $synchronized += $this->upsertStockBatch(array_values($batch));
@@ -465,10 +665,23 @@ class ImportMaterialsFromApi implements ShouldQueue
 
     private function upsertStockBatch(array $rows): int
     {
+        $updateColumns = isset($rows[0]['auto_perday_consumption'])
+            ? [
+                'sap_current_month_consumption',
+                'sap_previous_month_consumption',
+                'sap_two_months_ago_consumption',
+                'auto_monthly_consumption',
+                'auto_perday_consumption',
+                'status',
+                'synced_at',
+                'updated_at',
+            ]
+            : ['material_desc', 'current_stock', 'stock_value', 'status', 'synced_at', 'updated_at'];
+
         MaterialStock::upsert(
             $rows,
             ['matnr', 'plant_code'],
-            ['material_desc', 'current_stock', 'stock_value', 'status', 'synced_at', 'updated_at'],
+            $updateColumns,
         );
 
         return count($rows);
@@ -507,6 +720,12 @@ class ImportMaterialsFromApi implements ShouldQueue
             $unit = strtoupper(trim((string) ($row['purchaseorderquantityunit'] ?? $row['orderquantityunit'] ?? $row['order_unit'] ?? $row['meins'] ?? 'MT')));
             $quantityMt = $this->convertToMt($quantity, $unit);
             $receivedQuantityMt = $this->convertToMt($receivedQuantity, $unit);
+            $amount = (float) ($row['netamount'] ?? $row['netvalue'] ?? $row['amount'] ?? $row['netwr'] ?? $row['poprice'] ?? 0);
+            $rate = (float) ($row['netpriceamount'] ?? $row['netprice'] ?? $row['unitprice'] ?? $row['rate'] ?? 0);
+            if ($rate <= 0 && $amount > 0 && $quantityMt > 0) {
+                $rate = $amount / $quantityMt;
+            }
+            $currency = strtoupper(trim((string) ($row['documentcurrency'] ?? $row['currency'] ?? $row['currencycode'] ?? $row['waers'] ?? '')));
             $cancelled = filled($row['deletionindicator'] ?? $row['deletion_flag'] ?? $row['loekz'] ?? null);
             $completed = in_array(strtoupper((string) ($row['deliverycompleted'] ?? $row['elikz'] ?? '')), ['1', 'X', 'TRUE'], true);
             $status = $cancelled ? 'cancelled' : ($completed || ($quantity > 0 && $receivedQuantity >= $quantity) ? 'received' : ($receivedQuantity > 0 ? 'partially_received' : 'planned'));
@@ -539,6 +758,9 @@ class ImportMaterialsFromApi implements ShouldQueue
                 'order_unit' => $unit ?: null,
                 'quantity_mt' => $quantityMt,
                 'received_quantity_mt' => $receivedQuantityMt,
+                'rate' => $rate,
+                'amount' => $amount,
+                'currency' => $currency ?: null,
                 'delivery_status' => $status,
                 'status' => ! $cancelled,
                 'api_payload' => json_encode($item),
@@ -549,10 +771,14 @@ class ImportMaterialsFromApi implements ShouldQueue
         }
 
         if ($importVendors && $vendors !== []) {
-            DB::table('tbl_vendors')->upsert(array_values($vendors), ['vendor_code'], ['vendor_name', 'company_code', 'status', 'api_payload', 'synced_at', 'updated_at']);
+            foreach (array_chunk(array_values($vendors), 250) as $vendorBatch) {
+                DB::table('tbl_vendors')->upsert($vendorBatch, ['vendor_code'], ['vendor_name', 'company_code', 'status', 'api_payload', 'synced_at', 'updated_at']);
+            }
         }
         if ($importPurchaseOrders && $purchaseOrders !== []) {
-            DB::table('tbl_vendor_purchase_orders')->upsert(array_values($purchaseOrders), ['po_number', 'item_number'], ['vendor_code', 'vendor_name', 'company_code', 'material', 'plant_code', 'order_date', 'expected_delivery_date', 'order_quantity', 'order_unit', 'quantity_mt', 'received_quantity_mt', 'delivery_status', 'status', 'api_payload', 'synced_at', 'updated_at']);
+            foreach (array_chunk(array_values($purchaseOrders), 250) as $purchaseOrderBatch) {
+                DB::table('tbl_vendor_purchase_orders')->upsert($purchaseOrderBatch, ['po_number', 'item_number'], ['vendor_code', 'vendor_name', 'company_code', 'material', 'plant_code', 'order_date', 'expected_delivery_date', 'order_quantity', 'order_unit', 'quantity_mt', 'received_quantity_mt', 'rate', 'amount', 'currency', 'delivery_status', 'status', 'api_payload', 'synced_at', 'updated_at']);
+            }
         }
 
         return [$importPurchaseOrders ? count($purchaseOrders) : 0, $importVendors ? count($vendors) : 0, $skipped];

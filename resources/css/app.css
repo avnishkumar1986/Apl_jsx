@@ -230,6 +230,42 @@
 }
 
 @layer components {
+    .procurement-compact {
+        width: 100%;
+        min-width: 0;
+        overflow-x: clip;
+    }
+
+    .procurement-compact :where(.overflow-x-auto) {
+        max-width: 100%;
+        overscroll-behavior-inline: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .procurement-compact :where(button, a, input, select, textarea) {
+        min-width: 0;
+    }
+
+    @media (max-width: 767px) {
+        .procurement-compact {
+            padding: 0.5rem !important;
+        }
+
+        .procurement-compact :where(table:not(.table-unstyled) > thead > tr > th) {
+            padding: 0.625rem 0.75rem !important;
+        }
+
+        .procurement-compact :where(table:not(.table-unstyled) > tbody > tr > td) {
+            padding-right: 0.75rem !important;
+            padding-left: 0.75rem !important;
+        }
+
+        .procurement-compact :where([role='dialog']) {
+            max-width: calc(100vw - 1rem);
+            max-height: calc(100dvh - 1rem);
+        }
+    }
+
     .dashboard-shell .corporate-card {
         @apply rounded-2xl border border-slate-200/90 bg-white shadow-[0_10px_30px_-22px_rgba(15,23,42,0.45)];
     }

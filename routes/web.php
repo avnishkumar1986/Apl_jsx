@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Admin\MaterialStockController;
 use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\TrafficMonitorController;
 use App\Http\Controllers\Admin\UserMasterController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\UserTypeController;
@@ -91,7 +92,7 @@ Route::middleware(['auth'])->group(function () {
             fn (array $issue): int => $issue['severity'] === 'high' ? 25 : 15,
         ));
 
-        $latestLibraryScan = $request->user()->hasRole('Super Admin')
+        $latestLibraryScan = $request->user()->hasRole('Owner')
             ? SecurityScan::query()
                 ->with('findings')
                 ->whereIn('status', ['completed', 'completed_with_errors'])
@@ -152,7 +153,7 @@ Route::middleware(['auth'])->group(function () {
             ->whereIn('user_id', $activeUserIds)
             ->whereIn('id', UserLocation::query()->selectRaw('MAX(id)')->groupBy('user_id'))
             ->when(
-                ! $request->user()->hasRole('Super Admin'),
+                ! $request->user()->hasRole('Owner'),
                 fn ($query) => $query->where('user_id', $request->user()->getKey()),
             )
             ->get()
@@ -163,27 +164,27 @@ Route::middleware(['auth'])->group(function () {
                 );
 
                 return [
-                'userId' => $location->user_id,
-                'name' => $location->user->name,
-                'employeeId' => $location->user->unique_id,
-                'companyName' => $location->user->departmentAssignment?->company?->company_name,
-                'departmentName' => $location->user->departmentAssignment?->department?->department_name,
-                'designationName' => $location->user->departmentAssignment?->designation?->designation_name,
-                'latitude' => $location->latitude,
-                'longitude' => $location->longitude,
-                'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
-                'locationType' => match ($sittingLocation?->record_type) {
-                    2 => 'plant',
-                    3 => 'ho',
-                    default => 'unassigned',
-                },
-                'sittingLocationCode' => $sittingLocation?->company_code,
-                'lastSeen' => ($location->captured_at ?? $location->updated_at)->toIso8601String(),
-                'devices' => $activeSessions
-                    ->where('user_id', $location->user_id)
-                    ->map(fn (object $session): string => $deviceNameForUserAgent($session->user_agent))
-                    ->unique()
-                    ->values(),
+                    'userId' => $location->user_id,
+                    'name' => $location->user->name,
+                    'employeeId' => $location->user->unique_id,
+                    'companyName' => $location->user->departmentAssignment?->company?->company_name,
+                    'departmentName' => $location->user->departmentAssignment?->department?->department_name,
+                    'designationName' => $location->user->departmentAssignment?->designation?->designation_name,
+                    'latitude' => $location->latitude,
+                    'longitude' => $location->longitude,
+                    'locationName' => $location->location_name ?: "{$location->latitude}, {$location->longitude}",
+                    'locationType' => match ($sittingLocation?->record_type) {
+                        2 => 'plant',
+                        3 => 'ho',
+                        default => 'unassigned',
+                    },
+                    'sittingLocationCode' => $sittingLocation?->company_code,
+                    'lastSeen' => ($location->captured_at ?? $location->updated_at)->toIso8601String(),
+                    'devices' => $activeSessions
+                        ->where('user_id', $location->user_id)
+                        ->map(fn (object $session): string => $deviceNameForUserAgent($session->user_agent))
+                        ->unique()
+                        ->values(),
                 ];
             });
 
@@ -263,7 +264,7 @@ Route::middleware(['auth'])->group(function () {
             'portalLogs' => PortalLog::query()
                 ->with('user:id,first_name,last_name')
                 ->when(
-                    ! $request->user()->hasRole('Super Admin'),
+                    ! $request->user()->hasRole('Owner'),
                     fn ($query) => $query->where('user_id', $request->user()->getKey()),
                 )
                 ->latest()
@@ -284,7 +285,7 @@ Route::middleware(['auth'])->group(function () {
                     'createdAt' => $log->created_at->toIso8601String(),
                 ]),
         ]);
-    })->name('dashboard');
+    })->middleware('permission:dashboard.view')->name('dashboard');
 
     Route::post('dashboard/location', [DashboardLocationController::class, 'store'])->middleware('permission:dashboard.view')->name('dashboard.location.store');
     Route::get('dashboard/location-report', [DashboardLocationController::class, 'report'])
@@ -293,6 +294,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard/activity', [PortalActivityController::class, 'index'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.activity');
+    Route::get('admin/traffic-monitor', [TrafficMonitorController::class, 'index'])
+        ->middleware('role:Owner')
+        ->name('admin.traffic-monitor.index');
+    Route::post('admin/traffic-monitor/blocked-ips', [TrafficMonitorController::class, 'store'])
+        ->middleware('role:Owner')
+        ->name('admin.traffic-monitor.block');
+    Route::delete('admin/traffic-monitor/blocked-ips/{blockedIp}', [TrafficMonitorController::class, 'destroy'])
+        ->middleware('role:Owner')
+        ->name('admin.traffic-monitor.unblock');
     Route::post('dashboard/session-closing', [DashboardLocationController::class, 'markSessionClosing'])
         ->middleware('permission:dashboard.view')
         ->name('dashboard.session-closing');
@@ -328,12 +338,13 @@ Route::middleware(['auth'])->group(function () {
         Route::put('material-stocks/{materialStock}', [MaterialStockController::class, 'update'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.update');
         Route::patch('material-stocks/{materialStock}/status', [MaterialStockController::class, 'toggleStatus'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.status');
         Route::delete('material-stocks/{materialStock}', [MaterialStockController::class, 'destroy'])->middleware('permission:procurement.inventory.material_stock.manage')->name('material-stocks.destroy');
-        Route::get('api-integrations', [ApiIntegrationController::class, 'index'])->middleware('permission:procurement.api.material.view|procurement.api.production.view|procurement.api.quality.view|procurement.api.stock.view|procurement.api.vendor.view|users.view')->name('api-integrations.index');
-        Route::post('api-integrations', [ApiIntegrationController::class, 'store'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.store');
-        Route::put('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'update'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.update');
-        Route::patch('api-integrations/{apiIntegration}/status', [ApiIntegrationController::class, 'toggleStatus'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.status');
-        Route::post('api-integrations/{apiIntegration}/run', [ApiIntegrationController::class, 'run'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.run');
-        Route::delete('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'destroy'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.destroy');
+        Route::get('api-integrations', [ApiIntegrationController::class, 'index'])->middleware('permission:procurement.api.material.view|procurement.api.production.view|procurement.api.quality.view|procurement.api.stock.view|procurement.api.consumption.view|procurement.api.vendor.view|users.view')->name('api-integrations.index');
+        Route::post('api-integrations', [ApiIntegrationController::class, 'store'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.consumption.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.store');
+        Route::put('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'update'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.consumption.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.update');
+        Route::patch('api-integrations/{apiIntegration}/status', [ApiIntegrationController::class, 'toggleStatus'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.consumption.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.status');
+        Route::post('api-integrations/{apiIntegration}/run', [ApiIntegrationController::class, 'run'])->middleware('permission:procurement.api.material.run|procurement.api.production.run|procurement.api.quality.run|procurement.api.stock.run|procurement.api.consumption.run|procurement.api.vendor.run|users.manage')->name('api-integrations.run');
+        Route::post('api-integrations/run-procurement', [ApiIntegrationController::class, 'runProcurement'])->middleware('permission:procurement.api.material.run|users.manage')->name('api-integrations.run-procurement');
+        Route::delete('api-integrations/{apiIntegration}', [ApiIntegrationController::class, 'destroy'])->middleware('permission:procurement.api.material.manage|procurement.api.production.manage|procurement.api.quality.manage|procurement.api.stock.manage|procurement.api.consumption.manage|procurement.api.vendor.manage|users.manage')->name('api-integrations.destroy');
         Route::get('companies', [CompanyController::class, 'index'])->middleware('permission:users.view')->name('companies.index');
         Route::get('companies/hierarchy', [CompanyController::class, 'hierarchy'])->middleware('permission:users.view')->name('companies.hierarchy');
         Route::post('companies', [CompanyController::class, 'store'])->middleware('permission:users.manage')->name('companies.store');
@@ -398,8 +409,10 @@ require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 
 $moduleRouteFiles = [
+    base_path('Modules/GroupOverview/routes/web.php'),
     base_path('Modules/Procurement/routes/web.php'),
     base_path('Modules/Sales/routes/web.php'),
+    base_path('Modules/SalesDistribution/routes/web.php'),
     base_path('Modules/CorporateChat/routes/web.php'),
     base_path('Modules/Support/routes/web.php'),
 ];

@@ -6,27 +6,40 @@ use App\Contracts\ModuleServiceContract;
 use App\Models\ModulePackage;
 use Illuminate\Support\Facades\Storage;
 use Modules\CorporateChat\Services\CorporateChatService;
+use Modules\GroupOverview\Services\GroupOverviewService;
 use Modules\Procurement\Services\ProcurementService;
 use Modules\Sales\Services\SalesService;
+use Modules\SalesDistribution\Services\SalesDistributionService;
+use Modules\Support\Services\SupportService;
 
 class ModuleRegistryService
 {
     /** @var array<string,class-string<ModuleServiceContract>> */
     private array $services = [
+        'group-overview' => GroupOverviewService::class,
         'procurement' => ProcurementService::class,
         'sales' => SalesService::class,
+        'sales-distribution' => SalesDistributionService::class,
         'corporate-chat' => CorporateChatService::class,
+        'support' => SupportService::class,
     ];
 
     /** @var array<string,string> */
     private array $serviceFiles = [
+        'group-overview' => 'Modules/GroupOverview/Services/GroupOverviewService.php',
         'procurement' => 'Modules/Procurement/Services/ProcurementService.php',
         'sales' => 'Modules/Sales/Services/SalesService.php',
+        'sales-distribution' => 'Modules/SalesDistribution/Services/SalesDistributionService.php',
         'corporate-chat' => 'Modules/CorporateChat/Services/CorporateChatService.php',
+        'support' => 'Modules/Support/Services/SupportService.php',
     ];
 
     /** @var array<string,array{module_path:string,sections:list<string>}> */
     private array $moduleDefinitions = [
+        'group-overview' => [
+            'module_path' => 'Modules/GroupOverview',
+            'sections' => ['Dashboard'],
+        ],
         'procurement' => [
             'module_path' => 'Modules/Procurement',
             'sections' => ['Dashboard', 'Planning / Consumption', 'Planning / Balance Sheet', 'Planning / Material Inventory'],
@@ -35,9 +48,17 @@ class ModuleRegistryService
             'module_path' => 'Modules/Sales',
             'sections' => ['Dashboard'],
         ],
+        'sales-distribution' => [
+            'module_path' => 'Modules/SalesDistribution',
+            'sections' => ['Dashboard'],
+        ],
         'corporate-chat' => [
             'module_path' => 'Modules/CorporateChat',
             'sections' => ['Conversations'],
+        ],
+        'support' => [
+            'module_path' => 'Modules/Support',
+            'sections' => ['Support Desk', 'Ticket Management', 'Internal Notes', 'Reports'],
         ],
     ];
 

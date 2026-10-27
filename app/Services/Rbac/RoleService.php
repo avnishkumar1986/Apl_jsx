@@ -33,8 +33,8 @@ class RoleService
      */
     public function update(Role $role, array $data): Role
     {
-        if ($role->name === 'Super Admin' && $data['name'] !== 'Super Admin') {
-            throw ValidationException::withMessages(['name' => 'The Super Admin role cannot be renamed.']);
+        if (strcasecmp($role->name, 'Owner') === 0 && strcasecmp($data['name'], 'Owner') !== 0) {
+            throw ValidationException::withMessages(['name' => 'The Owner role cannot be renamed.']);
         }
 
         return DB::transaction(function () use ($role, $data): Role {
@@ -52,8 +52,8 @@ class RoleService
 
     public function delete(Role $role): void
     {
-        if ($role->name === 'Super Admin') {
-            throw ValidationException::withMessages(['role' => 'The Super Admin role cannot be deleted.']);
+        if (strcasecmp($role->name, 'Owner') === 0) {
+            throw ValidationException::withMessages(['role' => 'The Owner role cannot be deleted.']);
         }
 
         $role->delete();
@@ -64,8 +64,8 @@ class RoleService
      */
     public function syncUserRoles(User $user, array $roles, User $actor): void
     {
-        if ($user->is($actor) && $user->hasRole('Super Admin') && ! in_array('Super Admin', $roles, true)) {
-            throw ValidationException::withMessages(['roles' => 'You cannot remove your own Super Admin role.']);
+        if ($user->is($actor) && $user->hasRole('Owner') && ! collect($roles)->contains(fn (string $role): bool => strcasecmp($role, 'Owner') === 0)) {
+            throw ValidationException::withMessages(['roles' => 'You cannot remove your own Owner role.']);
         }
 
         $user->syncRoles($roles);

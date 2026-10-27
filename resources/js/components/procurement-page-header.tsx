@@ -8,24 +8,32 @@ export default function ProcurementPageHeader({
     icon: Icon,
     meta,
     actions,
+    backHref,
     embedded = false,
+    showEyebrow = true,
+    compact = false,
 }: {
     title: string;
     subtitle?: string;
     icon: LucideIcon;
-    meta?: string;
+    meta?: ReactNode;
     actions?: ReactNode;
+    backHref?: string;
     embedded?: boolean;
+    showEyebrow?: boolean;
+    compact?: boolean;
 }) {
     return (
         <ProjectPageHeader
-            eyebrow="Procurement"
+            eyebrow={showEyebrow ? 'Procurement' : undefined}
             title={title}
             subtitle={subtitle}
             icon={<Icon className="size-5" />}
             meta={meta}
             actions={actions}
+            backHref={backHref}
             embedded={embedded}
+            compact={compact}
         />
     );
 }

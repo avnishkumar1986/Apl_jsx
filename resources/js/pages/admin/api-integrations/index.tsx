@@ -41,11 +41,13 @@ type Api = {
   name: string;
   code: string;
   description: string | null;
-  base_url: string | null;
+  api_type: "sap" | "external";
   endpoint: string | null;
-  method: string;
-  auth_type: string;
-  credential_key: string | null;
+  credential_username: string;
+  has_credential_password: boolean;
+  subscription_name: string;
+  has_api_token: boolean;
+  credentials_unreadable: boolean;
   target_table: string[] | null;
   retries: number;
   retry_delay_seconds: number;
@@ -69,26 +71,40 @@ type FormData = {
   name: string;
   code: string;
   description: string;
-  base_url: string;
+  api_type: "sap" | "external";
   endpoint: string;
-  method: string;
-  auth_type: string;
-  credential_key: string;
+  credential_username: string;
+  credential_password: string;
+  subscription_name: string;
+  api_token: string;
   target_table: string;
   retries: number;
   retry_delay_seconds: number;
   timeout_seconds: number;
   status: boolean;
 };
+type ProcurementSync = {
+  canRun: boolean;
+  steps: {
+    step: number;
+    code: string;
+    name: string;
+    configured: boolean;
+    active: boolean;
+    lastRunStatus: string | null;
+    lastRunAt: string | null;
+  }[];
+};
 const empty: FormData = {
   name: "",
   code: "",
   description: "",
-  base_url: "",
+  api_type: "sap",
   endpoint: "",
-  method: "GET",
-  auth_type: "none",
-  credential_key: "",
+  credential_username: "",
+  credential_password: "",
+  subscription_name: "",
+  api_token: "",
   target_table: "",
   retries: 3,
   retry_delay_seconds: 10,
@@ -102,6 +118,9 @@ export default function ApiIntegrations({
   stats,
   canManage,
   manageableCodes,
+  runnableCodes,
+  procurementSync,
+  credentialSourceCode,
 }: {
   integrations: Page<Api>;
   filters: { search: string; per_page: number };
@@ -109,20 +128,35 @@ export default function ApiIntegrations({
   stats: { total: number; active: number };
   canManage: boolean;
   manageableCodes: string[];
+  runnableCodes: string[];
+  procurementSync: ProcurementSync | null;
+  credentialSourceCode: string;
 }) {
   const [search, setSearch] = useState(filters.search),
     [open, setOpen] = useState(false),
     [editing, setEditing] = useState<Api | null>(null),
     [logsFor, setLogsFor] = useState<Api | null>(null),
+    [procurementStarting, setProcurementStarting] = useState(false),
     [expandedId, setExpandedId] = useState<number | null>(null);
   const form = useForm<FormData>(empty);
   useEffect(() => {
-    if (!integrations.data.some((a) => a.last_run_status === "queued")) return;
+    const hasActiveRun = integrations.data.some(
+      (a) =>
+        ["queued", "running"].includes(a.last_run_status ?? "") ||
+        a.logs.some((log) => ["queued", "running"].includes(log.status)),
+    );
+    if (!hasActiveRun) return;
     const timer = window.setInterval(
       () => router.reload({ only: ["integrations"] }),
       3000,
     );
     return () => window.clearInterval(timer);
+  }, [integrations.data]);
+  useEffect(() => {
+    setLogsFor((current) => {
+      if (!current) return current;
+      return integrations.data.find((api) => api.id === current.id) ?? current;
+    });
   }, [integrations.data]);
   const load = (s = search, p = filters.per_page) =>
     router.get(
@@ -142,11 +176,12 @@ export default function ApiIntegrations({
       name: a.name,
       code: a.code,
       description: a.description ?? "",
-      base_url: a.base_url ?? "",
+      api_type: a.api_type ?? "sap",
       endpoint: a.endpoint ?? "",
-      method: a.method,
-      auth_type: a.auth_type,
-      credential_key: a.credential_key ?? "",
+      credential_username: a.credential_username ?? "",
+      credential_password: "",
+      subscription_name: a.subscription_name ?? "",
+      api_token: "",
       target_table: a.target_table?.join(", ") ?? "",
       retries: a.retries,
       retry_delay_seconds: a.retry_delay_seconds,
@@ -161,6 +196,20 @@ export default function ApiIntegrations({
     const o = { preserveScroll: true, onSuccess: () => setOpen(false) };
     if (editing) form.put(`/admin/api-integrations/${editing.id}`, o);
     else form.post("/admin/api-integrations", o);
+  };
+  const procurementReady =
+    procurementSync?.steps.every((step) => step.active && step.configured) ??
+    false;
+  const runProcurementSync = () => {
+    setProcurementStarting(true);
+    router.post(
+      "/admin/api-integrations/run-procurement",
+      {},
+      {
+        preserveScroll: true,
+        onFinish: () => setProcurementStarting(false),
+      },
+    );
   };
   return (
     <AppLayout
@@ -196,6 +245,27 @@ export default function ApiIntegrations({
                 <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                   <b>{stats.active}</b> active
                 </span>
+                {procurementSync && (
+                  <Button
+                    onClick={runProcurementSync}
+                    disabled={
+                      procurementStarting ||
+                      !procurementReady ||
+                      !procurementSync.canRun
+                    }
+                    title={
+                      procurementReady
+                        ? "Run Material, Stock, Vendor, and Consumption APIs in the background"
+                        : "Activate and configure all four procurement APIs first"
+                    }
+                    className="bg-slate-950 text-white shadow-sm hover:bg-cyan-800 disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    <Play className="size-3.5 fill-current" />
+                    {procurementStarting
+                      ? "Starting…"
+                      : "Run 4 APIs in background"}
+                  </Button>
+                )}
                 {canManage && (
                   <Button
                     onClick={create}
@@ -269,31 +339,26 @@ export default function ApiIntegrations({
                       </td>
                       <td
                         className="max-w-sm px-4 py-4 text-xs"
-                        title={`${a.base_url ?? ""}${a.endpoint ?? ""}`}
+                        title={a.endpoint ?? ""}
                       >
-                        {a.base_url && (
-                          <span className="block truncate text-[10px] text-slate-400">
-                            {a.base_url}
-                          </span>
-                        )}
                         <code className="block max-w-[310px] truncate font-sans font-medium text-slate-700">
                           {a.endpoint || "Not configured"}
                         </code>
                       </td>
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ring-1 ${a.method === "GET" ? "bg-sky-50 text-sky-700 ring-sky-200" : a.method === "POST" ? "bg-violet-50 text-violet-700 ring-violet-200" : "bg-slate-100 text-slate-700 ring-slate-200"}`}
+                          className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ring-1 ${a.api_type === "sap" ? "bg-sky-50 text-sky-700 ring-sky-200" : "bg-violet-50 text-violet-700 ring-violet-200"}`}
                         >
-                          {a.method}
+                          {a.api_type === "sap" ? "GET" : "POST"}
                         </span>
                       </td>
                       <td className="px-4 py-4 capitalize text-slate-700">
-                        <span className="font-medium">{a.auth_type}</span>
+                        <span className="font-medium">{a.api_type === "sap" ? "Basic" : "Subscription"}</span>
                         <span
                           className="mt-0.5 block max-w-[210px] truncate font-mono text-[10px] text-slate-400"
-                          title={a.credential_key || undefined}
+                          title="Encrypted database credentials"
                         >
-                          {a.credential_key || "No credential required"}
+                          Encrypted in database
                         </span>
                       </td>
                       <td className="px-4 py-4 text-xs">
@@ -383,7 +448,7 @@ export default function ApiIntegrations({
                                 Run, inspect logs, or update this connection.
                               </p>
                             </div>
-                            {manageableCodes.includes(a.code.toLowerCase()) && (
+                            {runnableCodes.includes(a.code.toLowerCase()) && (
                               <Button
                                 onClick={() =>
                                   router.post(
@@ -516,65 +581,99 @@ export default function ApiIntegrations({
                   onChange={(e) => form.setData("description", e.target.value)}
                 />
               </Field>
-              <Field label="Base URL" error={form.errors.base_url}>
-                <Input
-                  value={form.data.base_url}
-                  placeholder="https://api.example.com"
-                  onChange={(e) => form.setData("base_url", e.target.value)}
-                />
+              <Field label="API Type" error={form.errors.api_type}>
+                <Select
+                  value={form.data.api_type}
+                  onValueChange={(value: "sap" | "external") => form.setData("api_type", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sap">SAP API</SelectItem>
+                    <SelectItem value="external">External API</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
               <div className="sm:col-span-2">
-                <Field label="Endpoint" error={form.errors.endpoint}>
+                <Field
+                  label={form.data.api_type === "external" ? "External API URL" : "SAP Endpoint"}
+                  error={form.errors.endpoint}
+                >
                   <Input
                     value={form.data.endpoint}
-                    placeholder="/api/resource"
+                    placeholder={
+                      form.data.api_type === "external"
+                        ? "https://external.example.com/api/resource"
+                        : "/sap/opu/odata/..."
+                    }
                     onChange={(e) => form.setData("endpoint", e.target.value)}
                   />
                 </Field>
               </div>
-              <Field label="Method">
-                <Select
-                  value={form.data.method}
-                  onValueChange={(v) => form.setData("method", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["GET", "POST", "PUT", "PATCH", "DELETE"].map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Authentication">
-                <Select
-                  value={form.data.auth_type}
-                  onValueChange={(v) => form.setData("auth_type", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["none", "basic", "bearer"].map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Credential environment key">
-                <Input
-                  value={form.data.credential_key}
-                  placeholder="API_TOKEN_KEY"
-                  onChange={(e) =>
-                    form.setData("credential_key", e.target.value)
-                  }
-                />
-              </Field>
+              <div className="rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs text-cyan-900 sm:col-span-2">
+                {form.data.api_type === "external"
+                  ? "POST · subscription credentials are encrypted before being stored in the database"
+                  : ["production", "quality"].includes(form.data.code)
+                    ? "GET · shared Basic credentials are encrypted on this environment API"
+                    : `GET · uses shared Basic credentials from ${credentialSourceCode} API`}
+              </div>
+              {editing?.credentials_unreadable && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                  The saved credential cannot be decrypted with the current application key. Enter the username and password or token again, then save this integration.
+                </div>
+              )}
+              {form.data.api_type === "sap" && ["production", "quality"].includes(form.data.code) ? (
+                <>
+                  <Field label="API_AUTH_USERNAME" error={form.errors.credential_username}>
+                    <Input
+                      autoComplete="off"
+                      value={form.data.credential_username}
+                      placeholder="API authentication username"
+                      onChange={(e) => form.setData("credential_username", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="API_AUTH_PASSWORD" error={form.errors.credential_password}>
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      value={form.data.credential_password}
+                      placeholder={editing?.has_credential_password ? "•••••••••••• (saved)" : "API authentication password"}
+                      onChange={(e) => form.setData("credential_password", e.target.value)}
+                    />
+                    {editing?.has_credential_password && !form.data.credential_password && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Password is saved securely. Leave blank to keep it unchanged.
+                      </p>
+                    )}
+                  </Field>
+                </>
+              ) : form.data.api_type === "external" ? (
+                <>
+                  <Field label="Subscription Name" error={form.errors.subscription_name}>
+                    <Input
+                      autoComplete="off"
+                      value={form.data.subscription_name}
+                      placeholder="Subscription name"
+                      onChange={(e) => form.setData("subscription_name", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="API Token" error={form.errors.api_token}>
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      value={form.data.api_token}
+                      placeholder={editing?.has_api_token ? "•••••••••••• (saved)" : "API token"}
+                      onChange={(e) => form.setData("api_token", e.target.value)}
+                    />
+                    {editing?.has_api_token && !form.data.api_token && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Token is saved securely. Leave blank to keep it unchanged.
+                      </p>
+                    )}
+                  </Field>
+                </>
+              ) : null}
               <Field
                 label="Target tables (comma separated)"
                 error={form.errors.target_table}

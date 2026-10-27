@@ -21,9 +21,9 @@ test('users without permission cannot access RBAC screens', function () {
     $this->actingAs($user)->get(route('admin.users.index'))->assertForbidden();
 });
 
-test('super administrators can access RBAC screens', function () {
+test('owners can access RBAC screens', function () {
     $user = User::factory()->create();
-    $user->assignRole('Super Admin');
+    $user->assignRole('Owner');
 
     $this->actingAs($user)->get(route('admin.users.index'))->assertOk();
     $this->actingAs($user)->get(route('admin.roles.index'))->assertOk();

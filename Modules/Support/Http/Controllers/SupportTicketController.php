@@ -233,7 +233,7 @@ class SupportTicketController extends Controller
 
     private function canManage(Request $request): bool
     {
-        return $request->user()->hasRole('Super Admin') || $request->user()->can('support.manage') || $request->user()->can('support.view-all');
+        return $request->user()->hasRole('Owner') || $request->user()->can('support.manage') || $request->user()->can('support.view-all');
     }
 
     private function itAgents()

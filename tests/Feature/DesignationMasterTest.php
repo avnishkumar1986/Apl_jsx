@@ -7,7 +7,7 @@ use Database\Seeders\RolePermissionSeeder;
 beforeEach(function () {
     $this->seed(RolePermissionSeeder::class);
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Super Admin');
+    $this->admin->assignRole('Owner');
 });
 
 test('authorized users can view designation master', function () {

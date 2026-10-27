@@ -23,12 +23,13 @@ import {
     ChevronRight,
     ContactRound,
     FileSpreadsheet,
+    LayoutDashboard,
     LayoutGrid,
     MessageCircle,
     Package,
     PackageCheck,
-    PackageSearch,
     PlugZap,
+    Route,
     Scale,
     ShieldCheck,
     ShoppingCart,
@@ -42,24 +43,41 @@ import AppLogo from './app-logo';
 export function AppSidebar() {
     const page = usePage<SharedData>();
     const { setOpen } = useSidebar();
-    const { auth, activeModules } = page.props;
+    const { auth, activeModules, moduleDisplayLocations } = page.props;
+    const showInSidebar = (slug: string) => (moduleDisplayLocations[slug] ?? ['sidebar']).includes('sidebar');
     const currentPath = page.url.split('?')[0];
-    const isSuperAdmin = auth.roles.includes('Super Admin');
-    const canViewDashboard = isSuperAdmin || auth.permissions.includes('dashboard.view');
+    // Owner is the only global-access role. Every other role, including scoped
+    // Superadmin roles such as Superadmin(1000), follows its assigned permissions.
+    const hasGlobalAccess = auth.roles.some((role) => role.toLowerCase().trim() === 'owner');
+    const canViewDashboard = hasGlobalAccess || auth.permissions.includes('dashboard.view');
+    const groupOverviewActive =
+        activeModules.includes('group-overview') && (hasGlobalAccess || auth.permissions.includes('group_overview.dashboard.view'));
     const procurementActive = activeModules.includes('procurement');
-    const salesActive = activeModules.includes('sales') && (isSuperAdmin || auth.permissions.includes('sales.overview.view'));
+    const salesActive = activeModules.includes('sales') && (hasGlobalAccess || auth.permissions.includes('sales.overview.view'));
+    const salesDistributionActive =
+        activeModules.includes('sales-distribution') &&
+        (hasGlobalAccess || auth.permissions.includes('sales_distribution.dashboard.view'));
     const corporateChatActive = activeModules.includes('corporate-chat');
-    const canViewUsers = isSuperAdmin || auth.permissions.includes('users.view');
-    const canViewRoles = isSuperAdmin || auth.permissions.includes('roles.view');
-    const canViewMaterialApi = isSuperAdmin || auth.permissions.includes('procurement.api.material.view');
-    const canViewProductionApi = isSuperAdmin || auth.permissions.includes('procurement.api.production.view');
-    const canViewQualityApi = isSuperAdmin || auth.permissions.includes('procurement.api.quality.view');
-    const canViewStockApi = isSuperAdmin || auth.permissions.includes('procurement.api.stock.view');
-    const canViewVendorApi = isSuperAdmin || auth.permissions.includes('procurement.api.vendor.view');
+    const canViewUsers = hasGlobalAccess || auth.permissions.includes('users.view');
+    const canViewRoles = hasGlobalAccess || auth.permissions.includes('roles.view');
+    const canViewMaterialApi = hasGlobalAccess || auth.permissions.includes('procurement.api.material.view');
+    const canViewProductionApi = hasGlobalAccess || auth.permissions.includes('procurement.api.production.view');
+    const canViewQualityApi = hasGlobalAccess || auth.permissions.includes('procurement.api.quality.view');
+    const canViewStockApi = hasGlobalAccess || auth.permissions.includes('procurement.api.stock.view');
+    const canViewVendorApi = hasGlobalAccess || auth.permissions.includes('procurement.api.vendor.view');
     const canViewEmployeeApi = canViewUsers;
-    const canViewMaterials = isSuperAdmin || auth.permissions.includes('procurement.inventory.materials.view');
-    const canViewMaterialStock = isSuperAdmin || auth.permissions.includes('procurement.inventory.material_stock.view');
-    const canViewMaterialInventory = isSuperAdmin || auth.permissions.includes('procurement.overview.view');
+    const canViewMaterials = hasGlobalAccess || auth.permissions.includes('procurement.inventory.materials.view');
+    const canViewMaterialStock = hasGlobalAccess || auth.permissions.includes('procurement.inventory.material_stock.view');
+    const canViewProcurementDashboard = hasGlobalAccess || auth.permissions.includes('procurement.dashboard.view');
+    const canViewRmPlanningGroup = hasGlobalAccess || auth.permissions.includes('procurement.rm_planning.view');
+    const canViewPlanningDecisions = hasGlobalAccess || auth.permissions.includes('procurement.planning_decisions.view');
+    const canViewMaterialsBalance = hasGlobalAccess || auth.permissions.includes('procurement.materials_balance.view');
+    const canViewConsumption = hasGlobalAccess || auth.permissions.includes('procurement.consumption.view');
+    const canViewRmInventories = hasGlobalAccess || auth.permissions.includes('procurement.rm_inventories.view');
+    const canViewRmPlanning =
+        canViewRmPlanningGroup || canViewPlanningDecisions || canViewMaterialsBalance || canViewConsumption || canViewRmInventories;
+    const canViewProcurement = procurementActive && (canViewProcurementDashboard || canViewRmPlanning);
+    const canViewMaterialInventory = canViewRmInventories;
     const procurementApiTools = [
         ...(canViewMaterialApi ? [{ title: 'Material API', href: '/admin/api-integrations?search=material', icon: PlugZap }] : []),
         ...(canViewProductionApi ? [{ title: 'Production API', href: '/admin/api-integrations?search=production', icon: PlugZap }] : []),
@@ -67,7 +85,7 @@ export function AppSidebar() {
         ...(canViewStockApi ? [{ title: 'Stock API', href: '/admin/api-integrations?search=stock', icon: PlugZap }] : []),
         ...(canViewVendorApi ? [{ title: 'Vendor API', href: '/admin/api-integrations?search=vendor', icon: PlugZap }] : []),
         ...(canViewEmployeeApi ? [{ title: 'Employee API', href: '/admin/api-integrations?search=employee', icon: PlugZap }] : []),
-        ...(isSuperAdmin ? [{ title: 'Security Audit API', href: '/admin/api-integrations?search=security', icon: ShieldCheck }] : []),
+        ...(hasGlobalAccess ? [{ title: 'Security Audit API', href: '/admin/api-integrations?search=security', icon: ShieldCheck }] : []),
     ];
     const procurementInventoryTools = [
         ...(canViewMaterials ? [{ title: 'Materials', href: '/admin/materials', icon: Package }] : []),
@@ -92,13 +110,11 @@ export function AppSidebar() {
             items: [
                 ...(procurementApiTools.length > 0 ? [{ title: 'API Integrations', href: '/admin/api-integrations', icon: PlugZap }] : []),
                 ...procurementInventoryTools,
-                ...(canViewMaterialInventory
-                    ? [{ title: 'Material Inventory', href: '/admin/procurement/material-inventory', icon: PackageSearch }]
-                    : []),
+                ...(canViewMaterialInventory ? [{ title: 'Vendor List', href: '/admin/procurement/vendor-list', icon: ShoppingCart }] : []),
             ],
         },
         {
-            label: 'Security',
+            label: 'Main',
             items: [
                 ...(canViewUsers ? [{ title: 'Modules', href: '/admin/modules', icon: Boxes }] : []),
                 ...(canViewUsers ? [{ title: 'User types', href: '/admin/user-types', icon: Tags }] : []),
@@ -111,16 +127,30 @@ export function AppSidebar() {
         masterGroups.find((group) =>
             group.items.some((item) => (item.href.includes('?') ? page.url === item.href : currentPath.startsWith(item.href))),
         )?.label ?? null;
-    const [openMasterGroup, setOpenMasterGroup] = useState<string | null>(activeMasterGroup ?? masterGroups[0]?.label ?? null);
+    const [openMasterGroup, setOpenMasterGroup] = useState<string | null>(null);
     const compactItems = [
         ...(canViewDashboard ? [{ title: 'Dashboard', href: '/dashboard', icon: LayoutGrid, active: currentPath.startsWith('/dashboard') }] : []),
-        ...(salesActive ? [{ title: 'Sales', href: '/admin/sales', icon: TrendingUp, active: currentPath.startsWith('/admin/sales') }] : []),
-        ...(procurementActive
+        ...(groupOverviewActive && showInSidebar('group-overview')
             ? [
                   {
-                      title: isSuperAdmin ? 'Procurement' : 'Dashboard',
-                      ...(isSuperAdmin ? {} : { href: '/admin/procurement/dashboard' }),
-                      icon: isSuperAdmin ? ShoppingCart : LayoutGrid,
+                      title: 'Group Overview',
+                      href: '/admin/group-overview',
+                      icon: LayoutDashboard,
+                      active: currentPath.startsWith('/admin/group-overview'),
+                  },
+              ]
+            : []),
+        ...(salesActive && showInSidebar('sales')
+            ? [{ title: 'Sales', href: '/admin/sales', icon: TrendingUp, active: currentPath === '/admin/sales' }]
+            : []),
+        ...(salesDistributionActive && showInSidebar('sales-distribution')
+            ? [{ title: 'Sales & Distribution', href: '/admin/sales-distribution', icon: Route, active: currentPath.startsWith('/admin/sales-distribution') }]
+            : []),
+        ...(canViewProcurement && showInSidebar('procurement')
+            ? [
+                  {
+                      title: 'Procurement',
+                      icon: ShoppingCart,
                       active:
                           currentPath.startsWith('/admin/procurement') ||
                           currentPath.startsWith('/admin/api-integrations') ||
@@ -129,7 +159,9 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        ...(corporateChatActive ? [{ title: 'Corporate chat', href: '/chat', icon: MessageCircle, active: currentPath.startsWith('/chat') }] : []),
+        ...(corporateChatActive && showInSidebar('corporate-chat')
+            ? [{ title: 'Corporate chat', href: '/chat', icon: MessageCircle, active: currentPath.startsWith('/chat') }]
+            : []),
         ...(canViewMaster ? [{ title: 'Master Control', icon: SlidersHorizontal, active: activeMasterGroup !== null }] : []),
     ];
 
@@ -212,11 +244,26 @@ export function AppSidebar() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         )}
-                        {salesActive && (
+                        {groupOverviewActive && showInSidebar('group-overview') && (
                             <SidebarMenuItem>
                                 <SidebarMenuButton
                                     asChild
-                                    isActive={page.url.startsWith('/admin/sales')}
+                                    isActive={page.url.startsWith('/admin/group-overview')}
+                                    tooltip="Group Overview"
+                                    className="data-[active=true]:border-brand-gold data-[active=true]:bg-brand-berry h-10 border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white data-[active=true]:text-white data-[active=true]:shadow-sm"
+                                >
+                                    <Link href="/admin/group-overview" prefetch>
+                                        <LayoutDashboard className="!size-[17px] shrink-0" />
+                                        <span className="truncate">Group Overview</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        )}
+                        {salesActive && showInSidebar('sales') && (
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={currentPath === '/admin/sales'}
                                     tooltip="Sales"
                                     className="data-[active=true]:border-brand-gold data-[active=true]:bg-brand-berry h-10 border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white data-[active=true]:text-white data-[active=true]:shadow-sm"
                                 >
@@ -227,83 +274,25 @@ export function AppSidebar() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         )}
-                        {procurementActive && !isSuperAdmin && (
-                            <>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={currentPath === '/admin/procurement/dashboard'}
-                                        tooltip="Dashboard"
-                                        className="data-[active=true]:border-brand-gold data-[active=true]:bg-brand-berry h-10 border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white data-[active=true]:text-white data-[active=true]:shadow-sm"
-                                    >
-                                        <Link href="/admin/procurement/dashboard" prefetch>
-                                            <LayoutGrid className="!size-[17px] shrink-0" />
-                                            <span className="truncate">Dashboard</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                                <Collapsible
+                        {salesDistributionActive && showInSidebar('sales-distribution') && (
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
                                     asChild
-                                    defaultOpen={currentPath.startsWith('/admin/procurement') && currentPath !== '/admin/procurement/dashboard'}
-                                    className="group/planning-direct"
+                                    isActive={currentPath.startsWith('/admin/sales-distribution')}
+                                    tooltip="Sales & Distribution"
+                                    className="data-[active=true]:border-brand-gold data-[active=true]:bg-brand-berry h-10 border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white data-[active=true]:text-white data-[active=true]:shadow-sm"
                                 >
-                                    <SidebarMenuItem>
-                                        <CollapsibleTrigger asChild>
-                                            <SidebarMenuButton
-                                                isActive={
-                                                    currentPath.startsWith('/admin/procurement') && currentPath !== '/admin/procurement/dashboard'
-                                                }
-                                                className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-10 w-full border-l-2 border-transparent px-3 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white"
-                                            >
-                                                <CalendarDays className="!size-[17px] shrink-0" />
-                                                <span>RM Planning</span>
-                                                <ChevronRight className="ml-auto !size-3.5 transition-transform group-data-[state=open]/planning-direct:rotate-90" />
-                                            </SidebarMenuButton>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent>
-                                            <SidebarMenuSub className="ml-1 gap-1 border-white/15 py-1.5 pl-1">
-                                                {[
-                                                    { title: 'Consumption', href: '/admin/procurement/daily-consumption', icon: CalendarDays },
-                                                    { title: 'Balance Sheet View', href: '/admin/procurement/balance-overview', icon: TrendingUp },
-                                                    { title: 'Balance Sheet', href: '/admin/procurement/balance-sheet', icon: Scale },
-                                                    {
-                                                        title: 'Materials Balance',
-                                                        href: '/admin/procurement/all-balance-sheet',
-                                                        icon: FileSpreadsheet,
-                                                    },
-                                                ].map((item) => (
-                                                    <SidebarMenuSubItem key={item.href}>
-                                                        <SidebarMenuSubButton
-                                                            asChild
-                                                            isActive={
-                                                                currentPath === item.href ||
-                                                                (item.href === '/admin/procurement/daily-consumption' &&
-                                                                    currentPath === '/admin/procurement')
-                                                            }
-                                                            className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-                                                        >
-                                                            <Link href={item.href} prefetch>
-                                                                <item.icon className="!size-3.5" />
-                                                                <span>{item.title}</span>
-                                                            </Link>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                ))}
-                                            </SidebarMenuSub>
-                                        </CollapsibleContent>
-                                    </SidebarMenuItem>
-                                </Collapsible>
-                            </>
+                                    <Link href="/admin/sales-distribution" prefetch>
+                                        <Route className="!size-[17px] shrink-0" />
+                                        <span className="truncate">Sales & Distribution</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
                         )}
-                        {procurementActive && isSuperAdmin && (
+                        {canViewProcurement && showInSidebar('procurement') && (
                             <Collapsible
                                 asChild
-                                defaultOpen={
-                                    page.url.startsWith('/admin/procurement') ||
-                                    page.url.startsWith('/admin/api-integrations') ||
-                                    page.url.startsWith('/admin/materials') ||
-                                    page.url.startsWith('/admin/material-stocks')
-                                }
+                                defaultOpen={false}
                                 className="group/procurement"
                             >
                                 <SidebarMenuItem>
@@ -325,97 +314,116 @@ export function AppSidebar() {
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <SidebarMenuSub className="ml-1 gap-1 border-white/15 py-1.5 pl-1 group-data-[collapsible=icon]:hidden">
-                                            <SidebarMenuSubItem>
-                                                <SidebarMenuSubButton
-                                                    asChild
-                                                    isActive={currentPath === '/admin/procurement/dashboard'}
-                                                    className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-                                                >
-                                                    <Link href="/admin/procurement/dashboard" prefetch>
-                                                        <LayoutGrid className="!size-3.5" />
-                                                        <span>Dashboard</span>
-                                                    </Link>
-                                                </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                            <Collapsible
-                                                asChild
-                                                defaultOpen={
-                                                    currentPath === '/admin/procurement' ||
-                                                    currentPath.includes('/admin/procurement/daily-consumption') ||
-                                                    currentPath.includes('/admin/procurement/balance-overview') ||
-                                                    currentPath.includes('/admin/procurement/balance-sheet')
-                                                }
-                                                className="group/planning"
-                                            >
+                                            {canViewProcurementDashboard && (
                                                 <SidebarMenuSubItem>
-                                                    <CollapsibleTrigger asChild>
-                                                        <SidebarMenuSubButton
-                                                            isActive={
-                                                                currentPath === '/admin/procurement' ||
-                                                                currentPath.includes('/admin/procurement/daily-consumption') ||
-                                                                currentPath.includes('/admin/procurement/balance-overview') ||
-                                                                currentPath.includes('/admin/procurement/balance-sheet') ||
-                                                                currentPath.includes('/admin/procurement/all-balance-sheet')
-                                                            }
-                                                            className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 w-full rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-                                                        >
-                                                            <CalendarDays className="!size-3.5" />
-                                                            <span>RM Planning</span>
-                                                            <ChevronRight className="ml-auto !size-3 transition-transform group-data-[state=open]/planning:rotate-90" />
-                                                        </SidebarMenuSubButton>
-                                                    </CollapsibleTrigger>
-                                                    <CollapsibleContent>
-                                                        <div className="ml-1 space-y-1 border-l border-white/10 py-1 pl-1">
-                                                            {[
-                                                                {
-                                                                    title: 'Consumption',
-                                                                    href: '/admin/procurement/daily-consumption',
-                                                                    icon: CalendarDays,
-                                                                    active:
-                                                                        currentPath === '/admin/procurement' ||
-                                                                        currentPath === '/admin/procurement/daily-consumption',
-                                                                },
-                                                                {
-                                                                    title: 'Balance Sheet View',
-                                                                    href: '/admin/procurement/balance-overview',
-                                                                    icon: TrendingUp,
-                                                                    active: currentPath.startsWith('/admin/procurement/balance-overview'),
-                                                                },
-                                                                {
-                                                                    title: 'Balance Sheet',
-                                                                    href: '/admin/procurement/balance-sheet',
-                                                                    icon: Scale,
-                                                                    active: currentPath.startsWith('/admin/procurement/balance-sheet'),
-                                                                },
-                                                                {
-                                                                    title: 'Materials Balance',
-                                                                    href: '/admin/procurement/all-balance-sheet',
-                                                                    icon: FileSpreadsheet,
-                                                                    active: currentPath.startsWith('/admin/procurement/all-balance-sheet'),
-                                                                },
-                                                            ].map((item) => (
-                                                                <SidebarMenuSubButton
-                                                                    key={item.title}
-                                                                    asChild
-                                                                    isActive={item.active}
-                                                                    className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-                                                                >
-                                                                    <Link href={item.href} prefetch>
-                                                                        <item.icon className="!size-3.5" />
-                                                                        <span>{item.title}</span>
-                                                                    </Link>
-                                                                </SidebarMenuSubButton>
-                                                            ))}
-                                                        </div>
-                                                    </CollapsibleContent>
+                                                    <SidebarMenuSubButton
+                                                        asChild
+                                                        isActive={currentPath === '/admin/procurement/dashboard'}
+                                                        className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                                                    >
+                                                        <Link href="/admin/procurement/dashboard" prefetch>
+                                                            <LayoutGrid className="!size-3.5" />
+                                                            <span>Dashboard</span>
+                                                        </Link>
+                                                    </SidebarMenuSubButton>
                                                 </SidebarMenuSubItem>
-                                            </Collapsible>
+                                            )}
+                                            {canViewRmPlanning && (
+                                                <Collapsible
+                                                    asChild
+                                                    defaultOpen={false}
+                                                    className="group/planning"
+                                                >
+                                                    <SidebarMenuSubItem>
+                                                        <CollapsibleTrigger asChild>
+                                                            <SidebarMenuSubButton
+                                                                isActive={
+                                                                    currentPath === '/admin/procurement' ||
+                                                                    currentPath.includes('/admin/procurement/daily-consumption') ||
+                                                                    currentPath.includes('/admin/procurement/balance-sheet') ||
+                                                                    currentPath.includes('/admin/procurement/all-balance-sheet') ||
+                                                                    currentPath.includes('/admin/procurement/planning-decisions')
+                                                                }
+                                                                className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 w-full rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                                                            >
+                                                                <CalendarDays className="!size-3.5" />
+                                                                <span>RM Planning</span>
+                                                                <ChevronRight className="ml-auto !size-3 transition-transform group-data-[state=open]/planning:rotate-90" />
+                                                            </SidebarMenuSubButton>
+                                                        </CollapsibleTrigger>
+                                                        <CollapsibleContent>
+                                                            <div className="ml-1 space-y-1 border-l border-white/10 py-1 pl-1">
+                                                                {[
+                                                                    ...(canViewPlanningDecisions
+                                                                        ? [
+                                                                              {
+                                                                                  title: 'Planning Decisions',
+                                                                                  href: '/admin/procurement/planning-decisions',
+                                                                                  icon: SlidersHorizontal,
+                                                                                  active: currentPath.startsWith(
+                                                                                      '/admin/procurement/planning-decisions',
+                                                                                  ),
+                                                                              },
+                                                                          ]
+                                                                        : []),
+                                                                    ...(canViewMaterialsBalance
+                                                                        ? [
+                                                                              {
+                                                                                  title: 'Materials Balance',
+                                                                                  href: '/admin/procurement/all-balance-sheet',
+                                                                                  icon: FileSpreadsheet,
+                                                                                  active: currentPath.startsWith(
+                                                                                      '/admin/procurement/all-balance-sheet',
+                                                                                  ),
+                                                                              },
+                                                                          ]
+                                                                        : []),
+                                                                    ...(canViewConsumption
+                                                                        ? [
+                                                                              {
+                                                                                  title: 'Consumption',
+                                                                                  href: '/admin/procurement/daily-consumption',
+                                                                                  icon: CalendarDays,
+                                                                                  active:
+                                                                                      currentPath === '/admin/procurement' ||
+                                                                                      currentPath === '/admin/procurement/daily-consumption',
+                                                                              },
+                                                                          ]
+                                                                        : []),
+                                                                    ...(canViewRmInventories
+                                                                        ? [
+                                                                              {
+                                                                                  title: 'RM Inventories',
+                                                                                  href: '/admin/procurement/balance-sheet',
+                                                                                  icon: Scale,
+                                                                                  active: currentPath.startsWith('/admin/procurement/balance-sheet'),
+                                                                              },
+                                                                          ]
+                                                                        : []),
+                                                                ].map((item) => (
+                                                                    <SidebarMenuSubButton
+                                                                        key={item.title}
+                                                                        asChild
+                                                                        isActive={item.active}
+                                                                        className="data-[active=true]:bg-brand-aqua/15 data-[active=true]:text-brand-aqua h-8 rounded-md px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                                                                    >
+                                                                        <Link href={item.href} prefetch>
+                                                                            <item.icon className="!size-3.5" />
+                                                                            <span>{item.title}</span>
+                                                                        </Link>
+                                                                    </SidebarMenuSubButton>
+                                                                ))}
+                                                            </div>
+                                                        </CollapsibleContent>
+                                                    </SidebarMenuSubItem>
+                                                </Collapsible>
+                                            )}
                                         </SidebarMenuSub>
                                     </CollapsibleContent>
                                 </SidebarMenuItem>
                             </Collapsible>
                         )}
-                        {corporateChatActive && (
+                        {corporateChatActive && showInSidebar('corporate-chat') && (
                             <SidebarMenuItem>
                                 <SidebarMenuButton
                                     asChild

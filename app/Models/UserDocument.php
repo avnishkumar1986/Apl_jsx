@@ -26,6 +26,16 @@ class UserDocument extends Model
         'updated_by',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'file_size' => 'integer',
+            'issue_date' => 'date',
+            'expiry_date' => 'date',
+            'status' => 'boolean',
+        ];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'unique_id');

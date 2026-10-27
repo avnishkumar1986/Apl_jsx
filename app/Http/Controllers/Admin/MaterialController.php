@@ -104,8 +104,23 @@ return back()->with('success', "{$created} materials created, {$updated} updated
         $api = ApiIntegration::where('code', 'material')->where('status', true)->first();
         if (! $api) {
             return back()->withErrors(['api' => 'Active Material API configuration not found.']);
-        }ImportMaterialsFromApi::dispatch($api->id, $request->user()?->id);
-        $api->update(['last_run_status' => 'queued']);
+        }
+        $runLog = $api->logs()->create([
+            'run_id' => (string) \Illuminate\Support\Str::uuid(),
+            'status' => 'running',
+            'attempt' => 1,
+            'message' => 'API run queued.',
+            'created_by' => $request->user()?->id,
+            'created_at' => now(),
+        ]);
+        try {
+            ImportMaterialsFromApi::dispatch($api->id, $request->user()?->id, null, $runLog->id);
+            $api->update(['last_run_status' => 'running', 'last_run_at' => now()]);
+        } catch (\Throwable $exception) {
+            $runLog->update(['status' => 'failed', 'message' => $exception->getMessage()]);
+            $api->update(['last_run_status' => 'failed', 'last_run_at' => now()]);
+            throw $exception;
+        }
 
         return back()->with('success', 'Material API import queued. It will continue in the background.');
     }

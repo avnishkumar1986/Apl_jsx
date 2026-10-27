@@ -13,10 +13,12 @@ import {
     Eye,
     Factory,
     History,
+    LayoutDashboard,
     MapPin,
     Package,
     Pencil,
     RefreshCw,
+    Route,
     ShieldCheck,
     ShoppingCart,
     TrendingUp,
@@ -117,12 +119,17 @@ export default function Dashboard({
         createdAt: string;
     }>;
 }) {
-    const { auth, activeModules } = usePage<SharedData>().props;
-    const isSuperAdmin = auth.roles.includes('Super Admin');
+    const { auth, activeModules, moduleDisplayLocations } = usePage<SharedData>().props;
+    const showInTabs = (slug: string) => (moduleDisplayLocations[slug] ?? ['sidebar']).includes('tabs');
+    const isSuperAdmin = auth.roles.some((role) => role.toLowerCase() === 'owner');
+    const groupOverviewActive = activeModules.includes('group-overview');
     const procurementActive = activeModules.includes('procurement');
     const salesActive = activeModules.includes('sales');
+    const salesDistributionActive = activeModules.includes('sales-distribution');
+    const canViewGroupOverview = isSuperAdmin || auth.permissions.includes('group_overview.dashboard.view');
     const canViewProcurement = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('procurement.'));
     const canViewSales = isSuperAdmin || auth.permissions.some((permission) => permission.startsWith('sales.'));
+    const canViewSalesDistribution = isSuperAdmin || auth.permissions.includes('sales_distribution.dashboard.view');
     const [selectedUserType, setSelectedUserType] = useState('all');
     const [securityScanRunning, setSecurityScanRunning] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState(1);
@@ -395,14 +402,16 @@ export default function Dashboard({
     const maximumProductSale = Math.max(...productSales.map((sale) => sale.value), 1);
     const accessRows = isSuperAdmin
         ? [
-              { resource: 'Users', capability: 'Full access', source: 'Super Admin' },
-              { resource: 'Roles', capability: 'Full access', source: 'Super Admin' },
+              { resource: 'Users', capability: 'Full access', source: 'Owner', href: '/admin/user-master' },
+              { resource: 'Roles', capability: 'Full access', source: 'Owner', href: '/admin/roles' },
               {
                   resource: 'Permissions',
                   capability: 'Full access',
-                  source: 'Super Admin',
+                  source: 'Owner',
+                  href: '/admin/roles',
               },
-              { resource: 'Profile', capability: 'Manage own', source: 'Account' },
+              { resource: 'Traffic', capability: 'Monitor and block IPs', source: 'Owner', href: '/admin/traffic-monitor' },
+              { resource: 'Profile', capability: 'Manage own', source: 'Account', href: '/settings/profile' },
           ]
         : auth.permissions.slice(0, 6).map((permission) => {
               const [resource, capability = 'access'] = permission.split('.');
@@ -410,6 +419,7 @@ export default function Dashboard({
                   resource: resource.replaceAll('_', ' '),
                   capability: capability.replaceAll('_', ' '),
                   source: 'Assigned role',
+                  href: '/admin/roles',
               };
           });
 
@@ -417,13 +427,16 @@ export default function Dashboard({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
             <div className="dashboard-shell mx-auto min-h-full w-full max-w-[1760px] flex-1 bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] p-3 sm:p-4 md:p-6 xl:p-7">
-                {((procurementActive && canViewProcurement) || (salesActive && canViewSales)) && (
+                {((groupOverviewActive && canViewGroupOverview && showInTabs('group-overview')) ||
+                    (procurementActive && canViewProcurement && showInTabs('procurement')) ||
+                    (salesActive && canViewSales && showInTabs('sales')) ||
+                    (salesDistributionActive && canViewSalesDistribution && showInTabs('sales-distribution'))) && (
                     <nav className="mb-6 flex flex-wrap items-center gap-2.5" aria-label="Business modules">
-                        {procurementActive && canViewProcurement && (
+                        {procurementActive && canViewProcurement && showInTabs('procurement') && (
                             <Link
                                 href="/admin/procurement/dashboard"
                                 prefetch
-                                className="group inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-gradient-to-r from-cyan-50 to-sky-100 px-3.5 py-2 text-sm font-semibold text-cyan-950 shadow-sm transition-all hover:-translate-y-px hover:border-cyan-400 hover:shadow-md"
+                                className="group inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-gradient-to-r from-cyan-50 to-sky-100 px-3.5 py-2 text-sm font-semibold text-cyan-950 shadow-sm transition-all duration-150 hover:-translate-y-px hover:border-cyan-400 hover:shadow-md focus-visible:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-300/60 focus-visible:outline-none active:translate-y-0 active:scale-[0.97] active:border-cyan-500 active:bg-cyan-100 active:shadow-inner"
                             >
                                 <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-cyan-500 to-sky-600 text-white shadow-sm">
                                     <ShoppingCart className="size-4 text-white" />
@@ -432,17 +445,43 @@ export default function Dashboard({
                                 <ArrowRight className="size-3.5 text-cyan-700 transition-transform group-hover:translate-x-0.5" />
                             </Link>
                         )}
-                        {salesActive && canViewSales && (
+                        {groupOverviewActive && canViewGroupOverview && showInTabs('group-overview') && (
+                            <Link
+                                href="/admin/group-overview"
+                                prefetch
+                                className="group inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-100 px-3.5 py-2 text-sm font-semibold text-indigo-950 shadow-sm transition-all duration-150 hover:-translate-y-px hover:border-indigo-400 hover:shadow-md focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-300/60 focus-visible:outline-none active:translate-y-0 active:scale-[0.97] active:border-indigo-500 active:bg-indigo-100 active:shadow-inner"
+                            >
+                                <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
+                                    <LayoutDashboard className="size-4 text-white" />
+                                </span>
+                                Group Overview
+                                <ArrowRight className="size-3.5 text-indigo-700 transition-transform group-hover:translate-x-0.5" />
+                            </Link>
+                        )}
+                        {salesActive && canViewSales && showInTabs('sales') && (
                             <Link
                                 href="/admin/sales"
                                 prefetch
-                                className="group inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-100 px-3.5 py-2 text-sm font-semibold text-emerald-950 shadow-sm transition-all hover:-translate-y-px hover:border-emerald-400 hover:shadow-md"
+                                className="group inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-100 px-3.5 py-2 text-sm font-semibold text-emerald-950 shadow-sm transition-all duration-150 hover:-translate-y-px hover:border-emerald-400 hover:shadow-md focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-300/60 focus-visible:outline-none active:translate-y-0 active:scale-[0.97] active:border-emerald-500 active:bg-emerald-100 active:shadow-inner"
                             >
                                 <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
                                     <TrendingUp className="size-4 text-white" />
                                 </span>
                                 Sales
                                 <ArrowRight className="size-3.5 text-emerald-700 transition-transform group-hover:translate-x-0.5" />
+                            </Link>
+                        )}
+                        {salesDistributionActive && canViewSalesDistribution && showInTabs('sales-distribution') && (
+                            <Link
+                                href="/admin/sales-distribution"
+                                prefetch
+                                className="group inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-100 px-3.5 py-2 text-sm font-semibold text-amber-950 shadow-sm transition-all duration-150 hover:-translate-y-px hover:border-amber-400 hover:shadow-md focus-visible:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-300/60 focus-visible:outline-none active:translate-y-0 active:scale-[0.97] active:border-amber-500 active:bg-amber-100 active:shadow-inner"
+                            >
+                                <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm">
+                                    <Route className="size-4 text-white" />
+                                </span>
+                                Sales &amp; Distribution
+                                <ArrowRight className="size-3.5 text-amber-700 transition-transform group-hover:translate-x-0.5" />
                             </Link>
                         )}
                     </nav>
@@ -540,7 +579,11 @@ export default function Dashboard({
                                     <span className="absolute top-3 left-3 rounded-md bg-white/90 px-2 py-1 text-[9px] font-bold tracking-widest text-slate-500 shadow-sm">
                                         INDIA
                                     </span>
-                                    <div className="absolute top-3 right-3 z-30 inline-flex rounded-lg border border-cyan-200 bg-white/95 p-0.5 shadow-md backdrop-blur-sm" role="group" aria-label="Filter company locations">
+                                    <div
+                                        className="absolute top-3 right-3 z-30 inline-flex rounded-lg border border-cyan-200 bg-white/95 p-0.5 shadow-md backdrop-blur-sm"
+                                        role="group"
+                                        aria-label="Filter company locations"
+                                    >
                                         {(
                                             [
                                                 { value: 'plant', label: 'Plant', icon: Factory },
@@ -574,7 +617,7 @@ export default function Dashboard({
                                                 role="button"
                                                 tabIndex={0}
                                                 aria-label={location.name}
-                                                className="group/location absolute z-10 cursor-pointer -translate-x-1/2 -translate-y-1/2 outline-none hover:z-50 focus:z-50"
+                                                className="group/location absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer outline-none hover:z-50 focus:z-50"
                                                 style={position}
                                             >
                                                 <span className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-red-400/35" />
@@ -609,7 +652,8 @@ export default function Dashboard({
                                                 </span>
                                                 <p className="mt-2 text-xs font-bold text-slate-800">No active locations</p>
                                                 <p className="mt-1 text-[10px] leading-4 text-slate-500">
-                                                    No active {locationFilter === 'plant' ? 'plant' : 'head office'} with saved coordinates is available.
+                                                    No active {locationFilter === 'plant' ? 'plant' : 'head office'} with saved coordinates is
+                                                    available.
                                                 </p>
                                             </div>
                                         </div>
@@ -1039,6 +1083,7 @@ export default function Dashboard({
                                                   resource: 'No permissions',
                                                   capability: 'Pending',
                                                   source: 'Administrator',
+                                                  href: '/dashboard',
                                               },
                                           ]
                                     ).map((row) => (
@@ -1061,7 +1106,7 @@ export default function Dashboard({
                                             </td>
                                             <td className="px-5 py-3.5 text-right">
                                                 <Link
-                                                    href="/admin/roles"
+                                                    href={row.href}
                                                     aria-label={`View ${row.resource} access`}
                                                     className="hover:bg-brand-aqua/15 hover:text-brand-teal inline-grid size-8 place-items-center rounded-md text-black"
                                                 >

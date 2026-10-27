@@ -11,7 +11,7 @@ return new class extends Migration
             ->whereRaw('LOWER(code) = ?', ['employee'])
             ->update([
                 'code' => 'employee',
-                'endpoint' => 'sap/opu/odata/sap/ZSAP_CMS_SRV/ZempMasterSet',
+                'endpoint' => env('EMPLOYEE_API_URL'),
                 'target_table' => json_encode(['tbl_users', 'tbl_usrcontact', 'tbl_usrdept']),
                 'updated_at' => now(),
             ]);

@@ -9,7 +9,7 @@ import { ChevronDown } from 'lucide-react';
 export function TopbarUserMenu() {
     const { auth } = usePage<SharedData>().props;
     const initials = useInitials();
-    const primaryRole = auth.roles[0] ?? 'Team member';
+    const primaryRole = auth.roles.some((role) => role.toLowerCase() === 'owner') ? 'Owner' : (auth.roles[0] ?? 'Team member');
 
     return (
         <DropdownMenu>

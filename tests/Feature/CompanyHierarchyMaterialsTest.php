@@ -12,7 +12,7 @@ beforeEach(function () {
 
 test('company materials are filtered by material type and grouped by material group', function () {
     $user = User::factory()->create();
-    $user->assignRole('Super Admin');
+    $user->assignRole('Owner');
 
     Material::query()->insert([
         ['matnr' => 'APL-1', 'mtart' => 'ZRAW', 'matkl' => 'PIPE', 'maktx' => 'Apollo pipe resin', 'status' => true],

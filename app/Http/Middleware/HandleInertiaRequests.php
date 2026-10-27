@@ -48,9 +48,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'roles' => fn (): array => $request->user()?->getRoleNames()->values()->all() ?? [],
                 'permissions' => fn (): array => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
-                'homeUrl' => fn (): string => $request->user() && ! $request->user()->hasRole('Super Admin') && $request->user()->can('procurement.overview.view')
-                    ? '/admin/procurement/dashboard'
-                    : '/dashboard',
+                'homeUrl' => fn (): string => $this->homeUrl($request),
             ],
             'notifications' => fn (): array => $request->user() && Schema::hasTable('notifications') ? [
                 'unreadCount' => $request->user()->unreadNotifications()->count(),
@@ -75,8 +73,10 @@ class HandleInertiaRequests extends Middleware
                     ->where('status', true)
                     ->pluck('slug')
                     ->filter(fn (string $slug): bool => match ($slug) {
+                        'group-overview' => is_file(base_path('Modules/GroupOverview/routes/web.php')),
                         'procurement' => is_file(base_path('Modules/Procurement/routes/web.php')),
                         'sales' => is_file(base_path('Modules/Sales/routes/web.php')),
+                        'sales-distribution' => is_file(base_path('Modules/SalesDistribution/routes/web.php')),
                         'corporate-chat' => is_file(base_path('Modules/CorporateChat/routes/web.php')),
                         'support' => is_file(base_path('Modules/Support/routes/web.php')),
                         default => true,
@@ -87,6 +87,34 @@ class HandleInertiaRequests extends Middleware
                     ->filter(fn (string $slug): bool => is_file(base_path('Modules/'.ucfirst($slug).'/routes/web.php')))
                     ->values()
                     ->all(),
+            'moduleDisplayLocations' => fn (): array => Schema::hasTable('tbl_modules')
+                ? ModulePackage::query()->where('status', true)->get(['slug', 'display_locations'])
+                    ->mapWithKeys(fn (ModulePackage $module): array => [$module->slug => $module->display_locations])
+                    ->all()
+                : [],
         ]);
+    }
+
+    private function homeUrl(Request $request): string
+    {
+        $user = $request->user();
+
+        if (! $user || $user->can('dashboard.view')) {
+            return '/dashboard';
+        }
+
+        return match (true) {
+            $user->can('group_overview.dashboard.view') => '/admin/group-overview',
+            $user->can('procurement.dashboard.view') => '/admin/procurement/dashboard',
+            $user->can('procurement.planning_decisions.view') => '/admin/procurement/planning-decisions',
+            $user->can('procurement.materials_balance.view') => '/admin/procurement/all-balance-sheet',
+            $user->can('procurement.consumption.view') => '/admin/procurement/daily-consumption',
+            $user->can('procurement.rm_inventories.view') => '/admin/procurement/balance-sheet',
+            $user->can('sales.overview.view') => '/admin/sales',
+            $user->can('sales_distribution.dashboard.view') => '/admin/sales-distribution',
+            $user->can('users.view') => '/admin/users',
+            $user->can('roles.view') => '/admin/roles',
+            default => '/settings/profile',
+        };
     }
 }

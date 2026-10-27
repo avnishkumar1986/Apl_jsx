@@ -70,7 +70,7 @@ export default function MaterialInventory({ inventory, filters, pageSizeOptions 
                 />
                 <section className="min-w-0 overflow-hidden rounded-xl border bg-white shadow-sm">
                     <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <form onSubmit={load} className="flex w-full max-w-xl gap-2">
+                        <form onSubmit={load} className="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
                             <div className="relative flex-1">
                                 <Search className="absolute top-3 left-3 size-4 text-slate-400" />
                                 <Input
@@ -80,7 +80,7 @@ export default function MaterialInventory({ inventory, filters, pageSizeOptions 
                                     onChange={(e) => setSearch(e.target.value)}
                                 />
                             </div>
-                            <Button type="submit">Search</Button>
+                            <Button type="submit" className="w-full sm:w-auto">Search</Button>
                         </form>
                         <div className="flex items-center gap-2 rounded-lg bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">
                             <Database className="size-4" />

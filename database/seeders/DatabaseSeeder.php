@@ -20,6 +20,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@example.com',
         ]);
 
-        $user->assignRole('Super Admin');
+        $user->assignRole('Owner');
     }
 }

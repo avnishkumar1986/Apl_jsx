@@ -24,24 +24,42 @@ class SecurityAuditController extends Controller
     public function run(Request $request, ProjectSecurityAuditService $auditService): JsonResponse|RedirectResponse
     {
         $this->authorizeAudit($request);
-        $scan = $auditService->run();
         $integration = ApiIntegration::query()->where('code', 'security')->first();
+        $started = microtime(true);
+        $runLog = $integration?->logs()->create([
+            'run_id' => (string) Str::uuid(),
+            'status' => 'running',
+            'attempt' => 1,
+            'message' => 'Security audit started.',
+            'created_by' => $request->user()?->getKey(),
+            'created_at' => now(),
+        ]);
 
-        if ($integration) {
-            $integration->logs()->create([
-                'run_id' => (string) Str::uuid(),
-                'status' => $scan->status === 'completed' ? 'success' : 'warning',
-                'http_status' => 200,
-                'attempt' => 1,
-                'records_received' => $scan->total_findings,
-                'message' => "OWASP-aligned audit completed with score {$scan->score}/100 and {$scan->total_findings} finding(s).",
-                'created_by' => $request->user()?->getKey(),
-                'created_at' => now(),
+        try {
+            $scan = $auditService->run();
+
+            if ($integration && $runLog) {
+                $status = $scan->status === 'completed' ? 'success' : 'warning';
+                $runLog->update([
+                    'status' => $status,
+                    'http_status' => 200,
+                    'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                    'records_received' => $scan->total_findings,
+                    'message' => "OWASP-aligned audit completed with score {$scan->score}/100 and {$scan->total_findings} finding(s).",
+                ]);
+                $integration->update([
+                    'last_run_status' => $status,
+                    'last_run_at' => $scan->completed_at ?? now(),
+                ]);
+            }
+        } catch (\Throwable $exception) {
+            $runLog?->update([
+                'status' => 'failed',
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                'message' => $exception->getMessage(),
             ]);
-            $integration->update([
-                'last_run_status' => $scan->status,
-                'last_run_at' => $scan->completed_at ?? now(),
-            ]);
+            $integration?->update(['last_run_status' => 'failed', 'last_run_at' => now()]);
+            throw $exception;
         }
 
         if ($request->expectsJson()) {
@@ -53,6 +71,6 @@ class SecurityAuditController extends Controller
 
     private function authorizeAudit(Request $request): void
     {
-        abort_unless($request->user()?->hasRole('Super Admin'), 403);
+        abort_unless($request->user()?->hasRole('Owner'), 403);
     }
 }

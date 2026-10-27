@@ -82,7 +82,13 @@ class ModuleController extends Controller
 
     public function update(Request $request, ModulePackage $module): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:120'], 'description' => ['nullable', 'string', 'max:2000'], 'status' => ['required', 'boolean']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'status' => ['required', 'boolean'],
+            'display_locations' => ['required', 'array', 'min:1'],
+            'display_locations.*' => ['required', 'string', Rule::in(['sidebar', 'tabs', 'dropdown'])],
+        ]);
         $module->update($data);
 
         return back()->with('success', 'Module updated successfully.');

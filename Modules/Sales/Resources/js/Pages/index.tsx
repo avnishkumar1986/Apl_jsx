@@ -23,6 +23,7 @@ export default function Sales({ dashboard }: { dashboard: Dashboard }) {
                     subtitle="Targets, pipeline and outstanding overview"
                     icon={<TrendingUp className="size-5" />}
                     meta={`Updated ${dashboard.updated_at}`}
+                    backHref="/dashboard"
                 />
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {dashboard.kpis.map((k, i) => {

@@ -18,18 +18,43 @@ class RolePermissionSeeder extends Seeder
 
         $permissions = [
             'dashboard.view',
+            'group_overview.dashboard.view',
+            'sales_distribution.dashboard.view',
             'users.view',
             'users.manage',
             'roles.view',
             'roles.manage',
+            'procurement.dashboard.view',
+            'procurement.rm_planning.view',
+            'procurement.planning_decisions.view',
+            'procurement.planning_decisions.create',
+            'procurement.planning_decisions.edit',
+            'procurement.planning_decisions.delete',
+            'procurement.materials_balance.view',
+            'procurement.materials_balance.edit',
+            'procurement.consumption.view',
+            'procurement.consumption.create',
+            'procurement.consumption.edit',
+            'procurement.consumption.delete',
+            'procurement.rm_inventories.view',
         ];
 
         foreach ($permissions as $permission) {
             Permission::findOrCreate($permission, 'web');
         }
 
-        Role::findOrCreate('Super Admin', 'web')->syncPermissions($permissions);
-        Role::findOrCreate('Administrator', 'web')->syncPermissions($permissions);
-        Role::findOrCreate('Viewer', 'web')->syncPermissions(['dashboard.view']);
+        Role::findOrCreate('Owner', 'web')->givePermissionTo($permissions);
+        Role::findOrCreate('Administrator', 'web')->givePermissionTo($permissions);
+        Role::findOrCreate('Viewer', 'web')->givePermissionTo('dashboard.view');
+        Role::findOrCreate('Super Admin', 'web')->givePermissionTo([
+            'procurement.rm_planning.view',
+            'procurement.planning_decisions.view',
+            'procurement.planning_decisions.create',
+            'procurement.planning_decisions.edit',
+            'procurement.planning_decisions.delete',
+            'procurement.planning_decisions.unlock',
+        ]);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

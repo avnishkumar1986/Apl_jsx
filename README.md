@@ -4,7 +4,7 @@ Apl_jsx is a full-stack business application built with Laravel, React, Inertia.
 
 ## Technology Stack
 
-- Laravel 12 and PHP 8.2+
+- Laravel 13 and PHP 8.3+
 - React 19 and TypeScript
 - Inertia.js 2
 - Vite 6
@@ -14,7 +14,7 @@ Apl_jsx is a full-stack business application built with Laravel, React, Inertia.
 
 ## Requirements
 
-- PHP 8.2 or later with the extensions required by Laravel
+- PHP 8.3 or later with the extensions required by Laravel
 - Composer 2
 - Node.js 20 LTS or later and npm
 - MySQL 8 or MariaDB 10.6+
@@ -102,7 +102,7 @@ The recommended production architecture uses:
 
 ### 1. Prepare the server
 
-Create an Ubuntu EC2 instance and install Nginx, PHP 8.2+, Composer, Node.js 20+, npm, Git, and the PHP extensions required by Laravel. Restrict SSH and database access with security groups. Do not expose RDS publicly unless there is a specific operational requirement.
+Create an Ubuntu EC2 instance and install Nginx, PHP 8.3+, Composer, Node.js 20+, npm, Git, and the PHP extensions required by Laravel. Restrict SSH and database access with security groups. Do not expose RDS publicly unless there is a specific operational requirement.
 
 ### 2. Deploy the application
 

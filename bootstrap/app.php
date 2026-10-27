@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureModuleActive;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LogPortalActivity;
+use App\Http\Middleware\RejectBlockedIpAddress;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,7 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
-            'module.active' => \App\Http\Middleware\EnsureModuleActive::class,
+            'module.active' => EnsureModuleActive::class,
+        ]);
+
+        $middleware->web(prepend: [
+            RejectBlockedIpAddress::class,
         ]);
 
         $middleware->web(append: [

@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { CalendarDays, Check, ChevronDown, Database, Edit3, Eye, PackageCheck, Plus, Search, ShoppingCart, Trash2, TrendingUp } from 'lucide-react';
 import type { FormEventHandler, ReactNode } from 'react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -25,6 +26,12 @@ type MaterialStock = {
     matnr: string;
     plant_code: string;
     current_stock: number;
+};
+type ManualPlanningDecision = {
+    company_id: number;
+    plant_id: number;
+    material: string;
+    planning_month: string;
 };
 type Purchase = {
     id: number;
@@ -47,7 +54,10 @@ type Consumption = {
     plant_id: number;
     company_name: string | null;
     plant_name: string | null;
+    plant_code: string;
     material: string;
+    material_desc: string;
+    meins: string;
     consumption_date: string;
     effective_to: string | null;
     period_type: string;
@@ -58,6 +68,8 @@ type Consumption = {
     total_buying_mt: number;
     remarks: string | null;
     opening_stock_mt: number | null;
+    stock_value: number;
+    planned_po_mt: number;
     planned_buying_mt: number;
     total_availability_mt: number;
     total_required_mt: number;
@@ -65,6 +77,7 @@ type Consumption = {
     gross_shortage_mt: number;
     remaining_shortage_mt: number;
     cover_days: number | null;
+    planning_mode: 'auto' | 'manual';
 };
 const purchaseBlank = {
     company_id: '',
@@ -88,10 +101,6 @@ const consumptionBlank = {
     material: '',
     common_remarks: '',
     entries: [] as { plant_id: string; quantity_mt: string; remarks: string }[],
-};
-const MATERIAL_TYPE_BY_COMPANY: Record<string, string> = {
-    '1000': 'ZRAW',
-    '5000': 'YRAW',
 };
 const todayInIndia = () => {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -123,6 +132,8 @@ const formatMt = (value: number | null, decimals = 3) =>
               minimumFractionDigits: decimals,
               maximumFractionDigits: decimals,
           });
+const formatMoney = (value: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value || 0));
 const emptyStats = {
     purchases: 0,
     purchase_mt: 0,
@@ -135,6 +146,7 @@ export default function Procurement({
     companies,
     stats = emptyStats,
     filters,
+    planningMode,
     canManagePurchases,
     canManageConsumptions,
 }: {
@@ -147,52 +159,65 @@ export default function Procurement({
         planned_mt: number;
         open_orders: number;
     };
-    filters: { search: string; tab: 'purchases' | 'consumptions' };
+    filters: { search: string; tab: 'purchases' | 'consumptions'; month: string };
+    planningMode: 'auto' | 'manual';
     canManagePurchases: boolean;
     canManageConsumptions: boolean;
 }) {
+    const { datatable } = usePage<SharedData>().props;
     const tab = filters.tab;
-    const currentPageUrl = tab === 'consumptions' ? '/admin/procurement/daily-consumption' : '/admin/procurement/purchases';
-    const [search, setSearch] = useState(filters.search),
-        [purchaseOpen, setPurchaseOpen] = useState(false),
+    const consumptionMode = planningMode;
+    const [purchaseOpen, setPurchaseOpen] = useState(false),
         [consumptionOpen, setConsumptionOpen] = useState(false),
         [viewingConsumption, setViewingConsumption] = useState<Consumption | null>(null),
         [editingConsumption, setEditingConsumption] = useState<Consumption | null>(null),
         [selectedConsumptionIds, setSelectedConsumptionIds] = useState<number[]>([]),
         [expandedConsumptionIds, setExpandedConsumptionIds] = useState<number[]>([]),
         [consumptionPage, setConsumptionPage] = useState(1),
-        [consumptionPageSize, setConsumptionPageSize] = useState(10),
+        [consumptionPageSize, setConsumptionPageSize] = useState(datatable.perPage),
         [consumptionSort, setConsumptionSort] = useState<keyof Consumption>('consumption_date'),
         [consumptionSortDirection, setConsumptionSortDirection] = useState<'asc' | 'desc'>('desc'),
+        [search, setSearch] = useState(filters.search ?? ''),
         [bulkAction, setBulkAction] = useState(''),
         [materials, setMaterials] = useState<Material[]>([]),
         [materialStocks, setMaterialStocks] = useState<MaterialStock[]>([]),
+        [manualPlanningDecisions, setManualPlanningDecisions] = useState<ManualPlanningDecision[]>([]),
         [purchaseVendors, setPurchaseVendors] = useState<string[]>([]),
         [manualVendor, setManualVendor] = useState(false),
         [vendorLoading, setVendorLoading] = useState(false),
-        [referenceLoading, setReferenceLoading] = useState(false);
+        [referenceLoading, setReferenceLoading] = useState(false),
+        [referenceError, setReferenceError] = useState('');
     const purchase = useForm(purchaseBlank),
         consumption = useForm(consumptionBlank);
     const loadReferenceData = async () => {
         if (materials.length > 0 || referenceLoading) return;
         setReferenceLoading(true);
+        setReferenceError('');
         try {
             const response = await fetch('/admin/procurement/reference-data', {
                 headers: { Accept: 'application/json' },
             });
-            if (!response.ok) throw new Error('Unable to load material reference data.');
+            if (!response.ok) throw new Error(`Unable to load material reference data (HTTP ${response.status}).`);
             const data = (await response.json()) as {
                 materials: Material[];
                 materialStocks: MaterialStock[];
+                manualPlanningDecisions: ManualPlanningDecision[];
             };
             setMaterials(data.materials);
             setMaterialStocks(data.materialStocks);
+            setManualPlanningDecisions(data.manualPlanningDecisions);
+        } catch (error) {
+            setMaterials([]);
+            setMaterialStocks([]);
+            setManualPlanningDecisions([]);
+            setReferenceError(error instanceof Error ? error.message : 'Unable to load material reference data.');
         } finally {
             setReferenceLoading(false);
         }
     };
     const openPurchase = () => {
         setManualVendor(false);
+        purchase.setData('purchase_date', todayInIndia());
         setPurchaseOpen(true);
         void loadReferenceData();
     };
@@ -270,10 +295,26 @@ export default function Procurement({
             },
         );
     };
+    const submitSearch: FormEventHandler<HTMLFormElement> = (event) => {
+        event.preventDefault();
+        setConsumptionPage(1);
+        router.get(
+            tab === 'consumptions' ? '/admin/procurement/daily-consumption' : '/admin/procurement',
+            { search: search.trim(), month: filters.month },
+            { preserveState: true, replace: true },
+        );
+    };
+    const clearSearch = () => {
+        setSearch('');
+        setConsumptionPage(1);
+        router.get(
+            tab === 'consumptions' ? '/admin/procurement/daily-consumption' : '/admin/procurement',
+            { month: filters.month },
+            { preserveState: true, replace: true },
+        );
+    };
     const selectedPurchaseCompany = companies.find((company) => String(company.id) === purchase.data.company_id);
-    const purchaseMaterials = materials.filter(
-        (material) => material.mtart?.trim().toUpperCase() === MATERIAL_TYPE_BY_COMPANY[selectedPurchaseCompany?.company_code ?? ''],
-    );
+    const purchaseMaterials = materials;
     const selectedPurchasePlant = companies.find((company) => String(company.id) === purchase.data.plant_id);
     const purchasePlants = companies.filter(
         (company) => company.record_type === 2 && company.parent_company_id === selectedPurchaseCompany?.company_code,
@@ -310,8 +351,14 @@ export default function Procurement({
         return () => controller.abort();
     }, [purchase.data.material, selectedPurchasePlant?.company_code]);
     const selectedCompany = companies.find((company) => String(company.id) === consumption.data.company_id);
-    const consumptionMaterials = materials.filter(
-        (material) => material.mtart?.trim().toUpperCase() === MATERIAL_TYPE_BY_COMPANY[selectedCompany?.company_code ?? ''],
+    const consumptionMonth = (consumption.data.consumption_date || todayInIndia()).slice(0, 7);
+    const consumptionMaterials = materials.filter((material) =>
+        manualPlanningDecisions.some(
+            (decision) =>
+                String(decision.company_id) === consumption.data.company_id &&
+                decision.material === material.matnr &&
+                decision.planning_month.slice(0, 7) === consumptionMonth,
+        ),
     );
     const consumptionError = Object.values(consumption.errors)[0];
     const consumptionPlants = companies.filter(
@@ -319,9 +366,17 @@ export default function Procurement({
             company.record_type !== 1 &&
             !['head office', 'other plant'].includes(company.company_name.trim().toLowerCase()) &&
             company.parent_company_id === selectedCompany?.company_code &&
+            manualPlanningDecisions.some(
+                (decision) =>
+                    decision.company_id === selectedCompany?.id &&
+                    decision.plant_id === company.id &&
+                    decision.material === consumption.data.material &&
+                    decision.planning_month.slice(0, 7) === consumptionMonth,
+            ) &&
             (!editingConsumption || company.id === editingConsumption.plant_id),
     );
-    const allConsumptionsSelected = consumptions.length > 0 && consumptions.every((item) => selectedConsumptionIds.includes(item.id));
+    const manualConsumptions = consumptions.filter((item) => item.planning_mode === 'manual');
+    const allConsumptionsSelected = manualConsumptions.length > 0 && manualConsumptions.every((item) => selectedConsumptionIds.includes(item.id));
     const sortedConsumptions = useMemo(() => {
         return [...consumptions].sort((left, right) => {
             const a = left[consumptionSort] ?? '';
@@ -356,7 +411,7 @@ export default function Procurement({
             consumption.data.entries.map((entry) => (entry.plant_id === String(plantId) ? { ...entry, [field]: value } : entry)),
         );
     const SortHeading = ({ column, children, align = 'left' }: { column: keyof Consumption; children: ReactNode; align?: 'left' | 'right' }) => (
-        <th className={`px-3 py-3 ${align === 'right' ? 'text-right' : ''}`}>
+        <th className={`bg-slate-100/95 px-3 py-3.5 backdrop-blur ${align === 'right' ? 'text-right' : ''}`}>
             <button
                 type="button"
                 className={`inline-flex w-full items-center gap-1 hover:text-[#ff8200] ${align === 'right' ? 'justify-end' : ''}`}
@@ -378,19 +433,31 @@ export default function Procurement({
                     subtitle="Purchase planning, material demand and delivery tracking"
                     icon={ShoppingCart}
                     actions={
-                        <div className="flex flex-wrap gap-2">
-                            {canManageConsumptions && (
+                        <div className="flex flex-wrap justify-end gap-2">
+                            {consumptionMode === 'manual' && canManageConsumptions && (
                                 <Button
-                                    variant="outline"
-                                    className="border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900"
+                                    type="button"
                                     onClick={openConsumption}
+                                    aria-label="Add consumption"
+                                    className="group h-10 gap-2 rounded-xl border border-white/80 bg-white px-2.5 text-xs font-semibold text-cyan-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-900 hover:shadow-lg sm:px-3.5 sm:text-sm"
                                 >
-                                    <CalendarDays className="size-4" /> Add consumption
+                                    <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-700 transition-colors group-hover:bg-cyan-100">
+                                        <CalendarDays className="size-3.5" />
+                                    </span>
+                                    <span className="hidden sm:inline">Add consumption</span>
                                 </Button>
                             )}
                             {canManagePurchases && (
-                                <Button className="text-brand-teal bg-white hover:bg-white/90" onClick={openPurchase}>
-                                    <Plus className="size-4" /> Add purchase
+                                <Button
+                                    type="button"
+                                    onClick={openPurchase}
+                                    aria-label="Add purchase"
+                                    className="group h-10 gap-2 rounded-xl border border-white/80 bg-white px-2.5 text-xs font-semibold text-cyan-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-900 hover:shadow-lg sm:px-3.5 sm:text-sm"
+                                >
+                                    <span className="grid size-6 place-items-center rounded-md bg-cyan-50 text-cyan-700 transition-colors group-hover:bg-cyan-100">
+                                        <Plus className="size-3.5" />
+                                    </span>
+                                    <span className="hidden sm:inline">Add purchase</span>
                                 </Button>
                             )}
                         </div>
@@ -419,7 +486,7 @@ export default function Procurement({
                 <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
                     <div className="flex flex-col gap-2 border-b bg-slate-50/60 px-4 py-2.5 md:flex-row md:items-center md:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
-                            {tab === 'consumptions' && canManageConsumptions && (
+                            {tab === 'consumptions' && consumptionMode === 'manual' && canManageConsumptions && (
                                 <>
                                     <Select value={bulkAction} onValueChange={setBulkAction}>
                                         <SelectTrigger className="h-10 w-44 bg-white text-base">
@@ -441,10 +508,9 @@ export default function Procurement({
                                         size="sm"
                                         variant="outline"
                                         className="h-10 border-red-200 bg-white px-4 text-base text-red-600 hover:bg-red-50 hover:text-red-700"
-                                        disabled={consumptions.length === 0}
                                         onClick={() =>
                                             window.confirm(
-                                                'Move every active consumption record to inactive status? This can only be restored from the database.',
+                                                'Permanently delete all procurement data, including consumption plans, purchases, MOU plans, history, balance results, planning decisions, imported stock, and imported vendor purchase orders? Company, plant, material, user, and integration settings will remain. This cannot be undone.',
                                             ) && router.patch('/admin/procurement/consumptions/empty', {}, { preserveScroll: true })
                                         }
                                     >
@@ -453,20 +519,25 @@ export default function Procurement({
                                 </>
                             )}
                         </div>
-                        <form
-                            className="relative"
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                router.get(currentPageUrl, { search }, { preserveState: true });
-                            }}
-                        >
-                            <Search className="absolute top-3 left-3 size-4 text-slate-400" />
-                            <Input
-                                className="h-10 pl-9 text-base md:w-80"
-                                placeholder={tab === 'consumptions' ? 'Search material or plant' : 'Search material, vendor or reference'}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
+                        <form onSubmit={submitSearch} className="flex w-full items-center gap-2 md:w-auto">
+                            <div className="relative min-w-0 flex-1 md:w-80">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                                <Input
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    placeholder="Search material, plant or company"
+                                    aria-label="Search consumption records"
+                                    className="h-10 bg-white pr-3 pl-9"
+                                />
+                            </div>
+                            <Button type="submit" variant="outline" className="h-10 bg-white px-4">
+                                Search
+                            </Button>
+                            {(filters.search || search) && (
+                                <Button type="button" variant="ghost" className="h-10 px-3" onClick={clearSearch}>
+                                    Clear
+                                </Button>
+                            )}
                         </form>
                     </div>
                     <div className="overflow-x-auto">
@@ -544,45 +615,50 @@ export default function Procurement({
                                 </tbody>
                             </table>
                         ) : (
-                            <table className="w-full min-w-[1550px] text-sm">
-                                <thead className="bg-slate-100 text-left text-sm font-bold tracking-wide text-slate-700">
+                            <table className="w-full min-w-[1250px] border-separate border-spacing-0 text-sm">
+                                <thead className="sticky top-0 z-10 text-left text-[11px] font-bold tracking-[0.06em] text-slate-600 uppercase shadow-[0_1px_0_0_#cbd5e1]">
                                     <tr>
-                                        <th className="w-12 px-3 py-3"></th>
-                                        <th className="w-12 px-3 py-3">
-                                            <Checkbox
-                                                aria-label="Select all consumption records"
-                                                checked={allConsumptionsSelected}
-                                                onCheckedChange={(checked) =>
-                                                    setSelectedConsumptionIds(checked ? consumptions.map((item) => item.id) : [])
-                                                }
-                                            />
+                                        <th className="w-12 bg-slate-100/95 px-3 py-3.5 backdrop-blur"></th>
+                                        <th className="w-12 bg-slate-100/95 px-3 py-3.5 backdrop-blur">
+                                            {consumptionMode === 'manual' && (
+                                                <Checkbox
+                                                    aria-label="Select all consumption records"
+                                                    checked={allConsumptionsSelected}
+                                                    onCheckedChange={(checked) =>
+                                                        setSelectedConsumptionIds(checked ? manualConsumptions.map((item) => item.id) : [])
+                                                    }
+                                                />
+                                            )}
                                         </th>
-                                        <th className="w-16 px-3 py-3">S.No.</th>
-                                        <SortHeading column="material">Material</SortHeading>
-                                        <SortHeading column="company_name">Company</SortHeading>
-                                        <SortHeading column="plant_name">Plant</SortHeading>
-                                        <SortHeading column="consumption_date">Planning period</SortHeading>
+                                        <th className="w-16 bg-slate-100/95 px-3 py-3.5 text-center backdrop-blur">S.No.</th>
+                                        <SortHeading column="material">MATNR</SortHeading>
+                                        <SortHeading column="plant_name">Plant Name</SortHeading>
+                                        <SortHeading column="material_desc">Material Description</SortHeading>
+                                        <SortHeading column="meins">MEINS</SortHeading>
                                         <SortHeading column="opening_stock_mt" align="right">
                                             Current stock (MT)
                                         </SortHeading>
-                                        <SortHeading column="planned_buying_mt" align="right">
-                                            Buying / Imports (MT)
+                                        <SortHeading column="stock_value" align="right">
+                                            Stock Value
                                         </SortHeading>
-                                        <SortHeading column="total_availability_mt" align="right">
-                                            Total availability (MT)
+                                        <SortHeading column="planned_po_mt" align="right">
+                                            Planned PO (MT)
                                         </SortHeading>
                                         <SortHeading column="quantity_mt" align="right">
                                             Daily consumption (MT/day)
                                         </SortHeading>
+                                        <SortHeading column="planning_mode">Planning Mode</SortHeading>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y">
+                                <tbody className="text-[13px] text-slate-700">
                                     {paginatedConsumptions.map((c, index) => {
                                         const expanded = expandedConsumptionIds.includes(c.id);
                                         return (
                                             <Fragment key={c.id}>
-                                                <tr className={`transition-colors hover:bg-cyan-50/40 ${expanded ? 'bg-cyan-50/30' : ''}`}>
-                                                    <td className="px-3 py-3">
+                                                <tr
+                                                    className={`group border-b border-slate-200 transition-colors ${expanded ? 'bg-cyan-50/70' : index % 2 === 0 ? 'bg-white' : 'bg-slate-50/45'} hover:bg-cyan-50/60`}
+                                                >
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
                                                         <RowExpandButton
                                                             expanded={expanded}
                                                             label={expanded ? 'Collapse calculation details' : 'Expand calculation details'}
@@ -595,40 +671,62 @@ export default function Procurement({
                                                             }
                                                         />
                                                     </td>
-                                                    <td className="px-3 py-3">
-                                                        <Checkbox
-                                                            aria-label={`Select consumption ${index + 1}`}
-                                                            checked={selectedConsumptionIds.includes(c.id)}
-                                                            onCheckedChange={(checked) =>
-                                                                setSelectedConsumptionIds(
-                                                                    checked
-                                                                        ? [...new Set([...selectedConsumptionIds, c.id])]
-                                                                        : selectedConsumptionIds.filter((id) => id !== c.id),
-                                                                )
-                                                            }
-                                                        />
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
+                                                        {c.planning_mode === 'manual' && (
+                                                            <Checkbox
+                                                                aria-label={`Select consumption ${index + 1}`}
+                                                                checked={selectedConsumptionIds.includes(c.id)}
+                                                                onCheckedChange={(checked) =>
+                                                                    setSelectedConsumptionIds(
+                                                                        checked
+                                                                            ? [...new Set([...selectedConsumptionIds, c.id])]
+                                                                            : selectedConsumptionIds.filter((id) => id !== c.id),
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
                                                     </td>
-                                                    <td className="px-3 py-3 text-slate-500">{consumptionStart + index + 1}</td>
-                                                    <td className="px-3 py-3 font-mono font-semibold">{c.material}</td>
-                                                    <td className="px-3 py-3">{c.company_name || '—'}</td>
-                                                    <td className="px-3 py-3 font-medium text-slate-700">{c.plant_name || '—'}</td>
-                                                    <td className="px-3 py-3">
-                                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[11px] font-bold text-cyan-700 uppercase">
-                                                            {c.period_type}
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-center font-medium text-slate-400">
+                                                        {consumptionStart + index + 1}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
+                                                        <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-800 ring-1 ring-slate-200">
+                                                            {c.material}
                                                         </span>
-                                                        <div className="mt-1 font-medium">{formatDate(c.consumption_date)}</div>
                                                     </td>
-                                                    <td className="px-3 py-3 text-right font-medium">{formatMt(c.opening_stock_mt)}</td>
-                                                    <td className="px-3 py-3 text-right">{formatMt(c.planned_buying_mt)}</td>
-                                                    <td className="px-3 py-3 text-right font-semibold text-cyan-800">
-                                                        {formatMt(c.total_availability_mt)}
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 font-semibold text-slate-800">
+                                                        {c.plant_name || '—'}
                                                     </td>
-                                                    <td className="px-3 py-3 text-right">{formatMt(Number(c.quantity_mt))}</td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
+                                                        <span className="font-semibold text-slate-800">{c.material_desc || '—'}</span>
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-center font-semibold text-slate-700">
+                                                        {c.meins || '—'}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(c.opening_stock_mt)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-semibold tabular-nums">
+                                                        {formatMoney(c.stock_value)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(c.planned_po_mt)}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5 text-right font-medium tabular-nums">
+                                                        {formatMt(Number(c.quantity_mt))}
+                                                    </td>
+                                                    <td className="border-b border-slate-200 px-3 py-3.5">
+                                                        <span
+                                                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase ring-1 ${c.planning_mode === 'auto' ? 'bg-cyan-50 text-cyan-700 ring-cyan-100' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}
+                                                        >
+                                                            {c.planning_mode === 'auto' ? 'SAP Auto' : 'Manual'}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                                 {expanded && (
-                                                    <tr className="bg-white">
-                                                        <td colSpan={11} className="px-6 py-4">
-                                                            <div className="grid gap-x-12 gap-y-0 rounded-lg border border-slate-200 bg-slate-50/60 px-8 py-3 md:grid-cols-2">
+                                                    <tr className="bg-cyan-50/30">
+                                                        <td colSpan={12} className="border-b border-slate-200 px-6 py-4">
+                                                            <div className="grid gap-x-12 gap-y-0 rounded-xl border border-slate-200 bg-white px-8 py-3 shadow-inner md:grid-cols-2">
                                                                 {[
                                                                     ['Days in plan', String(c.day_count ?? 1), ''],
                                                                     ['Total required (MT)', formatMt(c.total_required_mt), ''],
@@ -667,43 +765,57 @@ export default function Procurement({
                                                                     </span>
                                                                     <div className="flex gap-1">
                                                                         <Button
-                                                                            size="icon"
-                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            variant="outline"
                                                                             aria-label={`View consumption ${index + 1}`}
                                                                             title="View"
-                                                                            className="text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                                                                            onClick={() =>
-                                                                                router.get(`/admin/procurement/consumptions/${c.id}/supply-plan`)
-                                                                            }
+                                                                            className="gap-1.5 text-slate-700 hover:bg-cyan-50 hover:text-cyan-800"
+                                                                            onClick={() => {
+                                                                                if (c.planning_mode === 'auto') {
+                                                                                    const params = new URLSearchParams({
+                                                                                        company_id: String(c.company_id),
+                                                                                        plant_id: String(c.plant_id),
+                                                                                        material: c.material,
+                                                                                        month: c.consumption_date.slice(0, 7),
+                                                                                    });
+                                                                                    router.get(`/admin/procurement/consumptions/auto/supply-plan?${params.toString()}`);
+                                                                                    return;
+                                                                                }
+
+                                                                                router.get(`/admin/procurement/consumptions/${c.id}/supply-plan`);
+                                                                            }}
                                                                         >
                                                                             <Eye className="size-4" />
+                                                                            View
                                                                         </Button>
-                                                                        {canManageConsumptions && (
-                                                                            <>
-                                                                                <Button
-                                                                                    size="icon"
-                                                                                    variant="ghost"
-                                                                                    aria-label={`Edit consumption ${index + 1}`}
-                                                                                    title="Edit"
-                                                                                    className="text-brand-teal hover:bg-cyan-50"
-                                                                                    onClick={() => editConsumption(c)}
-                                                                                >
-                                                                                    <Edit3 className="size-4" />
-                                                                                </Button>
-                                                                                <Button
-                                                                                    size="icon"
-                                                                                    variant="ghost"
-                                                                                    aria-label={`Move consumption ${index + 1} to inactive status`}
-                                                                                    title="Move to inactive"
-                                                                                    className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                                                                                    onClick={() =>
-                                                                                        confirm('Move this consumption plan to inactive status?') &&
-                                                                                        router.delete(`/admin/procurement/consumptions/${c.id}`)
-                                                                                    }
-                                                                                >
-                                                                                    <Trash2 className="size-4" />
-                                                                                </Button>
-                                                                            </>
+                                                                        {canManageConsumptions && c.planning_mode === 'manual' && (
+                                                                                <>
+                                                                                    <Button
+                                                                                        size="icon"
+                                                                                        variant="ghost"
+                                                                                        aria-label={`Edit consumption ${index + 1}`}
+                                                                                        title="Edit"
+                                                                                        className="text-brand-teal hover:bg-cyan-50"
+                                                                                        onClick={() => editConsumption(c)}
+                                                                                    >
+                                                                                        <Edit3 className="size-4" />
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        size="icon"
+                                                                                        variant="ghost"
+                                                                                        aria-label={`Move consumption ${index + 1} to inactive status`}
+                                                                                        title="Move to inactive"
+                                                                                        className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                                                                                        onClick={() =>
+                                                                                            confirm(
+                                                                                                'Move this consumption plan to inactive status?',
+                                                                                            ) &&
+                                                                                            router.delete(`/admin/procurement/consumptions/${c.id}`)
+                                                                                        }
+                                                                                    >
+                                                                                        <Trash2 className="size-4" />
+                                                                                    </Button>
+                                                                                </>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -726,9 +838,9 @@ export default function Procurement({
                         )}
                     </div>
                     {tab === 'consumptions' && consumptions.length > 0 && (
-                        <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-3.5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-2">
-                                <span>Show</span>
+                                <span className="font-medium text-slate-500">Rows per page</span>
                                 <Select
                                     value={String(consumptionPageSize)}
                                     onValueChange={(value) => {
@@ -736,20 +848,23 @@ export default function Procurement({
                                         setConsumptionPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="h-8 w-20 bg-white">
+                                    <SelectTrigger className="h-8 w-20 border-slate-200 bg-slate-50 font-semibold shadow-none">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {[10, 25, 50, 100].map((size) => (
+                                        {datatable.pageSizeOptions.map((size) => (
                                             <SelectItem key={size} value={String(size)}>
                                                 {size}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <span>
-                                    entries · Showing {consumptionStart + 1}–
-                                    {Math.min(consumptionStart + consumptionPageSize, sortedConsumptions.length)} of {sortedConsumptions.length}
+                                <span className="text-slate-500">
+                                    Showing{' '}
+                                    <b className="text-slate-700">
+                                        {consumptionStart + 1}–{Math.min(consumptionStart + consumptionPageSize, sortedConsumptions.length)} of{' '}
+                                        {sortedConsumptions.length}
+                                    </b>
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -761,7 +876,7 @@ export default function Procurement({
                                 >
                                     Previous
                                 </Button>
-                                <b>
+                                <b className="min-w-20 text-center text-slate-700">
                                     Page {safeConsumptionPage} of {consumptionPageCount}
                                 </b>
                                 <Button
@@ -910,17 +1025,6 @@ export default function Procurement({
                             />
                             <label className="relative block min-w-0">
                                 <span className="pointer-events-none absolute top-1.5 left-3 z-10 text-[10px] font-medium text-slate-500">
-                                    Booking date
-                                </span>
-                                <Input
-                                    className="h-11 pt-4"
-                                    type="date"
-                                    value={purchase.data.purchase_date}
-                                    onChange={(e) => purchase.setData('purchase_date', e.target.value)}
-                                />
-                            </label>
-                            <label className="relative block min-w-0">
-                                <span className="pointer-events-none absolute top-1.5 left-3 z-10 text-[10px] font-medium text-slate-500">
                                     Delivery date
                                 </span>
                                 <Input
@@ -993,6 +1097,11 @@ export default function Procurement({
                                     onChange={(v) => consumption.setData('material', v)}
                                     loading={referenceLoading}
                                 />
+                                {referenceError && (
+                                    <p className="text-xs text-red-600 sm:col-span-2 lg:col-span-3" role="alert">
+                                        {referenceError} Please refresh or contact the administrator.
+                                    </p>
+                                )}
                                 <FormField label="Period">
                                     <Select
                                         value={consumption.data.period_type}
@@ -1021,7 +1130,12 @@ export default function Procurement({
                                         value={consumption.data.consumption_date}
                                         onChange={(event) => {
                                             const value = event.target.value;
+                                            const monthChanged = value.slice(0, 7) !== consumption.data.consumption_date.slice(0, 7);
                                             consumption.setData('consumption_date', value);
+                                            if (monthChanged) {
+                                                consumption.setData('material', '');
+                                                consumption.setData('entries', []);
+                                            }
                                             if (value && consumption.data.period_type === 'monthly') {
                                                 consumption.setData('day_count', String(remainingDaysInSelectedMonth(value)));
                                             }

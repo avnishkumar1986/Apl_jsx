@@ -19,12 +19,12 @@ class LogPortalActivity
         $startedAt = hrtime(true);
         $response = $next($request);
 
-        if ($request->user() && $request->route()?->getName() !== 'dashboard.session-closing') {
+        if ($request->route()?->getName() !== 'dashboard.session-closing') {
             try {
                 $routeName = $request->route()?->getName();
 
                 PortalLog::query()->create([
-                    'user_id' => $request->user()->getKey(),
+                    'user_id' => $request->user()?->getKey(),
                     'action' => $routeName ? str($routeName)->replace('.', ' ')->headline()->toString() : 'Portal request',
                     'route_name' => $routeName,
                     'method' => $request->method(),
@@ -35,6 +35,9 @@ class LogPortalActivity
                     'metadata' => [
                         'duration_ms' => round((hrtime(true) - $startedAt) / 1_000_000, 2),
                         'inertia' => $request->header('X-Inertia') === 'true',
+                        'country' => $request->header('CF-IPCountry'),
+                        'region' => $request->header('CF-Region'),
+                        'city' => $request->header('CF-IPCity'),
                     ],
                 ]);
             } catch (\Throwable $exception) {

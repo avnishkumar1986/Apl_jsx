@@ -27,7 +27,15 @@ type Summary = {
     remaining_shortage: number;
     stock_cover: number;
 };
-type Plan = { id: number; consumption_date: string; quantity_mt: number };
+type Plan = {
+    id: number | null;
+    company_id?: number;
+    plant_id?: number;
+    material?: string;
+    consumption_date: string;
+    quantity_mt: number;
+    planning_mode?: 'auto' | 'manual';
+};
 type NamedEntity = { company_name: string } | null;
 type Material = { matnr: string; maktx: string } | null;
 
@@ -59,9 +67,25 @@ export default function SupplyPlan({
     });
     const [purchaseUsesLocalVendor, setPurchaseUsesLocalVendor] = useState(false);
     const mou = useForm({ vendor_name: '', vendor_code: '', quantity_mt: '', remarks: '' });
+    const isAutoPlan = plan.planning_mode === 'auto' || plan.id === null;
     const savePurchase = (e: FormEvent) => {
         e.preventDefault();
-        purchase.post(`/admin/procurement/consumptions/${plan.id}/purchase-orders`, {
+        purchase
+            .transform((data) =>
+                isAutoPlan
+                    ? {
+                          ...data,
+                          company_id: plan.company_id,
+                          plant_id: plan.plant_id,
+                          consumption_id: null,
+                          vendor_source: 'local',
+                          material: plan.material,
+                          purchase_date: plan.consumption_date,
+                          reference: null,
+                      }
+                    : data,
+            )
+            .post(isAutoPlan ? '/admin/procurement/purchases' : `/admin/procurement/consumptions/${plan.id}/purchase-orders`, {
             preserveScroll: true,
             onSuccess: () => {
                 purchase.reset();
@@ -71,7 +95,22 @@ export default function SupplyPlan({
     };
     const saveMou = (e: FormEvent) => {
         e.preventDefault();
-        mou.post(`/admin/procurement/consumptions/${plan.id}/mou-plans`, { preserveScroll: true, onSuccess: () => mou.reset() });
+        mou
+            .transform((data) =>
+                isAutoPlan
+                    ? {
+                          ...data,
+                          company_id: plan.company_id,
+                          plant_id: plan.plant_id,
+                          material: plan.material,
+                          planning_month: plan.consumption_date,
+                      }
+                    : data,
+            )
+            .post(isAutoPlan ? '/admin/procurement/consumptions/auto/mou-plans' : `/admin/procurement/consumptions/${plan.id}/mou-plans`, {
+                preserveScroll: true,
+                onSuccess: () => mou.reset(),
+            });
     };
     const month = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(`${plan.consumption_date}T00:00:00`));
     return (
