@@ -311,6 +311,7 @@ class ImportMaterialsFromApi implements ShouldQueue
             DB::transaction(function () use ($row, $employeeCode, $firstName, $middleName, $lastName, $existingUser, $employeeTypeId, $now): void {
                 $userValues = [
                     'user_type' => $employeeTypeId,
+                    'name' => trim(implode(' ', array_filter([$firstName, $middleName, $lastName], fn (string $part): bool => trim($part) !== ''))),
                     'first_name' => $firstName,
                     'middle_name' => $middleName !== '' ? $middleName : null,
                     'last_name' => $lastName,
